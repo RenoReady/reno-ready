@@ -132,6 +132,8 @@ export function getBathroomBaseCost(
 // ── Builder selections (passed to store + API) ────────────────────
 
 export interface BuilderSelections {
+  /** Optional pre-generation project brief (3 questions) */
+  projectBrief: import("./projectBrief").ProjectBrief | null;
   roomPhotoUrl:         string | null;
   /** Bathroom size selection */
   bathroomSize:         BathroomSize;

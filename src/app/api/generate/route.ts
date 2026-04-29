@@ -37,6 +37,8 @@ export const dynamic = "force-dynamic";
 interface GenerateRequest {
   /** Optional base-64 data URL of the uploaded room photo */
   imageBase64?: string | null;
+  /** Optional project brief from the 3-question modal */
+  projectBrief?: { yearBuilt: number; budgetTier: string; scope: string } | null;
   /** Human-readable prompt derived from the user's selections */
   prompt: string;
   /** Structured selections for logging / prompt enrichment */
@@ -85,8 +87,10 @@ function isMockMode(): boolean {
 /** Build the system instruction + user prompt from structured selections */
 function buildGeminiPrompt(req: GenerateRequest): string {
   return buildSharedPrompt({
-    imageBase64: req.imageBase64,
-    selections:  req.selections,
+    imageBase64:  req.imageBase64,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    projectBrief: req.projectBrief as any,
+    selections:   req.selections,
   });
 }
 

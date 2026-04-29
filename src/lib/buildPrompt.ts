@@ -13,9 +13,15 @@ import {
   VanityType,
   TapwareFinish,
 } from "./types";
+import {
+  type ProjectBrief,
+  TIER_PROMPT_SUFFIX,
+  SCOPE_PROMPT_SUFFIX,
+} from "./projectBrief";
 
 interface PromptInput {
   imageBase64?: string | null;       // present if user uploaded a photo
+  projectBrief?: ProjectBrief | null;
   selections: {
     floorTile?:         { id: string; name: string } | TileOption | null;
     wallTile?:          { id: string; name: string } | TileOption | null;
@@ -110,6 +116,14 @@ export function buildGeminiPrompt(req: PromptInput): string {
     ? `\n\nAdditional client request: "${selections.customNote.trim()}"`
     : "";
 
+  // ── Project brief injections ──────────────────────────────────
+  const tierSuffix  = req.projectBrief ? TIER_PROMPT_SUFFIX[req.projectBrief.budgetTier]  : "";
+  const scopeSuffix = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope] : "";
+  const briefSection =
+    (tierSuffix || scopeSuffix)
+      ? `\n\nProject brief context: ${[scopeSuffix, tierSuffix].filter(Boolean).join(" ")}`
+      : "";
+
   // No-photo fallback
   const noPhotoContext = !req.imageBase64
     ? [
@@ -122,5 +136,5 @@ export function buildGeminiPrompt(req: PromptInput): string {
       ].join("\n")
     : "";
 
-  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + customNoteSection + noPhotoContext;
+  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + customNoteSection + briefSection + noPhotoContext;
 }

@@ -7,6 +7,7 @@ import {
   CheckCircle2, X, Info, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
+  ClipboardList, TriangleAlert,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -22,8 +23,16 @@ import {
   calcEstimatedCost, getBathroomBaseCost,
 } from "@/lib/types";
 import PaywallModal from "@/components/ui/PaywallModal";
+import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import { useUserStatus, bustUserStatusCache } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
+import {
+  type ProjectBrief,
+  calcBriefCostItems,
+  calcBriefTotal,
+  needsAsbestosCheck,
+  TIER_MULTIPLIER,
+} from "@/lib/projectBrief";
 
 // ══════════════════════════════════════════════════════════════════
 //  DESIGN CONCIERGE  — cycling tips during generation
@@ -439,19 +448,28 @@ function EstimateAccuracyBadge() {
   );
 }
 
-function CostSummary() {
+function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
   const { budget, floorTile, wallTile, vanity, tapware, structuralChanges,
-          bathroomSize, customLength, customWidth } = useBuilderStore();
+          bathroomSize, customLength, customWidth, projectBrief } = useBuilderStore();
 
-  const baseCost  = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
+  const baseCost       = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+  const tierMultiplier = projectBrief ? TIER_MULTIPLIER[projectBrief.budgetTier] : 1;
+  const estimated      = Math.round(
+    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost)
+    * tierMultiplier / 500
+  ) * 500;
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
 
-  const isOverBudget = estimated > budget;
+  const briefItems   = projectBrief ? calcBriefCostItems(projectBrief) : [];
+  const briefTotal   = projectBrief ? calcBriefTotal(projectBrief)     : 0;
+  const grandTotal   = estimated + briefTotal;
+  const isOverBudget = grandTotal > budget;
+  const hasAsbestos  = needsAsbestosCheck(projectBrief);
 
   return (
     <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-5">
+      {/* ── Header ── */}
       <div>
         <div className="flex items-center justify-between gap-3 mb-2">
           <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Estimated Cost Range</p>
@@ -463,9 +481,9 @@ function CostSummary() {
             "text-3xl font-bold transition-colors duration-300",
             isOverBudget ? "text-terracotta" : "text-white",
           )}>
-            {formatAUD(low)}
+            {formatAUD(Math.round((low + briefTotal) / 500) * 500)}
             <span className={cn("text-2xl mx-2 transition-colors duration-300", isOverBudget ? "text-terracotta/50" : "text-white/40")}>–</span>
-            {formatAUD(high)}
+            {formatAUD(Math.round((high + briefTotal) / 500) * 500)}
           </p>
           {isOverBudget && (
             <span className="text-xs font-bold px-2 py-1 rounded-full mb-1 bg-terracotta/20 text-terracotta">
@@ -476,13 +494,14 @@ function CostSummary() {
 
         <p className={cn("text-xs mt-1 transition-colors duration-300", isOverBudget ? "text-terracotta/60" : "text-white/30")}>
           {isOverBudget
-            ? `${formatAUD(estimated - budget)} over your ${formatAUD(budget)} target`
+            ? `${formatAUD(grandTotal - budget)} over your ${formatAUD(budget)} target`
             : `Within your ${formatAUD(budget)} budget · Australian market rates`}
         </p>
       </div>
 
       <div className="h-px bg-white/10" />
 
+      {/* ── Base breakdown ── */}
       <div className="flex flex-col gap-3">
         {COST_BREAKDOWN.map((item) => {
           const amount = Math.round((estimated * item.pct) / 100) * 100;
@@ -495,7 +514,80 @@ function CostSummary() {
         })}
       </div>
 
-      <p className="text-[10px] text-white/25 pt-1 leading-snug">
+      {/* ── Brief-driven real cost items ── */}
+      {briefItems.length > 0 && (
+        <>
+          <div className="h-px bg-white/10" />
+          <div>
+            <p className="text-[10px] font-bold text-white/35 uppercase tracking-widest mb-3">
+              Verified Cost Items · From real QLD invoices
+            </p>
+            <div className="flex flex-col gap-3">
+              {briefItems.map((item) => (
+                <div key={item.label} className="flex flex-col gap-0.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {item.warning && (
+                        <TriangleAlert size={11} className="text-amber-400 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                      )}
+                      <p className={cn(
+                        "text-xs leading-snug",
+                        item.warning ? "text-amber-300" : "text-white/70",
+                      )}>
+                        {item.label}
+                      </p>
+                    </div>
+                    <p className={cn(
+                      "text-xs font-semibold tabular-nums flex-shrink-0",
+                      item.warning ? "text-amber-300" : "text-white/80",
+                    )}>
+                      {formatAUD(item.amount)}
+                    </p>
+                  </div>
+                  {item.source && (
+                    <p className="text-[10px] text-white/25 ml-4 leading-snug">{item.source}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Grand total (with brief) ── */}
+      {projectBrief && (
+        <>
+          <div className="h-px bg-white/10" />
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-white/50 uppercase tracking-widest">All-in Estimate</p>
+            <p className="text-sm font-bold text-white tabular-nums">{formatAUD(Math.round(grandTotal / 500) * 500)}</p>
+          </div>
+        </>
+      )}
+
+      {/* ── Project Brief CTA ── */}
+      {!projectBrief ? (
+        <button
+          onClick={onOpenBrief}
+          className="flex items-center gap-2 w-full py-2.5 px-4 rounded-xl border border-white/15 text-xs font-semibold text-white/50 hover:text-white/80 hover:border-white/30 transition-all duration-200"
+        >
+          <ClipboardList size={13} />
+          Add project brief for a more accurate estimate
+          <ArrowRight size={12} className="ml-auto" />
+        </button>
+      ) : (
+        <button
+          onClick={onOpenBrief}
+          className="flex items-center gap-2 w-full py-2 px-3 rounded-xl text-[10px] font-semibold text-white/30 hover:text-white/50 transition-colors"
+        >
+          <ClipboardList size={11} />
+          {projectBrief.yearBuilt} · {projectBrief.budgetTier} · {projectBrief.scope === "full-stripout" ? "Full strip-out" : "Cosmetic refresh"}
+          {hasAsbestos && <TriangleAlert size={10} className="text-amber-400 ml-1" />}
+          <span className="ml-auto underline underline-offset-2">Edit brief</span>
+        </button>
+      )}
+
+      <p className="text-[10px] text-white/25 -mt-2 leading-snug">
         Estimates are indicative only. Obtain licensed builder quotes for accuracy.
       </p>
     </div>
@@ -1073,6 +1165,7 @@ export default function BuilderPage() {
     setGeneratedImageUrl,
     setGenerateDescription,
     generateDescription,
+    projectBrief,       setProjectBrief,
   } = useBuilderStore();
 
   const userStatus = useUserStatus(statusRefreshKey);
@@ -1081,8 +1174,9 @@ export default function BuilderPage() {
   const [viewportState,    setViewportState]   = useState<ViewportState>("idle");
   const [isGenerating,     setIsGenerating]    = useState(false);
   const [generateError,    setGenerateError]   = useState<string | null>(null);
-  const [showAuthModal,    setShowAuthModal]   = useState(false);
+  const [showAuthModal,    setShowAuthModal]    = useState(false);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [showBriefModal,   setShowBriefModal]   = useState(false);
   const [modalTile,        setModalTile]       = useState<TileOption | null>(null);
   const [refinementNote,   setRefinementNote]  = useState("");
   const [isRefining,       setIsRefining]      = useState(false);
@@ -1153,7 +1247,8 @@ export default function BuilderPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: store.roomPhotoUrl,
+          imageBase64:  store.roomPhotoUrl,
+          projectBrief: store.projectBrief,
           prompt,
           selections: {
             floorTile:         store.floorTile,
@@ -1846,7 +1941,7 @@ export default function BuilderPage() {
               </div>
             )}
 
-            <CostSummary />
+            <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
           </div>
         </div>
       </div>
@@ -1871,6 +1966,15 @@ export default function BuilderPage() {
           onClose={() => setShowPaywallModal(false)}
           generationCount={userStatus.generationCount}
           freeLimit={userStatus.freeLimit}
+        />
+      )}
+
+      {/* Project Brief modal */}
+      {showBriefModal && (
+        <ProjectBriefModal
+          initial={projectBrief}
+          onSave={(brief) => { setProjectBrief(brief); setShowBriefModal(false); }}
+          onClose={() => setShowBriefModal(false)}
         />
       )}
 

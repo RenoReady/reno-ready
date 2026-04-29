@@ -111,12 +111,19 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
 }
 
 // ── Models — fastest first ─────────────────────────────────────────
-// gemini-2.5-flash-image is the quickest image-gen model on v1beta.
-// gemini-3.1-flash-image-preview is the fallback if the first fails.
+// Try 2.5-flash first; fall back to 3.1-flash-preview if it fails.
 const MODELS = [
   "gemini-2.5-flash-image",
   "gemini-3.1-flash-image-preview",
 ];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Returns true for transient capacity errors that are worth retrying */
+function isRetryable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("503") || msg.includes("Service Unavailable") || msg.includes("high demand");
+}
 
 // ── Real Gemini handler ────────────────────────────────────────────
 async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
@@ -139,46 +146,73 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
   }
   parts.push({ text: prompt });
 
-  // Try each model in order; move on if one fails
+  // Try each model; on a 503 retry once after 3 s before moving on
   let lastError = "";
+  let allBusy   = true;   // tracks whether every failure was a capacity 503
+
   for (const modelName of MODELS) {
-    try {
-      console.info(`[generate] Trying model: ${modelName}`);
-      const model  = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts }],
-        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-      });
+    const maxAttempts = 2;  // 1 initial + 1 retry on 503
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.info(`[generate] Trying ${modelName} (attempt ${attempt})`);
+        const model  = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent({
+          contents: [{ role: "user", parts }],
+          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+        });
 
-      console.info(`[generate] Response received from: ${modelName}`);
+        console.info(`[generate] Response received from: ${modelName}`);
 
-      const candidate     = result.response.candidates?.[0];
-      const responseParts = candidate?.content?.parts ?? [];
+        const candidate     = result.response.candidates?.[0];
+        const responseParts = candidate?.content?.parts ?? [];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const imagePart = responseParts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const textPart  = responseParts.find((p: any) => typeof p.text === "string");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const imagePart = responseParts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textPart  = responseParts.find((p: any) => typeof p.text === "string");
 
-      if (imagePart?.inlineData) {
-        const { mimeType, data } = imagePart.inlineData;
-        return {
-          success:     true,
-          imageUrl:    `data:${mimeType};base64,${data}`,
-          description: textPart?.text ?? "Your AI renovation preview is ready.",
-        };
+        if (imagePart?.inlineData) {
+          const { mimeType, data } = imagePart.inlineData;
+          return {
+            success:     true,
+            imageUrl:    `data:${mimeType};base64,${data}`,
+            description: textPart?.text ?? "Your AI renovation preview is ready.",
+          };
+        }
+
+        // Returned text only — treat as non-retryable failure
+        lastError = "Model returned no image";
+        allBusy   = false;
+        console.warn(`[generate] ${modelName} returned no image, trying next model`);
+        break;
+
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err.message : "Unknown error";
+
+        if (isRetryable(err) && attempt < maxAttempts) {
+          console.warn(`[generate] ${modelName} busy (503), retrying in 3 s…`);
+          await sleep(3_000);
+          continue;   // retry same model
+        }
+
+        if (!isRetryable(err)) allBusy = false;
+        console.warn(`[generate] ${modelName} failed: ${lastError}`);
+        break;  // move to next model
       }
-
-      // Model returned text only — try next model
-      lastError = "Model returned no image";
-      console.warn(`[generate] ${modelName} returned no image, trying next model`);
-    } catch (err: unknown) {
-      lastError = err instanceof Error ? err.message : "Unknown error";
-      console.warn(`[generate] ${modelName} failed: ${lastError}`);
     }
   }
 
-  // All models failed — return text-only fallback
+  // All attempts exhausted ─────────────────────────────────────────
+  if (allBusy) {
+    // Every failure was a 503 — give the user a clear, actionable message
+    // instead of silently showing the CSS mockup.
+    return {
+      success: false,
+      error:   "Gemini is experiencing high demand right now. Please try again in 30 seconds — it usually clears quickly.",
+    };
+  }
+
+  // Non-capacity failure — return the CSS mockup with a description
   return {
     success:     true,
     imageUrl:    null,

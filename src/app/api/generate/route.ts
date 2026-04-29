@@ -212,11 +212,10 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
     };
   }
 
-  // Non-capacity failure — return the CSS mockup with a description
+  // Non-capacity failure — return an error so the count is NOT incremented
   return {
-    success:     true,
-    imageUrl:    null,
-    description: `Preview description only — image generation unavailable (${lastError}).`,
+    success: false,
+    error:   "The AI couldn't generate an image this time. Please try again in a moment.",
   };
 }
 

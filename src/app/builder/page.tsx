@@ -900,11 +900,12 @@ function ArchitectViewport({
             </div>
             <div className="text-center max-w-xs px-4">
               <p className="text-sm font-bold text-white/80">Generation failed</p>
-              <p className="text-xs text-white/40 mt-1 break-words">{generateError ?? "Check your API key and try again."}</p>
+              <p className="text-xs text-white/40 mt-1 break-words">{generateError ?? "Something went wrong. Please try again."}</p>
+              <p className="text-xs text-emerald-400/80 mt-2 font-medium">✓ This didn&apos;t use one of your free previews</p>
             </div>
             <Button variant="outline" size="sm" onClick={onGenerate}
                     className="border-white/20 text-white/70 hover:bg-white/10 hover:border-white/40">
-              Retry
+              Try Again
             </Button>
           </div>
         )}

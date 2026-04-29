@@ -670,13 +670,25 @@ function BlueprintIdle({ onGenerate }: { onGenerate: () => void }) {
 // ══════════════════════════════════════════════════════════════════
 type ViewportState = "idle" | "generating" | "ready" | "error";
 
+/** Maps a click position (0–1 fractions) to a human-readable spatial label */
+function getRegionLabel(xPct: number, yPct: number): string {
+  const col = xPct < 0.35 ? "left" : xPct < 0.65 ? "centre" : "right";
+  const row = yPct < 0.33 ? "top"  : yPct < 0.67 ? "middle" : "bottom";
+  if (row === "top")    return `upper wall area${col !== "centre" ? ` (${col} side)` : ""}`;
+  if (row === "bottom") return `floor area${col !== "centre" ? ` (${col} side)` : ""}`;
+  if (col === "centre") return "main fixture / vanity area";
+  return `${col} wall area`;
+}
+
 function ArchitectViewport({
-  onGenerate, onViewFullPreview, isGenerating, viewportState, generateDescription, generateError,
+  onGenerate, onViewFullPreview, onRegionClick, isGenerating,
+  viewportState, generateDescription, generateError,
 }: {
-  onGenerate:          () => void;
-  onViewFullPreview:   () => void;
-  isGenerating:        boolean;
-  viewportState:       ViewportState;
+  onGenerate:        () => void;
+  onViewFullPreview: () => void;
+  onRegionClick:     (region: string) => void;
+  isGenerating:      boolean;
+  viewportState:     ViewportState;
   generateDescription: string | null;
   generateError:       string | null;
 }) {
@@ -686,6 +698,7 @@ function ArchitectViewport({
   const [isFullscreen,    setIsFullscreen]    = useState(false);
   const [beforeAfterMode, setBeforeAfterMode] = useState(false);
   const [sliderPos,       setSliderPos]       = useState(50);
+  const [focusMarker,     setFocusMarker]     = useState<{ xPct: number; yPct: number } | null>(null);
 
   // ── Auto before/after reveal when generation completes with a photo ──
   // Starts fully showing the AI result, then sweeps left to 50% so the
@@ -724,6 +737,7 @@ function ArchitectViewport({
     if (viewportState === "generating") {
       setBeforeAfterMode(false);
       setSliderPos(50);
+      setFocusMarker(null);
     }
   }, [viewportState, roomPhotoUrl]);
 
@@ -847,6 +861,35 @@ function ArchitectViewport({
               View Full Preview
               <ArrowRight size={15} />
             </button>
+          </div>
+        )}
+
+        {/* Click-to-focus overlay — shown on the AI image when not in before/after mode */}
+        {hasGenerated && generatedImageUrl && !beforeAfterMode && !isGenerating && (
+          <div
+            className="absolute inset-0 z-10 cursor-crosshair"
+            title="Click to focus on a specific area"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const xPct = (e.clientX - rect.left) / rect.width;
+              const yPct = (e.clientY - rect.top)  / rect.height;
+              const region = getRegionLabel(xPct, yPct);
+              setFocusMarker({ xPct, yPct });
+              onRegionClick(region);
+            }}
+          >
+            {/* Pulsing ring at the last clicked point */}
+            {focusMarker && (
+              <div
+                className="absolute pointer-events-none"
+                style={{ left: `${focusMarker.xPct * 100}%`, top: `${focusMarker.yPct * 100}%`, transform: "translate(-50%, -50%)" }}
+              >
+                <span className="relative flex h-5 w-5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-60" />
+                  <span className="relative inline-flex rounded-full h-5 w-5 border-2 border-white bg-terracotta/80" />
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1042,6 +1085,7 @@ export default function BuilderPage() {
   const [modalTile,        setModalTile]       = useState<TileOption | null>(null);
   const [refinementNote,   setRefinementNote]  = useState("");
   const [isRefining,       setIsRefining]      = useState(false);
+  const [selectedRegion,   setSelectedRegion]  = useState<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -1180,31 +1224,47 @@ export default function BuilderPage() {
     if (!store.generatedImageUrl) return;
 
     setIsRefining(true);
+    setIsGenerating(true);      // ← triggers orange scan bar + DesignConcierge tips
     setViewportState("generating");
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
     setRefinementNote("");
+    setSelectedRegion(null);
 
     try {
+      // Build a context-locked prompt so the model never forgets the chosen finishes
+      const floorDesc = store.floorTile
+        ? `${store.floorTile.name}${store.customFloorColor ? ` (colour: ${store.customFloorColor})` : ""}`
+        : "stone tile";
+      const wallDesc = store.wallTile
+        ? `${store.wallTile.name}${store.customWallColor ? ` (colour: ${store.customWallColor})` : ""}`
+        : "wall tile";
+
+      const regionPrefix = selectedRegion ? `Focus change on the ${selectedRegion}. ` : "";
+
       const basePrompt =
-        `Refine this bathroom render: ${note}. ` +
-        `Keep all existing finishes (floor=${store.floorTile?.name ?? "stone"}, ` +
-        `wall=${store.wallTile?.name ?? "tile"}, vanity=${store.vanity}, ` +
-        `tapware=${store.tapware}) unless the instruction specifically changes them.`;
+        `${regionPrefix}Apply ONLY this specific change to the bathroom render: "${note}". ` +
+        `You MUST keep ALL of the following finishes exactly as they are — ` +
+        `do NOT change any colours, materials, or textures unless the change request explicitly asks for it: ` +
+        `floor = ${floorDesc}, wall = ${wallDesc}, ` +
+        `vanity style = ${store.vanity}, tapware finish = ${store.tapware}. ` +
+        `Every other part of the room should remain identical to the input image.`;
 
       const res = await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: store.generatedImageUrl,  // use previous render as input
+          imageBase64: store.generatedImageUrl,  // previous render is the new base
           prompt:      basePrompt,
           selections: {
-            floorTile:         store.floorTile,
-            wallTile:          store.wallTile,
-            vanity:            store.vanity,
-            tapware:           store.tapware,
-            budget:            store.budget,
-            customNote:        note,
+            floorTile:        store.floorTile,
+            wallTile:         store.wallTile,
+            vanity:           store.vanity,
+            tapware:          store.tapware,
+            budget:           store.budget,
+            customNote:       note,
+            customFloorColor: store.customFloorColor,  // ← was missing
+            customWallColor:  store.customWallColor,   // ← was missing
             structuralChanges: store.structuralChanges,
           },
         }),
@@ -1226,8 +1286,9 @@ export default function BuilderPage() {
       setViewportState("error");
     } finally {
       setIsRefining(false);
+      setIsGenerating(false);   // ← always reset both
     }
-  }, [refinementNote, setGeneratedImageUrl, setGenerateDescription]);
+  }, [refinementNote, selectedRegion, setGeneratedImageUrl, setGenerateDescription]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -1717,6 +1778,7 @@ export default function BuilderPage() {
             <ArchitectViewport
               onGenerate={handleGenerate}
               onViewFullPreview={() => router.push("/preview")}
+              onRegionClick={(region) => setSelectedRegion(region)}
               isGenerating={isGenerating}
               viewportState={viewportState}
               generateDescription={generateDescription}
@@ -1726,9 +1788,27 @@ export default function BuilderPage() {
             {/* ── Refinement panel — visible after first generation ── */}
             {viewportState === "ready" && (
               <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
-                <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">
-                  Not quite right?
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">
+                    Not quite right?
+                  </p>
+                  <p className="text-[10px] text-charcoal/30">
+                    Click the image to focus on a specific area
+                  </p>
+                </div>
+                {selectedRegion && (
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-xs font-semibold text-terracotta">
+                      📍 {selectedRegion}
+                    </span>
+                    <button
+                      onClick={() => setSelectedRegion(null)}
+                      className="text-[10px] text-charcoal/30 hover:text-charcoal/60 transition-colors"
+                    >
+                      clear
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <input
                     type="text"

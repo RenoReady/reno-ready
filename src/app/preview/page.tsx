@@ -22,8 +22,16 @@ import {
   TAPWARE_OPTIONS,
   calcEstimatedCost,
   buildItemisedCosts,
+  getBathroomBaseCost,
 } from "@/lib/types";
+import {
+  calcBriefCostItems,
+  calcBriefTotal,
+  needsAsbestosCheck,
+  TIER_MULTIPLIER,
+} from "@/lib/projectBrief";
 import { cn, formatAUD } from "@/lib/utils";
+import { TriangleAlert } from "lucide-react";
 
 
 export default function PreviewPage() {
@@ -35,18 +43,35 @@ export default function PreviewPage() {
     tapware,
     budget,
     structuralChanges,
+    bathroomSize,
+    customLength,
+    customWidth,
+    projectBrief,
     generatedImageUrl,
     generateDescription,
   } = useBuilderStore();
 
   const hasImage = !!generatedImageUrl;
 
-  const estimatedCost  = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges);
-  const low            = Math.round(estimatedCost * 0.88 / 500) * 500;
-  const high           = Math.round(estimatedCost * 1.12 / 500) * 500;
-  const itemisedCosts  = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges);
-  const overBudget     = estimatedCost > budget;
-  const budgetDelta    = Math.abs(estimatedCost - budget);
+  // Base estimate — uses bathroom size and tier multiplier from brief
+  const baseCost       = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+  const tierMultiplier = projectBrief ? TIER_MULTIPLIER[projectBrief.budgetTier] : 1;
+  const estimatedCost  = Math.round(
+    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost)
+    * tierMultiplier / 500
+  ) * 500;
+
+  const low  = Math.round(estimatedCost * 0.88 / 500) * 500;
+  const high = Math.round(estimatedCost * 1.12 / 500) * 500;
+
+  // Itemised base breakdown + brief-driven verified items
+  const baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
+  const briefItems        = projectBrief ? calcBriefCostItems(projectBrief) : [];
+  const briefTotal        = projectBrief ? calcBriefTotal(projectBrief)     : 0;
+  const grandTotal        = estimatedCost + briefTotal;
+
+  const overBudget  = grandTotal > budget;
+  const budgetDelta = Math.abs(grandTotal - budget);
 
   const vanityLabel  = VANITY_OPTIONS.find((v) => v.id === vanity)?.label  ?? vanity;
   const tapwareLabel = TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware;
@@ -190,16 +215,28 @@ export default function PreviewPage() {
 
               {/* Total */}
               <div className="px-6 pt-6 pb-5">
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] mb-1">Estimated Renovation Cost</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] mb-1">
+                  {projectBrief ? "All-in Estimated Cost" : "Estimated Renovation Cost"}
+                </p>
                 <p className="text-5xl font-bold text-white tabular-nums leading-none mb-1">
-                  {formatAUD(estimatedCost)}
+                  {formatAUD(projectBrief ? Math.round(grandTotal / 500) * 500 : estimatedCost)}
                 </p>
                 <p className="text-sm text-white/40">
                   Range&nbsp;
-                  <span className="text-white/70 font-semibold tabular-nums">{formatAUD(low)}</span>
+                  <span className="text-white/70 font-semibold tabular-nums">
+                    {formatAUD(Math.round((low + briefTotal) / 500) * 500)}
+                  </span>
                   <span className="mx-1.5 text-white/30">–</span>
-                  <span className="text-white/70 font-semibold tabular-nums">{formatAUD(high)}</span>
+                  <span className="text-white/70 font-semibold tabular-nums">
+                    {formatAUD(Math.round((high + briefTotal) / 500) * 500)}
+                  </span>
                 </p>
+                {projectBrief && (
+                  <p className="text-[10px] text-white/30 mt-1.5">
+                    Includes base reno + verified supply &amp; install costs
+                    {needsAsbestosCheck(projectBrief) && " · ⚠ Asbestos removal included"}
+                  </p>
+                )}
               </div>
 
               {/* Budget comparison bar */}
@@ -213,16 +250,16 @@ export default function PreviewPage() {
                     {overBudget ? `+${formatAUD(budgetDelta)} over` : "Within budget ✓"}
                   </span>
                 </div>
-                {/* Stacked bar: budget vs estimated */}
+                {/* Stacked bar: budget vs grand total */}
                 <div className="relative h-2 rounded-full bg-white/10 overflow-hidden">
                   <div
                     className={cn("h-full rounded-full transition-all", overBudget ? "bg-terracotta/60" : "bg-emerald-500/60")}
-                    style={{ width: `${Math.min(100, (estimatedCost / Math.max(budget, estimatedCost)) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (grandTotal / Math.max(budget, grandTotal)) * 100)}%` }}
                   />
                   {/* Budget marker */}
                   <div
                     className="absolute top-0 bottom-0 w-0.5 bg-white/50"
-                    style={{ left: `${Math.min(100, (budget / Math.max(budget, estimatedCost)) * 100)}%` }}
+                    style={{ left: `${Math.min(100, (budget / Math.max(budget, grandTotal)) * 100)}%` }}
                   />
                 </div>
                 <div className="flex justify-between mt-1.5">
@@ -241,8 +278,9 @@ export default function PreviewPage() {
                 <h3 className="text-sm font-bold text-charcoal">Cost Breakdown</h3>
               </div>
 
+              {/* Base renovation items */}
               <div className="divide-y divide-sand-100">
-                {itemisedCosts.map((item, i) => (
+                {baseItemisedCosts.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 px-5 py-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-charcoal leading-snug">{item.label}</p>
@@ -260,10 +298,56 @@ export default function PreviewPage() {
                 ))}
               </div>
 
+              {/* Brief-driven verified cost items */}
+              {briefItems.length > 0 && (
+                <>
+                  <div className="px-5 py-2.5 bg-sand-50 border-y border-sand-200">
+                    <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest">
+                      Verified Cost Items · From real QLD invoices
+                    </p>
+                  </div>
+                  <div className="divide-y divide-sand-100">
+                    {briefItems.map((item, i) => (
+                      <div key={i} className="flex items-start gap-3 px-5 py-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {item.warning && (
+                              <TriangleAlert size={11} className="text-amber-500 flex-shrink-0" strokeWidth={2.5} />
+                            )}
+                            <p className={cn(
+                              "text-[13px] font-semibold leading-snug",
+                              item.warning ? "text-amber-700" : "text-charcoal",
+                            )}>
+                              {item.label}
+                            </p>
+                          </div>
+                          {item.detail && (
+                            <p className="text-[11px] text-charcoal/40 mt-0.5 leading-tight">{item.detail}</p>
+                          )}
+                          {item.source && (
+                            <p className="text-[10px] text-charcoal/30 mt-0.5 leading-tight italic">{item.source}</p>
+                          )}
+                        </div>
+                        <p className={cn(
+                          "text-[13px] font-bold tabular-nums flex-shrink-0 mt-0.5",
+                          item.warning ? "text-amber-700" : "text-charcoal",
+                        )}>
+                          +{formatAUD(item.amount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {/* Total row */}
               <div className="flex items-center justify-between px-5 py-4 bg-charcoal/4 border-t-2 border-charcoal/10">
-                <span className="text-sm font-bold text-charcoal">Estimated Total</span>
-                <span className="text-lg font-bold text-charcoal tabular-nums">{formatAUD(estimatedCost)}</span>
+                <span className="text-sm font-bold text-charcoal">
+                  {projectBrief ? "All-in Estimated Total" : "Estimated Total"}
+                </span>
+                <span className="text-lg font-bold text-charcoal tabular-nums">
+                  {formatAUD(projectBrief ? Math.round(grandTotal / 500) * 500 : estimatedCost)}
+                </span>
               </div>
             </Card>
 

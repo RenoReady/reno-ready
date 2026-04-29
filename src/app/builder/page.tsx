@@ -671,9 +671,10 @@ function BlueprintIdle({ onGenerate }: { onGenerate: () => void }) {
 type ViewportState = "idle" | "generating" | "ready" | "error";
 
 function ArchitectViewport({
-  onGenerate, isGenerating, viewportState, generateDescription, generateError,
+  onGenerate, onViewFullPreview, isGenerating, viewportState, generateDescription, generateError,
 }: {
   onGenerate:          () => void;
+  onViewFullPreview:   () => void;
   isGenerating:        boolean;
   viewportState:       ViewportState;
   generateDescription: string | null;
@@ -757,14 +758,14 @@ function ArchitectViewport({
     >
       {/* ── Toolbar ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-[#151920] flex-shrink-0">
-        <div className="flex gap-1.5 mr-2">
-          <div className="w-3 h-3 rounded-full bg-red-500/60" />
-          <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-          <div className="w-3 h-3 rounded-full bg-green-500/60" />
+        {/* Minimal brand header — replaces macOS traffic-light circles */}
+        <div className="flex items-center gap-2 mr-auto">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Reno Ready" className="w-5 h-5 object-contain opacity-60" />
+          <span className="text-xs font-bold text-white/35 tracking-widest uppercase">
+            Design Preview
+          </span>
         </div>
-        <span className="text-xs font-bold text-white/35 tracking-widest uppercase mr-auto">
-          Viewport — Bathroom Preview
-        </span>
 
         {hasGenerated && roomPhotoUrl && (
           <button
@@ -829,6 +830,26 @@ function ArchitectViewport({
 
       {/* ── Canvas ──────────────────────────────────────────── */}
       <div className="relative w-full flex-1" style={{ minHeight: isFullscreen ? "calc(100vh - 145px)" : "460px" }}>
+
+        {/* Floating "View Full Preview" FAB — appears once generation completes */}
+        {hasGenerated && !isGenerating && (
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
+            <button
+              onClick={onViewFullPreview}
+              className={cn(
+                "flex items-center gap-2.5 px-5 py-3 rounded-2xl",
+                "bg-terracotta text-white text-sm font-bold",
+                "shadow-[0_8px_32px_rgba(210,125,94,0.45)]",
+                "hover:bg-terracotta/90 hover:scale-105 active:scale-100",
+                "transition-all duration-200",
+              )}
+            >
+              <Sparkles size={15} />
+              View Full Preview
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
 
         {viewportState === "error" && !isGenerating && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-20">
@@ -1020,6 +1041,8 @@ export default function BuilderPage() {
   const [showAuthModal,    setShowAuthModal]   = useState(false);
   const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [modalTile,        setModalTile]       = useState<TileOption | null>(null);
+  const [refinementNote,   setRefinementNote]  = useState("");
+  const [isRefining,       setIsRefining]      = useState(false);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -1140,13 +1163,72 @@ export default function BuilderPage() {
     }
   }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump]);
 
-  // Auto-trigger generation when returning from Google OAuth redirect
+  // Auto-trigger generation when returning from Google OAuth redirect.
+  // Waits until userStatus has finished loading so the paywall check
+  // inside handleGenerate uses real data (not the loading placeholder).
   useEffect(() => {
     if (!shouldAutoGenerate) return;
+    if (userStatus.loading) return;   // hold until status is known
     setShouldAutoGenerate(false);
-    const t = setTimeout(() => handleGenerate(), 200);
-    return () => clearTimeout(t);
-  }, [shouldAutoGenerate, handleGenerate]);
+    handleGenerate();
+  }, [shouldAutoGenerate, userStatus.loading, handleGenerate]);
+
+  // ── Refinement: re-generate using the current AI image as the base ──
+  const handleRefine = useCallback(async () => {
+    const note = refinementNote.trim();
+    if (!note) return;
+    const store = useBuilderStore.getState();
+    if (!store.generatedImageUrl) return;
+
+    setIsRefining(true);
+    setViewportState("generating");
+    setGeneratedImageUrl(null);
+    setGenerateDescription(null);
+    setRefinementNote("");
+
+    try {
+      const basePrompt =
+        `Refine this bathroom render: ${note}. ` +
+        `Keep all existing finishes (floor=${store.floorTile?.name ?? "stone"}, ` +
+        `wall=${store.wallTile?.name ?? "tile"}, vanity=${store.vanity}, ` +
+        `tapware=${store.tapware}) unless the instruction specifically changes them.`;
+
+      const res = await fetch("/api/generate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: store.generatedImageUrl,  // use previous render as input
+          prompt:      basePrompt,
+          selections: {
+            floorTile:         store.floorTile,
+            wallTile:          store.wallTile,
+            vanity:            store.vanity,
+            tapware:           store.tapware,
+            budget:            store.budget,
+            customNote:        note,
+            structuralChanges: store.structuralChanges,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (data.upgrade_required) { setShowPaywallModal(true); return; }
+      if (!data.success) throw new Error(data.error ?? "Refinement failed");
+
+      setGeneratedImageUrl(data.imageUrl ?? null);
+      setGenerateDescription(data.description ?? null);
+      setGenerateError(null);
+      setViewportState("ready");
+      bustUserStatusCache();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[refine]", msg);
+      setGenerateError(msg);
+      setViewportState("error");
+    } finally {
+      setIsRefining(false);
+    }
+  }, [refinementNote, setGeneratedImageUrl, setGenerateDescription]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -1629,23 +1711,58 @@ export default function BuilderPage() {
                 : <><Sparkles size={18} className="mr-2" />Generate AI Preview</>}
             </Button>
 
-            {viewportState === "ready" && (
-              <Button variant="secondary" size="md" fullWidth onClick={() => router.push("/preview")} className="group">
-                View Full Preview
-                <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            )}
           </aside>
 
           {/* ══ RIGHT PANEL ═══════════════════════════════════ */}
           <div className="flex flex-col gap-6">
             <ArchitectViewport
               onGenerate={handleGenerate}
+              onViewFullPreview={() => router.push("/preview")}
               isGenerating={isGenerating}
               viewportState={viewportState}
               generateDescription={generateDescription}
               generateError={generateError}
             />
+
+            {/* ── Refinement panel — visible after first generation ── */}
+            {viewportState === "ready" && (
+              <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
+                <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">
+                  Not quite right?
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={refinementNote}
+                    onChange={(e) => setRefinementNote(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleRefine(); }}
+                    placeholder="Tell us what to fix… e.g. 'warmer lighting' or 'different vanity'"
+                    disabled={isRefining}
+                    className={cn(
+                      "flex-1 text-sm px-4 py-2.5 rounded-xl",
+                      "border border-sand-200 bg-white text-charcoal placeholder:text-charcoal/30",
+                      "focus:outline-none focus:ring-2 focus:ring-terracotta/30 focus:border-terracotta/50",
+                      "disabled:opacity-50 transition-all",
+                    )}
+                  />
+                  <button
+                    onClick={handleRefine}
+                    disabled={isRefining || !refinementNote.trim()}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold",
+                      "bg-terracotta text-white transition-all duration-200",
+                      "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed",
+                    )}
+                  >
+                    {isRefining
+                      ? <Loader2 size={15} className="animate-spin" />
+                      : <Sparkles size={15} />}
+                    {isRefining ? "Refining…" : "Apply"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <CostSummary />
           </div>
         </div>

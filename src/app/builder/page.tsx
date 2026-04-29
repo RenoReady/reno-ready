@@ -758,12 +758,11 @@ function ArchitectViewport({
     >
       {/* ── Toolbar ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-[#151920] flex-shrink-0">
-        {/* Minimal brand header — replaces macOS traffic-light circles */}
-        <div className="flex items-center gap-2 mr-auto">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Reno Ready" className="w-5 h-5 object-contain opacity-60" />
+        {/* Minimal brand header */}
+        <div className="flex items-center gap-2.5 mr-auto">
+          <div className="w-1.5 h-1.5 rounded-full bg-terracotta/70" />
           <span className="text-xs font-bold text-white/35 tracking-widest uppercase">
-            Design Preview
+            Reno Ready — Design Preview
           </span>
         </div>
 

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git --yes)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Users/braid/AppData/Roaming/**)",
+      "Read(//c/Users/braid/.nvm/**)",
+      "Bash(cmd.exe /c \"node --version && npm --version\")",
+      "Bash(cmd.exe /c \"node --version\")",
+      "Bash(cmd.exe /c \"npm --version\")",
+      "Bash(cmd.exe /c \"where node 2>nul && where npm 2>nul\")",
+      "Bash(cmd.exe /c \"node --version & npm --version\")",
+      "Bash(powershell.exe -Command \"node --version; npm --version\")",
+      "Bash(powershell.exe -Command \"Test-Path 'C:\\\\Program Files\\\\nodejs\\\\node.exe'\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/next/package.json'\\).version\\)\")",
+      "Bash(rd /s /q \"D:\\\\OneDrive - Griffith University\\\\Documents\\\\Work\\\\Reno Ready Claude\\\\.next\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(npx tsc *)",
+      "Bash(vercel login *)",
+      "Bash(vercel)",
+      "Bash(vercel --name reno-ready)",
+      "Bash(vercel --prod)",
+      "Bash(vercel env *)",
+      "Bash(npm list *)",
+      "Bash(vercel logs *)",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)",
+      "Bash(vercel dns *)"
+    ]
+  }
+}

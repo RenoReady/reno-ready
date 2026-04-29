@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-charcoal:   #2C3E50;
+  --color-terracotta: #D27D5E;
+  --color-sand:       #F5F0E8;
+  --color-sand-light: #FDFAF5;
+  --color-stone:      #8B7355;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+@layer base {
+  html {
+    background-color: var(--color-sand);
+    color: var(--color-charcoal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--color-charcoal);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ── Range Input (Budget Slider) ───────────────────────────── */
+@layer components {
+  .range-terracotta {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-terracotta) 0%,
+      var(--color-terracotta) var(--range-pct, 50%),
+      #E0D5BE var(--range-pct, 50%),
+      #E0D5BE 100%
+    );
+    outline: none;
+    cursor: pointer;
+  }
+
+  .range-terracotta::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--color-terracotta);
+    box-shadow: 0 2px 8px rgba(210, 125, 94, 0.3);
+    cursor: pointer;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .range-terracotta::-webkit-slider-thumb:hover {
+    box-shadow: 0 4px 16px rgba(210, 125, 94, 0.4);
+  }
+
+  .range-terracotta::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--color-terracotta);
+    box-shadow: 0 2px 8px rgba(210, 125, 94, 0.3);
+    cursor: pointer;
+  }
+}
+
+/* ── Keyframe animations ───────────────────────────────────── */
+@keyframes scan-viewport {
+  0%, 100% { top: 0px; }
+  50%       { top: calc(100% - 1px); }
+}
+
+/* ── Utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-sand-light {
+    background-color: var(--color-sand-light);
+  }
+
+  /* Subtle grain overlay for premium feel */
+  .grain {
+    position: relative;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+}

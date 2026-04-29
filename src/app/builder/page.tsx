@@ -1216,15 +1216,22 @@ export default function BuilderPage() {
     handleGenerate();
   }, [shouldAutoGenerate, userStatus.loading, handleGenerate]);
 
-  // ── Refinement: re-generate using the current AI image as the base ──
+  // ── Refinement: regenerate from the original room photo with all
+  //    existing selections intact, plus the user's change appended.
+  //
+  //    We intentionally do NOT pass the generated image back to Gemini.
+  //    Gemini is a text-to-image model, not an inpainting editor — giving
+  //    it an image and saying "change X but keep everything identical"
+  //    creates a conflicting objective it resolves by doing nothing.
+  //    Instead we rebuild the full prompt (selections + refinement note)
+  //    and let it regenerate from scratch, just like handleGenerate does.
   const handleRefine = useCallback(async () => {
     const note = refinementNote.trim();
     if (!note) return;
     const store = useBuilderStore.getState();
-    if (!store.generatedImageUrl) return;
 
     setIsRefining(true);
-    setIsGenerating(true);      // ← triggers orange scan bar + DesignConcierge tips
+    setIsGenerating(true);
     setViewportState("generating");
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
@@ -1232,39 +1239,35 @@ export default function BuilderPage() {
     setSelectedRegion(null);
 
     try {
-      // Build a context-locked prompt so the model never forgets the chosen finishes
-      const floorDesc = store.floorTile
-        ? `${store.floorTile.name}${store.customFloorColor ? ` (colour: ${store.customFloorColor})` : ""}`
-        : "stone tile";
-      const wallDesc = store.wallTile
-        ? `${store.wallTile.name}${store.customWallColor ? ` (colour: ${store.customWallColor})` : ""}`
-        : "wall tile";
+      const regionPrefix = selectedRegion ? `${selectedRegion}: ` : "";
 
-      const regionPrefix = selectedRegion ? `Focus change on the ${selectedRegion}. ` : "";
-
-      const basePrompt =
-        `${regionPrefix}Apply ONLY this specific change to the bathroom render: "${note}". ` +
-        `You MUST keep ALL of the following finishes exactly as they are — ` +
-        `do NOT change any colours, materials, or textures unless the change request explicitly asks for it: ` +
-        `floor = ${floorDesc}, wall = ${wallDesc}, ` +
-        `vanity style = ${store.vanity}, tapware finish = ${store.tapware}. ` +
-        `Every other part of the room should remain identical to the input image.`;
+      // Same structure as handleGenerate — all selections + refinement appended
+      const prompt =
+        `Transform bathroom: floor=${store.floorTile?.name ?? "stone"}` +
+        (store.customFloorColor ? ` in ${store.customFloorColor}` : "") + `, ` +
+        `wall=${store.wallTile?.name ?? "white tile"}` +
+        (store.customWallColor  ? ` in ${store.customWallColor}`  : "") + `, ` +
+        `vanity=${store.vanity}, tapware=${store.tapware}` +
+        (store.tileStyle   ? `, layout=${store.tileStyle}`   : "") +
+        (store.customNote  ? `, note: ${store.customNote}`   : "") +
+        `. Additionally: ${regionPrefix}${note}`;
 
       const res = await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: store.generatedImageUrl,  // previous render is the new base
-          prompt:      basePrompt,
+          imageBase64: store.roomPhotoUrl,   // original room photo — not the AI render
+          prompt,
           selections: {
-            floorTile:        store.floorTile,
-            wallTile:         store.wallTile,
-            vanity:           store.vanity,
-            tapware:          store.tapware,
-            budget:           store.budget,
-            customNote:       note,
-            customFloorColor: store.customFloorColor,  // ← was missing
-            customWallColor:  store.customWallColor,   // ← was missing
+            floorTile:         store.floorTile,
+            wallTile:          store.wallTile,
+            vanity:            store.vanity,
+            tapware:           store.tapware,
+            budget:            store.budget,
+            customNote:        `${store.customNote ? store.customNote + ". " : ""}${regionPrefix}${note}`,
+            customFloorColor:  store.customFloorColor,
+            customWallColor:   store.customWallColor,
+            tileStyle:         store.tileStyle,
             structuralChanges: store.structuralChanges,
           },
         }),
@@ -1286,7 +1289,7 @@ export default function BuilderPage() {
       setViewportState("error");
     } finally {
       setIsRefining(false);
-      setIsGenerating(false);   // ← always reset both
+      setIsGenerating(false);
     }
   }, [refinementNote, selectedRegion, setGeneratedImageUrl, setGenerateDescription]);
 

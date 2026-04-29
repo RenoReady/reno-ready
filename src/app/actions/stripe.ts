@@ -18,10 +18,6 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PLANS, type PlanKey } from "@/lib/plans";
 
-// Re-export PlanKey so any server-side code that already imported it
-// from here continues to work without changes.
-export type { PlanKey };
-
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not set in .env.local");

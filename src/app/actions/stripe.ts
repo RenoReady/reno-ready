@@ -55,29 +55,36 @@ async function getBaseUrl(): Promise<string> {
 
 export async function createCheckoutSession(
   plan: PlanKey,
-): Promise<{ url: string }> {
-  const stripe = getStripe();
-  const base   = await getBaseUrl();
-  const { mode, priceId } = PLANS[plan];
-
-  // ── Resolve the current user ID so the webhook can attribute the purchase ──
-  let userId: string | undefined;
+): Promise<{ url: string } | { error: string }> {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    userId = user?.id;
-  } catch { /* not signed in — allow anyway, webhook will log */ }
+    const stripe = getStripe();
+    const base   = await getBaseUrl();
+    const { mode, priceId } = PLANS[plan];
 
-  const session = await stripe.checkout.sessions.create({
-    mode,
-    client_reference_id: userId,   // passed back in checkout.session.completed webhook
-    metadata: { plan },            // lets the webhook know which plan was purchased
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${base}/builder?payment_success=true&plan=${plan}`,
-    cancel_url:  `${base}/#pricing`,
-    billing_address_collection: "auto",
-  });
+    // ── Resolve the current user ID so the webhook can attribute the purchase ──
+    let userId: string | undefined;
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+    } catch { /* not signed in — allow anyway, webhook will log */ }
 
-  if (!session.url) throw new Error("Stripe did not return a checkout URL");
-  return { url: session.url };
+    const session = await stripe.checkout.sessions.create({
+      mode,
+      client_reference_id: userId,   // passed back in checkout.session.completed webhook
+      metadata: { plan },            // lets the webhook know which plan was purchased
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${base}/builder?payment_success=true&plan=${plan}`,
+      cancel_url:  `${base}/#pricing`,
+      billing_address_collection: "auto",
+    });
+
+    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    return { url: session.url };
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error(`[stripe] createCheckoutSession failed for plan "${plan}":`, message);
+    return { error: message };
+  }
 }

@@ -25,8 +25,13 @@ export default function PaywallModal({ onClose, generationCount, freeLimit }: Pa
   const handlePlan = async (plan: PlanKey) => {
     try {
       setLoadingPlan(plan);
-      const { url } = await createCheckoutSession(plan);
-      window.location.href = url;
+      const result = await createCheckoutSession(plan);
+      if ("error" in result) {
+        console.error("[paywall] checkout error:", result.error);
+        setLoadingPlan(null);
+      } else {
+        window.location.href = result.url;
+      }
     } catch (err) {
       console.error("[paywall] checkout error", err);
       setLoadingPlan(null);

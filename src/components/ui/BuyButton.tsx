@@ -21,8 +21,12 @@ export default function BuyButton({ plan, label, featured, className }: BuyButto
     setError(null);
     startTransition(async () => {
       try {
-        const { url } = await createCheckoutSession(plan);
-        window.location.href = url;
+        const result = await createCheckoutSession(plan);
+        if ("error" in result) {
+          setError(result.error);
+        } else {
+          window.location.href = result.url;
+        }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       }

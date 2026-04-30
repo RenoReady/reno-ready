@@ -7,6 +7,7 @@ import {
   TileStyle,
   VanityType,
   TapwareFinish,
+  LightingOption,
   BUDGET_MIN,
   BUDGET_MAX,
 } from "./types";
@@ -30,6 +31,7 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
   const s = useBuilderStore.getState();
   const snapshot = {
     projectBrief:      s.projectBrief,
+    lightingOption:    s.lightingOption,
     floorTile:         s.floorTile,
     wallTile:          s.wallTile,
     vanity:            s.vanity,
@@ -70,7 +72,8 @@ export function restoreBuilderStateFromAuth(): boolean {
     sessionStorage.removeItem(PERSIST_KEY);
     const saved = JSON.parse(raw) as Record<string, unknown>;
     const store = useBuilderStore.getState();
-    if (saved.projectBrief  !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
+    if (saved.projectBrief   !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
+    if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);
     if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
     if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
@@ -106,6 +109,7 @@ interface BuilderStore extends BuilderSelections {
   setTileStyle:           (style: TileStyle | null)        => void;
   setStructuralChanges:   (c: Partial<StructuralChanges>)  => void;
   setProjectBrief:        (b: ProjectBrief | null)         => void;
+  setLightingOption:      (o: LightingOption)              => void;
   setBathroomSize:        (s: BathroomSize)                => void;
   setUseCustomDimensions: (v: boolean)                     => void;
   setCustomLength:        (n: number)                      => void;
@@ -121,6 +125,7 @@ const DEFAULT_BUDGET = Math.round(
 
 const defaults: BuilderSelections = {
   projectBrief:        null,
+  lightingOption:      "standard",
   roomPhotoUrl:        null,
   bathroomSize:        "medium",
   useCustomDimensions: false,
@@ -164,6 +169,7 @@ export const useBuilderStore = create<BuilderStore>((set) => ({
     structuralChanges: { ...s.structuralChanges, ...c },
   })),
   setProjectBrief:        (b)     => set({ projectBrief: b }),
+  setLightingOption:      (o)     => set({ lightingOption: o }),
   setBathroomSize:        (s)     => set({ bathroomSize: s }),
   setUseCustomDimensions: (v)     => set({ useCustomDimensions: v }),
   setCustomLength:        (n)     => set({ customLength: n }),

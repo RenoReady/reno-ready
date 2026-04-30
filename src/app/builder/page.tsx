@@ -7,7 +7,7 @@ import {
   CheckCircle2, X, Info, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
-  ClipboardList, TriangleAlert,
+  ClipboardList, TriangleAlert, Lightbulb,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -15,11 +15,11 @@ import TileTexture from "@/components/ui/TileTexture";
 import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth } from "@/lib/store";
 import {
   FLOOR_TILES, WALL_TILES, VANITY_OPTIONS, TAPWARE_OPTIONS,
-  TILE_STYLE_OPTIONS,
+  TILE_STYLE_OPTIONS, LIGHTING_OPTIONS,
   COST_BREAKDOWN, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP,
   BATHROOM_SIZE_OPTIONS,
   TileOption, VanityType, TapwareFinish, TileStyle, ShowerNiche, ShowerFixtures,
-  BathroomSize,
+  BathroomSize, LightingOption,
   calcEstimatedCost, getBathroomBaseCost,
 } from "@/lib/types";
 import PaywallModal from "@/components/ui/PaywallModal";
@@ -450,7 +450,8 @@ function EstimateAccuracyBadge() {
 
 function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
   const { budget, floorTile, wallTile, vanity, tapware, structuralChanges,
-          bathroomSize, customLength, customWidth, projectBrief } = useBuilderStore();
+          bathroomSize, customLength, customWidth, projectBrief,
+          lightingOption } = useBuilderStore();
 
   const baseCost       = getBathroomBaseCost(bathroomSize, customLength, customWidth);
   const tierMultiplier = projectBrief ? TIER_MULTIPLIER[projectBrief.budgetTier] : 1;
@@ -461,9 +462,10 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
 
+  const lightingCost = LIGHTING_OPTIONS.find((o) => o.id === lightingOption)?.cost ?? 0;
   const briefItems   = projectBrief ? calcBriefCostItems(projectBrief) : [];
   const briefTotal   = projectBrief ? calcBriefTotal(projectBrief)     : 0;
-  const grandTotal   = estimated + briefTotal;
+  const grandTotal   = estimated + briefTotal + lightingCost;
   const isOverBudget = grandTotal > budget;
   const hasAsbestos  = needsAsbestosCheck(projectBrief);
 
@@ -512,6 +514,15 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
             </div>
           );
         })}
+        {lightingCost > 0 && (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-white/60 flex items-center gap-1.5">
+              <Lightbulb size={10} className="text-amber-400" />
+              Lighting &amp; Electrical
+            </p>
+            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(lightingCost)}</p>
+          </div>
+        )}
       </div>
 
       {/* ── Brief-driven real cost items ── */}
@@ -1106,6 +1117,106 @@ function ArchitectViewport({
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  INLINE BRIEF PANEL  (always-visible left column on xl screens)
+// ══════════════════════════════════════════════════════════════════
+function InlineBriefPanel({
+  projectBrief,
+  onSave,
+}: {
+  projectBrief: import("@/lib/projectBrief").ProjectBrief | null;
+  onSave: (b: import("@/lib/projectBrief").ProjectBrief) => void;
+}) {
+  const [year,   setYear]   = useState(projectBrief?.yearBuilt  ? String(projectBrief.yearBuilt)  : "");
+  const [tier,   setTier]   = useState<import("@/lib/projectBrief").BudgetTier>(projectBrief?.budgetTier  ?? "standard");
+  const [scope,  setScope]  = useState<import("@/lib/projectBrief").RenovationScope>(projectBrief?.scope ?? "full-stripout");
+
+  const { ASBESTOS_THRESHOLD_YEAR } = require("@/lib/projectBrief");
+  const y      = parseInt(year, 10);
+  const valid  = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
+  const isOld  = valid && y < ASBESTOS_THRESHOLD_YEAR;
+
+  // Auto-save whenever any value changes and year is valid
+  useEffect(() => {
+    if (!valid) return;
+    onSave({ yearBuilt: y, budgetTier: tier, scope });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, tier, scope]);
+
+  const TIERS: { key: import("@/lib/projectBrief").BudgetTier; label: string; range: string }[] = [
+    { key: "value",    label: "Value",    range: "$10–18k" },
+    { key: "standard", label: "Standard", range: "$18–30k" },
+    { key: "premium",  label: "Premium",  range: "$30k+"   },
+  ];
+
+  return (
+    <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-5">
+      <div className="flex items-center gap-2.5">
+        <ClipboardList size={14} className="text-charcoal/50" />
+        <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Project Brief</p>
+      </div>
+
+      {/* Year built */}
+      <div>
+        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Year built</p>
+        <input
+          type="number" min={1900} max={new Date().getFullYear()} placeholder="e.g. 1985"
+          value={year} onChange={(e) => setYear(e.target.value)}
+          className={cn(
+            "w-full px-3 py-2 rounded-xl border-2 text-sm font-semibold text-charcoal focus:outline-none transition-all",
+            isOld   ? "border-amber-400 bg-amber-50"
+            : valid ? "border-emerald-400 bg-emerald-50"
+                    : "border-sand-200 bg-white/60",
+          )}
+        />
+        {isOld && (
+          <div className="flex items-start gap-1.5 mt-1.5">
+            <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+            <p className="text-[10px] text-amber-700 leading-snug">Pre-1990 — asbestos removal added to estimate (~$2,272)</p>
+          </div>
+        )}
+      </div>
+
+      {/* Budget tier */}
+      <div>
+        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Budget tier</p>
+        <div className="flex flex-col gap-1.5">
+          {TIERS.map(({ key, label, range }) => (
+            <button key={key} onClick={() => setTier(key)}
+              className={cn("flex items-center justify-between px-3 py-2 rounded-xl border-2 text-left transition-all duration-200",
+                tier === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
+              <p className={cn("text-xs font-semibold", tier === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
+              <p className={cn("text-[10px] tabular-nums", tier === key ? "text-terracotta/70" : "text-charcoal/35")}>{range}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Scope */}
+      <div>
+        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Scope</p>
+        <div className="flex flex-col gap-1.5">
+          {([
+            { key: "full-stripout",    label: "Full Strip-out",    sub: "Complete gut renovation" },
+            { key: "cosmetic-refresh", label: "Cosmetic Refresh",  sub: "Surfaces & finishes only" },
+          ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string }[]).map(({ key, label, sub }) => (
+            <button key={key} onClick={() => setScope(key)}
+              className={cn("flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
+                scope === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
+              <p className={cn("text-xs font-semibold", scope === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
+              <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!valid && (
+        <p className="text-[10px] text-charcoal/35 text-center">Enter year to activate cost estimate</p>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  MAIN PAGE
 // ══════════════════════════════════════════════════════════════════
 export default function BuilderPage() {
@@ -1166,6 +1277,7 @@ export default function BuilderPage() {
     setGenerateDescription,
     generateDescription,
     projectBrief,       setProjectBrief,
+    lightingOption,     setLightingOption,
   } = useBuilderStore();
 
   const userStatus = useUserStatus(statusRefreshKey);
@@ -1260,6 +1372,7 @@ export default function BuilderPage() {
             customFloorColor:  store.customFloorColor,
             customWallColor:   store.customWallColor,
             tileStyle:         store.tileStyle,
+            lightingOption:    store.lightingOption,
             structuralChanges: store.structuralChanges,
           },
         }),
@@ -1312,19 +1425,23 @@ export default function BuilderPage() {
     handleGenerate();
   }, [shouldAutoGenerate, userStatus.loading, handleGenerate]);
 
-  // ── Refinement: regenerate from the original room photo with all
-  //    existing selections intact, plus the user's change appended.
+  // ── Refinement: surgical edit using the generated image as the seed.
   //
-  //    We intentionally do NOT pass the generated image back to Gemini.
-  //    Gemini is a text-to-image model, not an inpainting editor — giving
-  //    it an image and saying "change X but keep everything identical"
-  //    creates a conflicting objective it resolves by doing nothing.
-  //    Instead we rebuild the full prompt (selections + refinement note)
-  //    and let it regenerate from scratch, just like handleGenerate does.
+  //    KEY INSIGHT: We pass generatedImageUrl (not the original room photo)
+  //    as the base, with a prompt that says ONLY "keep everything identical,
+  //    change only X". We deliberately omit all material selections from
+  //    the prompt — re-declaring them creates conflicting objectives
+  //    (image already has them applied) which previously caused zero changes.
+  //
+  //    The surgical approach: seed image + minimal "only change X" prompt
+  //    = Gemini preserves the existing render and applies the single edit.
   const handleRefine = useCallback(async () => {
     const note = refinementNote.trim();
     if (!note) return;
     const store = useBuilderStore.getState();
+
+    // Need a generated image to refine; fall back to original photo if somehow missing
+    const seedImage = store.generatedImageUrl ?? store.roomPhotoUrl;
 
     setIsRefining(true);
     setIsGenerating(true);
@@ -1335,35 +1452,33 @@ export default function BuilderPage() {
     setSelectedRegion(null);
 
     try {
-      const regionPrefix = selectedRegion ? `${selectedRegion}: ` : "";
+      const regionPrefix = selectedRegion ? `Focus on the ${selectedRegion}. ` : "";
 
-      // Same structure as handleGenerate — all selections + refinement appended
+      // Surgical prompt — DO NOT re-declare material selections.
+      // Gemini should see the image as ground truth and apply only the requested change.
       const prompt =
-        `Transform bathroom: floor=${store.floorTile?.name ?? "stone"}` +
-        (store.customFloorColor ? ` in ${store.customFloorColor}` : "") + `, ` +
-        `wall=${store.wallTile?.name ?? "white tile"}` +
-        (store.customWallColor  ? ` in ${store.customWallColor}`  : "") + `, ` +
-        `vanity=${store.vanity}, tapware=${store.tapware}` +
-        (store.tileStyle   ? `, layout=${store.tileStyle}`   : "") +
-        (store.customNote  ? `, note: ${store.customNote}`   : "") +
-        `. Additionally: ${regionPrefix}${note}`;
+        `You are making a single surgical edit to this bathroom render. ` +
+        `Keep the bathroom layout, walls, plumbing locations, tile patterns, ` +
+        `vanity position, toilet, shower screen, and all structural elements ` +
+        `EXACTLY as they appear in this image. ` +
+        `Do not change anything that is not explicitly requested below. ` +
+        `${regionPrefix}` +
+        `Only modify: ${note}`;
 
       const res = await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: store.roomPhotoUrl,   // original room photo — not the AI render
+          imageBase64: seedImage,   // ← generated render as seed (img2img)
           prompt,
           selections: {
-            floorTile:         store.floorTile,
-            wallTile:          store.wallTile,
-            vanity:            store.vanity,
-            tapware:           store.tapware,
-            budget:            store.budget,
-            customNote:        `${store.customNote ? store.customNote + ". " : ""}${regionPrefix}${note}`,
-            customFloorColor:  store.customFloorColor,
-            customWallColor:   store.customWallColor,
-            tileStyle:         store.tileStyle,
+            // Minimal selections — just enough for logging; prompt does the work
+            floorTile:  store.floorTile,
+            wallTile:   store.wallTile,
+            vanity:     store.vanity,
+            tapware:    store.tapware,
+            budget:     store.budget,
+            customNote: `[REFINE] ${regionPrefix}${note}`,
             structuralChanges: store.structuralChanges,
           },
         }),
@@ -1416,9 +1531,143 @@ export default function BuilderPage() {
           <p className="text-charcoal/50 mt-1">Choose your finishes, then generate your AI preview.</p>
         </div>
 
-        <div className="grid lg:grid-cols-[400px_1fr] gap-8 items-start">
+        <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start">
 
-          {/* ══ LEFT SIDEBAR ══════════════════════════════════ */}
+          {/* ══ LEFT PANEL — Project Brief + Structural Needs (xl only) ══ */}
+          <aside className="hidden xl:flex flex-col gap-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
+            {/* Inline Project Brief */}
+            <InlineBriefPanel
+              projectBrief={projectBrief}
+              onSave={setProjectBrief}
+            />
+
+            {/* Structural Needs */}
+            <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-2.5">
+                <Wrench size={14} className="text-charcoal/50" />
+                <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Structural Needs</p>
+              </div>
+
+              {activeStructuralCount >= 2 && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+                  <Zap size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-700 leading-snug">
+                    Multiple structural changes — generation may take up to 60 s. One at a time gives better results.
+                  </p>
+                </div>
+              )}
+
+              {/* Shower Niche */}
+              <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/70")}>
+                  Shower Niche · {structuralChanges.showerNiche === "single" ? "+$600" : structuralChanges.showerNiche === "double" ? "+$1,000" : "No niche"}
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(["none", "single", "double"] as ShowerNiche[]).map((v) => (
+                    <button key={v} onClick={() => setStructuralChanges({ showerNiche: v })}
+                      className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                        structuralChanges.showerNiche === v ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                      {v === "none" ? "None" : v === "single" ? "Single" : "Double"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Shower Fixtures */}
+              <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/70")}>
+                  Shower Fixtures · {structuralChanges.showerFixtures === "dual" ? "+$1,200 · Rain + Handheld" : "Single head"}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([{ value: "single", label: "Single" }, { value: "dual", label: "Dual" }] as { value: ShowerFixtures; label: string }[]).map(({ value, label }) => (
+                    <button key={value} onClick={() => setStructuralChanges({ showerFixtures: value })}
+                      className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                        structuralChanges.showerFixtures === value ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Boolean toggles */}
+              {booleanToggles.map(({ key, label, sub }) => {
+                const checked = structuralChanges[key] as boolean;
+                return (
+                  <label key={key} className={cn(
+                    "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-200",
+                    checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40")}>
+                    <div>
+                      <p className={cn("text-xs font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
+                      <p className="text-[10px] text-charcoal/40">{sub}</p>
+                    </div>
+                    <div className="relative flex-shrink-0">
+                      <input type="checkbox" className="sr-only" checked={checked}
+                             onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
+                      <div className={cn("w-9 h-5 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
+                        <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
+                          checked ? "translate-x-4" : "translate-x-0.5")} />
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </aside>
+
+          {/* ══ CENTER: Viewport + Refinement + Cost ══════════════ */}
+          <div className="flex flex-col gap-6">
+            <ArchitectViewport
+              onGenerate={handleGenerate}
+              onViewFullPreview={() => router.push("/preview")}
+              onRegionClick={(region) => setSelectedRegion(region)}
+              isGenerating={isGenerating}
+              viewportState={viewportState}
+              generateDescription={generateDescription}
+              generateError={generateError}
+            />
+
+            {/* ── Refinement panel ── */}
+            {viewportState === "ready" && (
+              <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">Not quite right?</p>
+                  <p className="text-[10px] text-charcoal/30">Click the image to focus on a specific area</p>
+                </div>
+                {selectedRegion && (
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-xs font-semibold text-terracotta">
+                      📍 {selectedRegion}
+                    </span>
+                    <button onClick={() => setSelectedRegion(null)} className="text-[10px] text-charcoal/30 hover:text-charcoal/60 transition-colors">clear</button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <textarea
+                    value={refinementNote}
+                    onChange={(e) => setRefinementNote(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
+                    placeholder="e.g. make the tiles darker, change tapware to matte black, add a window…"
+                    rows={2}
+                    className="flex-1 resize-none rounded-xl px-3 py-2.5 text-sm border-2 border-sand-200 bg-white/50 focus:outline-none focus:border-terracotta/60 text-charcoal/80 placeholder:text-charcoal/30"
+                  />
+                  <button onClick={handleRefine} disabled={isRefining || !refinementNote.trim()}
+                    className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold",
+                      "bg-terracotta text-white transition-all duration-200",
+                      "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed")}>
+                    {isRefining ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                    {isRefining ? "Refining…" : "Apply"}
+                  </button>
+                </div>
+                <p className="text-[10px] text-charcoal/30">Uses the current render as a starting point — surgical changes only</p>
+              </div>
+            )}
+
+            <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
+          </div>
+
+          {/* ══ RIGHT SIDEBAR — Design Selectors ══════════════════ */}
           <aside className="flex flex-col gap-4 lg:sticky lg:top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-0.5">
             <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-6 flex flex-col gap-6">
 
@@ -1692,122 +1941,39 @@ export default function BuilderPage() {
                 </div>
               </SidebarSection>
 
-              {/* 8. Structural Changes */}
-              <SidebarSection icon={Wrench} title="Structural Changes">
-                <div className="flex flex-col gap-3">
-                  {activeStructuralCount >= 2 && (
-                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                      <Zap size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-[11px] text-amber-700 leading-snug">
-                        Multiple structural changes selected — generation may take up to 60 seconds. One at a time gives faster, more accurate results.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Shower Niche — segmented toggle */}
-                  <div className={cn(
-                    "p-3.5 rounded-xl border-2 transition-all duration-200",
-                    structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50",
-                  )}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div>
-                        <p className={cn("text-sm font-semibold", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/80")}>
-                          Shower Niche
-                        </p>
-                        <p className="text-[11px] text-charcoal/40">
-                          {structuralChanges.showerNiche === "single" ? "+$600 est." : structuralChanges.showerNiche === "double" ? "+$1,000 est." : "Recessed storage shelf"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {([
-                        { value: "none",   label: "None" },
-                        { value: "single", label: "Single" },
-                        { value: "double", label: "Double" },
-                      ] as { value: ShowerNiche; label: string }[]).map(({ value, label }) => (
-                        <button
-                          key={value}
-                          onClick={() => setStructuralChanges({ showerNiche: value })}
-                          className={cn(
-                            "py-2 rounded-xl text-xs font-bold transition-all duration-200",
-                            structuralChanges.showerNiche === value
-                              ? "bg-terracotta text-white shadow-warm-sm"
-                              : "bg-sand-100 text-charcoal/60 hover:bg-sand-200",
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Shower Fixtures — segmented toggle */}
-                  <div className={cn(
-                    "p-3.5 rounded-xl border-2 transition-all duration-200",
-                    structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50",
-                  )}>
-                    <div className="flex items-center justify-between mb-2.5">
-                      <div>
-                        <p className={cn("text-sm font-semibold", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/80")}>
-                          Shower Fixtures
-                        </p>
-                        <p className="text-[11px] text-charcoal/40">
-                          {structuralChanges.showerFixtures === "dual"
-                            ? "+$1,200 est. · Includes plumbing split"
-                            : "Standard single shower head"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {([
-                        { value: "single", label: "Single Head",         sub: "Standard" },
-                        { value: "dual",   label: "Dual Heads",           sub: "Rain + Handheld" },
-                      ] as { value: ShowerFixtures; label: string; sub: string }[]).map(({ value, label, sub }) => (
-                        <button
-                          key={value}
-                          onClick={() => setStructuralChanges({ showerFixtures: value })}
-                          className={cn(
-                            "py-2 px-2 rounded-xl text-xs font-bold transition-all duration-200 flex flex-col gap-0.5 items-center",
-                            structuralChanges.showerFixtures === value
-                              ? "bg-terracotta text-white shadow-warm-sm"
-                              : "bg-sand-100 text-charcoal/60 hover:bg-sand-200",
-                          )}
-                        >
-                          <span>{label}</span>
-                          <span className={cn(
-                            "text-[9px] font-medium leading-none",
-                            structuralChanges.showerFixtures === value ? "text-white/80" : "text-charcoal/40",
-                          )}>{sub}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Boolean toggles */}
-                  {booleanToggles.map(({ key, label, sub }) => {
-                    const checked = structuralChanges[key] as boolean;
+              {/* 8. Lighting & Electrical */}
+              <SidebarSection icon={Lightbulb} title="Lighting & Electrical">
+                <div className="flex flex-col gap-2">
+                  {LIGHTING_OPTIONS.map((opt) => {
+                    const active = lightingOption === opt.id;
                     return (
-                      <label key={key}
+                      <button
+                        key={opt.id}
+                        onClick={() => setLightingOption(opt.id as LightingOption)}
                         className={cn(
-                          "flex items-center justify-between gap-3 p-3.5 rounded-xl cursor-pointer border-2 transition-all duration-200",
-                          checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                          "flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200",
+                          active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
                         )}
                       >
-                        <div>
-                          <p className={cn("text-sm font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
-                          <p className="text-[11px] text-charcoal/40">{sub}</p>
+                        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                          active ? "bg-terracotta/15" : "bg-sand-100")}>
+                          <Lightbulb size={15} className={active ? "text-terracotta" : "text-charcoal/40"} />
                         </div>
-                        <div className="relative flex-shrink-0">
-                          <input type="checkbox" className="sr-only" checked={checked}
-                                 onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
-                          <div className={cn("w-10 h-6 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
-                            <div className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
-                              checked ? "translate-x-5" : "translate-x-1")} />
-                          </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn("text-sm font-semibold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
+                          <p className="text-[11px] text-charcoal/45 mt-0.5 leading-snug">{opt.sub}</p>
                         </div>
-                      </label>
+                        {opt.cost > 0 && (
+                          <p className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/40")}>
+                            +${opt.cost.toLocaleString()}
+                          </p>
+                        )}
+                      </button>
                     );
                   })}
+                  <p className="text-[10px] text-charcoal/35 leading-snug">
+                    Prices include supply + estimated electrician labour. Marvel 3-in-1 from BDW Quote #235561.
+                  </p>
                 </div>
               </SidebarSection>
 
@@ -1872,77 +2038,6 @@ export default function BuilderPage() {
 
           </aside>
 
-          {/* ══ RIGHT PANEL ═══════════════════════════════════ */}
-          <div className="flex flex-col gap-6">
-            <ArchitectViewport
-              onGenerate={handleGenerate}
-              onViewFullPreview={() => router.push("/preview")}
-              onRegionClick={(region) => setSelectedRegion(region)}
-              isGenerating={isGenerating}
-              viewportState={viewportState}
-              generateDescription={generateDescription}
-              generateError={generateError}
-            />
-
-            {/* ── Refinement panel — visible after first generation ── */}
-            {viewportState === "ready" && (
-              <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">
-                    Not quite right?
-                  </p>
-                  <p className="text-[10px] text-charcoal/30">
-                    Click the image to focus on a specific area
-                  </p>
-                </div>
-                {selectedRegion && (
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-xs font-semibold text-terracotta">
-                      📍 {selectedRegion}
-                    </span>
-                    <button
-                      onClick={() => setSelectedRegion(null)}
-                      className="text-[10px] text-charcoal/30 hover:text-charcoal/60 transition-colors"
-                    >
-                      clear
-                    </button>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={refinementNote}
-                    onChange={(e) => setRefinementNote(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleRefine(); }}
-                    placeholder="Tell us what to fix… e.g. 'warmer lighting' or 'different vanity'"
-                    disabled={isRefining}
-                    className={cn(
-                      "flex-1 text-sm px-4 py-2.5 rounded-xl",
-                      "border border-sand-200 bg-white text-charcoal placeholder:text-charcoal/30",
-                      "focus:outline-none focus:ring-2 focus:ring-terracotta/30 focus:border-terracotta/50",
-                      "disabled:opacity-50 transition-all",
-                    )}
-                  />
-                  <button
-                    onClick={handleRefine}
-                    disabled={isRefining || !refinementNote.trim()}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold",
-                      "bg-terracotta text-white transition-all duration-200",
-                      "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed",
-                    )}
-                  >
-                    {isRefining
-                      ? <Loader2 size={15} className="animate-spin" />
-                      : <Sparkles size={15} />}
-                    {isRefining ? "Refining…" : "Apply"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
-          </div>
         </div>
       </div>
 

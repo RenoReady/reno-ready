@@ -52,6 +52,7 @@ interface GenerateRequest {
     customFloorColor?:  string | null;
     customWallColor?:   string | null;
     tileStyle?:         string | null;
+    lightingOption?:    string | null;
     structuralChanges?: {
       removeBathtub:   boolean;
       addWalkinShower: boolean;

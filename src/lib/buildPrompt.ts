@@ -12,6 +12,8 @@ import {
   TileStyle,
   VanityType,
   TapwareFinish,
+  LightingOption,
+  LIGHTING_OPTIONS,
 } from "./types";
 import {
   type ProjectBrief,
@@ -31,6 +33,7 @@ interface PromptInput {
     customFloorColor?:  string | null;
     customWallColor?:   string | null;
     tileStyle?:         TileStyle | string | null;
+    lightingOption?:    LightingOption | string | null;
     structuralChanges?: BuilderSelections["structuralChanges"];
   };
 }
@@ -116,6 +119,13 @@ export function buildGeminiPrompt(req: PromptInput): string {
     ? `\n\nAdditional client request: "${selections.customNote.trim()}"`
     : "";
 
+  // ── Lighting & Electrical ─────────────────────────────────────
+  const lightingId   = selections.lightingOption ?? "none";
+  const lightingLine = LIGHTING_OPTIONS.find((o) => o.id === lightingId)?.promptLine ?? "";
+  const lightingSection = lightingLine
+    ? `\n\nLighting & electrical: ${lightingLine}`
+    : "";
+
   // ── Project brief injections ──────────────────────────────────
   const tierSuffix  = req.projectBrief ? TIER_PROMPT_SUFFIX[req.projectBrief.budgetTier]  : "";
   const scopeSuffix = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope] : "";
@@ -136,5 +146,5 @@ export function buildGeminiPrompt(req: PromptInput): string {
       ].join("\n")
     : "";
 
-  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + customNoteSection + briefSection + noPhotoContext;
+  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + lightingSection + customNoteSection + briefSection + noPhotoContext;
 }

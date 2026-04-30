@@ -133,7 +133,8 @@ export function getBathroomBaseCost(
 
 export interface BuilderSelections {
   /** Optional pre-generation project brief (3 questions) */
-  projectBrief: import("./projectBrief").ProjectBrief | null;
+  projectBrief:    import("./projectBrief").ProjectBrief | null;
+  lightingOption:  LightingOption;
   roomPhotoUrl:         string | null;
   /** Bathroom size selection */
   bathroomSize:         BathroomSize;
@@ -305,6 +306,40 @@ export const TAPWARE_OPTIONS: {
     label:    "Brushed Gold",
     swatchBg: "linear-gradient(135deg,#e8c97e,#c9a84c,#b8962c)",
     premium:  "+14%",
+  },
+];
+
+// ── Lighting & Electrical ─────────────────────────────────────────
+
+export type LightingOption = "none" | "standard" | "premium";
+
+export const LIGHTING_OPTIONS: {
+  id:          LightingOption;
+  label:       string;
+  sub:         string;
+  cost:        number;   // AUD inc. GST — fixture + estimated electrician labour
+  promptLine:  string;
+}[] = [
+  {
+    id:         "none",
+    label:      "No Upgrade",
+    sub:        "Keep existing lighting",
+    cost:       0,
+    promptLine: "",
+  },
+  {
+    id:         "standard",
+    label:      "Heat Exhaust (3-in-1)",
+    sub:        "$308 fixture + ~$150 install",
+    cost:       458,    // Marvel 3-in-1 $308.18 ex GST (BDW #235561) + $150 electrician est.
+    promptLine: "Include a wall-mounted 3-in-1 heat/exhaust/light unit above the shower or toilet zone.",
+  },
+  {
+    id:         "premium",
+    label:      "LED Accent + Heat Exhaust",
+    sub:        "3-in-1 + under-vanity & cabinet LED",
+    cost:       908,    // $308.18 fixture + $350 LED fixtures + $250 electrician est.
+    promptLine: "Include a 3-in-1 heat/exhaust/light unit, LED strip lighting under the floating vanity, and integrated LED lighting around the shaving cabinet mirror.",
   },
 ];
 

@@ -3,18 +3,19 @@
 /**
  * ProjectBriefModal
  *
- * A minimalist 3-question brief that:
- *  1. Captures year of construction → triggers asbestos cost injection for pre-1990 homes
- *  2. Sets budget tier (Value / Standard / Premium) → adjusts cost estimate + Gemini prompt
+ * A minimalist 4-question brief that:
+ *  1. Captures year of construction → triggers asbestos cost for pre-1990 + wall-disturbing work
+ *  2. Sets plumbing & layout intention (keep existing / move plumbing) → adjusts cost + asbestos trigger
  *  3. Sets renovation scope (Full Strip-out / Cosmetic Refresh) → adjusts cost + prompt
+ *  4. How many bathrooms? → if 1, shows hygiene advisory modal after save
  */
 
 import { useState } from "react";
-import { X, ClipboardList, TriangleAlert, CheckCircle2, Hammer, Sparkles } from "lucide-react";
+import { X, ClipboardList, TriangleAlert, CheckCircle2, Hammer, Sparkles, Wrench, ArrowRight, Bath } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   type ProjectBrief,
-  type BudgetTier,
+  type PlumbingLayout,
   type RenovationScope,
   ASBESTOS_THRESHOLD_YEAR,
 } from "@/lib/projectBrief";
@@ -23,45 +24,37 @@ interface ProjectBriefModalProps {
   initial?: ProjectBrief | null;
   onSave:  (brief: ProjectBrief) => void;
   onClose: () => void;
+  /** Called after save when bathroomCount === 1 so parent can show hygiene modal */
+  onSingleBathroom?: () => void;
 }
 
-const BUDGET_TIERS: {
-  key:        BudgetTier;
-  label:      string;
-  sub:        string;
-  range:      string;
-  icon:       React.ReactNode;
-  featured?:  boolean;
+const PLUMBING_OPTIONS: {
+  key:   PlumbingLayout;
+  label: string;
+  sub:   string;
+  icon:  React.ReactNode;
+  cost?: string;
 }[] = [
   {
-    key:   "value",
-    label: "Value",
-    sub:   "Clean & functional",
-    range: "$10k – $18k",
-    icon:  <span className="text-lg">💧</span>,
+    key:   "keep-layout",
+    label: "Keep Existing Layout",
+    sub:   "All plumbing stays in place — lower cost, faster build",
+    icon:  <CheckCircle2 size={18} className="text-terracotta" />,
   },
   {
-    key:      "standard",
-    label:    "Standard",
-    sub:      "Quality upgrade",
-    range:    "$18k – $30k",
-    icon:     <span className="text-lg">⭐</span>,
-    featured: true,
-  },
-  {
-    key:   "premium",
-    label: "Premium",
-    sub:   "Luxury finish",
-    range: "$30k+",
-    icon:  <span className="text-lg">✨</span>,
+    key:   "move-plumbing",
+    label: "Moving Plumbing / Walls",
+    sub:   "Relocating fixtures, drains, or removing walls",
+    icon:  <Wrench size={18} className="text-terracotta" />,
+    cost:  "+$2,500 est.",
   },
 ];
 
 const SCOPE_OPTIONS: {
-  key:    RenovationScope;
-  label:  string;
-  sub:    string;
-  icon:   React.ReactNode;
+  key:   RenovationScope;
+  label: string;
+  sub:   string;
+  icon:  React.ReactNode;
 }[] = [
   {
     key:   "full-stripout",
@@ -77,20 +70,33 @@ const SCOPE_OPTIONS: {
   },
 ];
 
-export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectBriefModalProps) {
-  const [yearBuilt,   setYearBuilt]   = useState<string>(initial?.yearBuilt ? String(initial.yearBuilt) : "");
-  const [budgetTier,  setBudgetTier]  = useState<BudgetTier>(initial?.budgetTier  ?? "standard");
-  const [scope,       setScope]       = useState<RenovationScope>(initial?.scope ?? "full-stripout");
+const BATHROOM_COUNT_OPTIONS: { count: 1 | 2 | 3; label: string; sub: string }[] = [
+  { count: 1, label: "1 Bathroom",  sub: "Only bathroom in the home"          },
+  { count: 2, label: "2 Bathrooms", sub: "Secondary bathroom available"        },
+  { count: 3, label: "3+",          sub: "Multiple bathrooms / ensuite setup"  },
+];
+
+export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBathroom }: ProjectBriefModalProps) {
+  const [yearBuilt,       setYearBuilt]       = useState<string>(initial?.yearBuilt ? String(initial.yearBuilt) : "");
+  const [plumbingLayout,  setPlumbingLayout]  = useState<PlumbingLayout>(initial?.plumbingLayout  ?? "keep-layout");
+  const [scope,           setScope]           = useState<RenovationScope>(initial?.scope ?? "full-stripout");
+  const [bathroomCount,   setBathroomCount]   = useState<1 | 2 | 3>(initial?.bathroomCount ?? 1);
 
   const year      = parseInt(yearBuilt, 10);
   const validYear = !isNaN(year) && year >= 1900 && year <= new Date().getFullYear();
   const isOld     = validYear && year < ASBESTOS_THRESHOLD_YEAR;
 
-  const canSave   = validYear;
+  // Asbestos is triggered when walls will be disturbed in a pre-1990 home
+  const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
+
+  const canSave = validYear;
 
   function handleSave() {
     if (!canSave) return;
-    onSave({ yearBuilt: year, budgetTier, scope });
+    onSave({ yearBuilt: year, plumbingLayout, scope, bathroomCount });
+    if (bathroomCount === 1) {
+      onSingleBathroom?.();
+    }
   }
 
   return (
@@ -99,7 +105,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectB
       onClick={onClose}
     >
       <div
-        className="relative bg-white rounded-3xl shadow-warm-xl max-w-lg w-full overflow-hidden"
+        className="relative bg-white rounded-3xl shadow-warm-xl max-w-lg w-full overflow-hidden max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -110,7 +116,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectB
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-white">Project Brief</h2>
             <p className="text-xs text-white/50 mt-0.5">
-              3 quick questions — sharpens your cost estimate and AI rendering
+              4 quick questions — sharpens your cost estimate and AI rendering
             </p>
           </div>
           <button
@@ -149,7 +155,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectB
               {isOld && (
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                   <TriangleAlert size={13} strokeWidth={2.5} />
-                  <span>Pre-1990 — asbestos risk added to estimate</span>
+                  <span>Pre-1990 — possible asbestos risk</span>
                 </div>
               )}
               {validYear && !isOld && (
@@ -161,55 +167,66 @@ export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectB
             </div>
             {isOld && (
               <p className="mt-2 text-[11px] text-amber-600 leading-snug">
-                Australian homes built before 1990 commonly contain asbestos in bathroom wall and floor sheeting.
-                A licensed removal will be added as a line item (~$2,272 inc. GST).
+                Australian homes built before 1990 may contain asbestos in bathroom sheeting.
+                If you&apos;re doing a full strip-out or moving plumbing, removal will be added as a line item (~$2,272 inc. GST).
               </p>
             )}
           </div>
 
-          {/* ── Q2: Budget tier ── */}
+          {/* ── Q2: Plumbing & Layout ── */}
           <div>
             <label className="block text-xs font-bold text-charcoal/50 uppercase tracking-widest mb-2">
-              2 — Budget tier
+              2 — Plumbing &amp; layout
             </label>
-            <div className="grid grid-cols-3 gap-3">
-              {BUDGET_TIERS.map(({ key, label, sub, range, icon, featured }) => {
-                const active = budgetTier === key;
+            <div className="flex flex-col gap-2.5">
+              {PLUMBING_OPTIONS.map(({ key, label, sub, icon, cost }) => {
+                const active = plumbingLayout === key;
                 return (
                   <button
                     key={key}
-                    onClick={() => setBudgetTier(key)}
+                    onClick={() => setPlumbingLayout(key)}
                     className={cn(
-                      "relative flex flex-col items-center gap-1.5 p-4 rounded-2xl border-2 transition-all duration-200 text-center",
+                      "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left",
                       active
-                        ? featured
-                          ? "border-terracotta bg-terracotta/6 shadow-warm-sm"
-                          : "border-charcoal/60 bg-charcoal/4"
-                        : "border-sand-200 bg-sand-50 hover:border-charcoal/20",
+                        ? "border-terracotta bg-terracotta/5 shadow-warm-sm"
+                        : "border-sand-200 bg-sand-50 hover:border-terracotta/30",
                     )}
                   >
-                    {featured && (
-                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-terracotta text-white text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                        Most Popular
+                    <div className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
+                      active ? "bg-terracotta/15" : "bg-sand-200",
+                    )}>
+                      {icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("text-sm font-bold", active ? "text-charcoal" : "text-charcoal/60")}>{label}</p>
+                      <p className="text-xs text-charcoal/40 mt-0.5">{sub}</p>
+                    </div>
+                    {cost && (
+                      <span className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/30")}>
+                        {cost}
                       </span>
                     )}
-                    <span>{icon}</span>
-                    <p className={cn("text-sm font-bold", active ? "text-charcoal" : "text-charcoal/60")}>{label}</p>
-                    <p className="text-[10px] text-charcoal/40">{sub}</p>
-                    <p className={cn("text-xs font-semibold mt-0.5", active ? "text-terracotta" : "text-charcoal/30")}>{range}</p>
+                    <div className={cn(
+                      "ml-auto w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all",
+                      active ? "border-terracotta bg-terracotta" : "border-charcoal/20",
+                    )} />
                   </button>
                 );
               })}
             </div>
-            {budgetTier === "premium" && (
-              <p className="mt-2 text-[11px] text-charcoal/50 leading-snug">
-                Premium tier uses brushed brass / matte black tapware, high-end stone tiles, and
-                hotel-grade staging in the AI render.
-              </p>
+            {/* Asbestos warning — shown when the combination triggers it */}
+            {asbestosTriggered && (
+              <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                <p className="text-[11px] text-amber-700 leading-snug">
+                  Pre-1990 home + wall disturbance = asbestos removal added to estimate (~$2,272 inc. GST)
+                </p>
+              </div>
             )}
           </div>
 
-          {/* ── Q3: Scope ── */}
+          {/* ── Q3: Renovation scope ── */}
           <div>
             <label className="block text-xs font-bold text-charcoal/50 uppercase tracking-widest mb-2">
               3 — Renovation scope
@@ -248,22 +265,67 @@ export default function ProjectBriefModal({ initial, onSave, onClose }: ProjectB
             </div>
           </div>
 
+          {/* ── Q4: How many bathrooms? ── */}
+          <div>
+            <label className="block text-xs font-bold text-charcoal/50 uppercase tracking-widest mb-2">
+              4 — How many bathrooms are you renovating?
+            </label>
+            <div className="grid grid-cols-3 gap-2.5">
+              {BATHROOM_COUNT_OPTIONS.map(({ count, label, sub }) => {
+                const active = bathroomCount === count;
+                return (
+                  <button
+                    key={count}
+                    onClick={() => setBathroomCount(count)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border-2 transition-all duration-200 text-center",
+                      active
+                        ? "border-terracotta bg-terracotta/5 shadow-warm-sm"
+                        : "border-sand-200 bg-sand-50 hover:border-terracotta/30",
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
+                      active ? "bg-terracotta/15" : "bg-sand-200",
+                    )}>
+                      <Bath size={16} className={active ? "text-terracotta" : "text-charcoal/40"} />
+                    </div>
+                    <p className={cn("text-xs font-bold leading-tight", active ? "text-charcoal" : "text-charcoal/60")}>{label}</p>
+                    <p className="text-[10px] text-charcoal/35 leading-tight">{sub}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {bathroomCount === 1 && (
+              <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+                <p className="text-[11px] text-amber-700 leading-snug">
+                  Single bathroom — we&apos;ll show you how to plan hygiene access during the build.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* ── Save ── */}
           <button
             onClick={handleSave}
             disabled={!canSave}
             className={cn(
-              "w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200",
+              "w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold transition-all duration-200",
               canSave
                 ? "bg-terracotta text-white hover:bg-terracotta/90 shadow-warm-sm"
                 : "bg-sand-200 text-charcoal/30 cursor-not-allowed",
             )}
           >
-            {canSave ? "Save Brief & Update Estimate" : "Enter year of construction to continue"}
+            {canSave ? (
+              <>Save Brief &amp; Update Estimate <ArrowRight size={15} /></>
+            ) : (
+              "Enter year of construction to continue"
+            )}
           </button>
 
           <p className="text-center text-[10px] text-charcoal/30 -mt-2">
-            Brief affects your cost breakdown and the AI rendering style · Can be updated anytime
+            Brief affects your cost breakdown and AI rendering · Can be updated anytime
           </p>
         </div>
       </div>

@@ -12,6 +12,12 @@ import {
   BUDGET_MAX,
 } from "./types";
 import { type ProjectBrief } from "./projectBrief";
+import {
+  type RoomType,
+  type KitchenSelections,
+  type BedroomSelections,
+  type SavedRoom,
+} from "./roomTypes";
 
 // ── OAuth state persistence ────────────────────────────────────────
 // When Google OAuth redirects away from the page, the Zustand store
@@ -96,7 +102,49 @@ export function restoreBuilderStateFromAuth(): boolean {
   }
 }
 
+// ── Default kitchen selections ────────────────────────────────────────────────
+const defaultKitchenSelections: KitchenSelections = {
+  cabinetry:  "shaker",
+  benchtop:   "engineered-stone",
+  mixer:      "brushed-brass",
+  splashback: "subway-vertical",
+  cooktop:    "induction",
+  dishwasher: "integrated",
+  hasIsland:  false,
+  customNote: "",
+};
+
+// ── Default bedroom selections ────────────────────────────────────────────────
+const defaultBedroomSelections: BedroomSelections = {
+  flooring:          "engineered-oak-herringbone",
+  wallTreatment:     "feature-paint",
+  lighting:          "architectural-downlights",
+  storage:           "built-in-mirror-sliders",
+  windowTreatment:   "floor-ceiling-sheers",
+  hasElectricalWork: false,
+  customNote:        "",
+};
+
 interface BuilderStore extends BuilderSelections {
+  // ── Room type ──────────────────────────────────────────────────────────────
+  roomType:              RoomType;
+  setRoomType:           (r: RoomType) => void;
+
+  // ── Kitchen selections ─────────────────────────────────────────────────────
+  kitchenSelections:    KitchenSelections;
+  setKitchenSelections: (s: Partial<KitchenSelections>) => void;
+
+  // ── Bedroom selections ─────────────────────────────────────────────────────
+  bedroomSelections:    BedroomSelections;
+  setBedroomSelections: (s: Partial<BedroomSelections>) => void;
+
+  // ── Multi-room project ─────────────────────────────────────────────────────
+  savedRooms:    SavedRoom[];
+  saveCurrentRoom:  (label?: string) => void;
+  removeSavedRoom:  (id: string)     => void;
+  clearSavedRooms:  ()               => void;
+
+  // ── Existing setters ───────────────────────────────────────────────────────
   setRoomPhotoUrl:        (url: string | null)            => void;
   setFloorTile:           (tile: TileOption | null)        => void;
   setWallTile:            (tile: TileOption | null)        => void;
@@ -152,9 +200,47 @@ const defaults: BuilderSelections = {
   generateDescription: null,
 };
 
-export const useBuilderStore = create<BuilderStore>((set) => ({
+export const useBuilderStore = create<BuilderStore>((set, get) => ({
   ...defaults,
 
+  // ── Room type ──────────────────────────────────────────────────────────────
+  roomType:              "bathroom",
+  setRoomType:           (r) => set({ roomType: r, generatedImageUrl: null, generateDescription: null }),
+
+  // ── Kitchen ───────────────────────────────────────────────────────────────
+  kitchenSelections:     defaultKitchenSelections,
+  setKitchenSelections:  (s) => set((st) => ({ kitchenSelections: { ...st.kitchenSelections, ...s } })),
+
+  // ── Bedroom ───────────────────────────────────────────────────────────────
+  bedroomSelections:     defaultBedroomSelections,
+  setBedroomSelections:  (s) => set((st) => ({ bedroomSelections: { ...st.bedroomSelections, ...s } })),
+
+  // ── Multi-room ────────────────────────────────────────────────────────────
+  savedRooms: [],
+  saveCurrentRoom: (label) => set((st) => {
+    const id = `room-${Date.now()}`;
+    const roomLabel = label ?? (
+      st.roomType === "bathroom" ? "Bathroom"
+      : st.roomType === "kitchen" ? "Kitchen"
+      : "Bedroom"
+    );
+    const newRoom: SavedRoom = {
+      id,
+      roomType:          st.roomType,
+      roomLabel,
+      roomPhotoUrl:      st.roomPhotoUrl,
+      generatedImageUrl: st.generatedImageUrl,
+      estimatedCost:     0, // caller sets this after calculating
+      kitchenSelections: st.roomType === "kitchen"  ? { ...st.kitchenSelections } : undefined,
+      bedroomSelections: st.roomType === "bedroom"  ? { ...st.bedroomSelections } : undefined,
+      projectBrief:      st.roomType === "bathroom" ? st.projectBrief : undefined,
+    };
+    return { savedRooms: [...st.savedRooms, newRoom] };
+  }),
+  removeSavedRoom: (id)  => set((st) => ({ savedRooms: st.savedRooms.filter((r) => r.id !== id) })),
+  clearSavedRooms: ()    => set({ savedRooms: [] }),
+
+  // ── Existing setters ───────────────────────────────────────────────────────
   setRoomPhotoUrl:        (url)   => set({ roomPhotoUrl: url }),
   setFloorTile:           (tile)  => set({ floorTile: tile }),
   setWallTile:            (tile)  => set({ wallTile: tile }),
@@ -176,5 +262,5 @@ export const useBuilderStore = create<BuilderStore>((set) => ({
   setCustomWidth:         (n)     => set({ customWidth: n }),
   setGeneratedImageUrl:   (url)   => set({ generatedImageUrl: url }),
   setGenerateDescription: (desc)  => set({ generateDescription: desc }),
-  reset:                  ()      => set({ ...defaults }),
+  reset:                  ()      => set({ ...defaults, roomType: "bathroom", kitchenSelections: defaultKitchenSelections, bedroomSelections: defaultBedroomSelections, savedRooms: [] }),
 }));

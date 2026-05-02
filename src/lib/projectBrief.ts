@@ -9,13 +9,14 @@
 
 // ── Types ──────────────────────────────────────────────────────────
 
-export type BudgetTier       = "value" | "standard" | "premium";
-export type RenovationScope  = "full-stripout" | "cosmetic-refresh";
+export type PlumbingLayout  = "keep-layout" | "move-plumbing";
+export type RenovationScope = "full-stripout" | "cosmetic-refresh";
 
 export interface ProjectBrief {
-  yearBuilt:  number;           // e.g. 1985
-  budgetTier: BudgetTier;
-  scope:      RenovationScope;
+  yearBuilt:      number;         // e.g. 1985
+  plumbingLayout: PlumbingLayout;
+  scope:          RenovationScope;
+  bathroomCount:  1 | 2 | 3;     // 1 = sole bathroom → triggers hygiene advisory
 }
 
 // ── Asbestos ───────────────────────────────────────────────────────
@@ -29,59 +30,43 @@ export const ASBESTOS_THRESHOLD_YEAR = 1990;
  */
 export const ASBESTOS_COST_INC_GST = 2_272;
 
+/**
+ * Asbestos risk is triggered when:
+ *  - The home was built before 1990 (high likelihood of ACM in wet-area sheeting)
+ *  - AND the job disturbs walls/substrate: full strip-out OR moving plumbing
+ *
+ * A cosmetic refresh that keeps all existing layout rarely disturbs wall sheeting
+ * and therefore carries lower risk. A full strip-out or plumbing move always does.
+ */
 export function needsAsbestosCheck(brief: ProjectBrief | null): boolean {
-  return !!brief && brief.yearBuilt > 0 && brief.yearBuilt < ASBESTOS_THRESHOLD_YEAR;
+  if (!brief || brief.yearBuilt <= 0 || brief.yearBuilt >= ASBESTOS_THRESHOLD_YEAR) return false;
+  return brief.scope === "full-stripout" || brief.plumbingLayout === "move-plumbing";
 }
 
-// ── Real invoice benchmarks by budget tier ─────────────────────────
+// ── Cost constants (conservative mid-range benchmarks) ─────────────
 
 /**
- * Shower screen supply + install.
- * Premium figure from Millennium Glass #27532:
- *   $1,550 (screen) + $200 (Enduro-shield) + GST = $1,925
+ * Shower screen — standard mid-range semi-frameless (Millennium Glass anchor).
+ * Invoice figure was $1,925 for premium; $1,450 is realistic for standard finish.
  */
-export const SHOWER_SCREEN_COST: Record<BudgetTier, number> = {
-  value:    1_100,   // basic semi-frameless, chrome fittings
-  standard: 1_450,   // mid-range, choice of finish
-  premium:  1_925,   // semi-frameless, brushed brass + Enduro-shield (exact invoice)
-};
+export const SHOWER_SCREEN_COST_STANDARD = 1_450;
 
 /**
- * Hardware & fixtures — toilet, vanity, tapware, accessories.
- * Premium figure from BDW #235561:
- *   $3,167.69 ex GST → $3,484.44 inc. GST (Urban Brass / Brushed Gold package)
+ * Fixtures & hardware — toilet, vanity, tapware, accessories.
+ * Calibrated to mid-range specification (e.g. Shelly Slim mixers at ~$232 ea.)
+ * rather than the premium BDW quote ($3,484). Targets the $25k–$35k standard range.
  */
-export const HARDWARE_COST: Record<BudgetTier, number> = {
-  value:    1_600,   // economy toilet + vanity + chrome tapware
-  standard: 2_400,   // mid-range suite
-  premium:  3_484,   // BDW invoice figure — brushed gold/urban brass package
-};
+export const HARDWARE_COST_STANDARD = 2_000;
+
+/** Plumbing relocation — drain repositioning + rough-in, estimate for standard move */
+export const PLUMBING_RELOCATION_COST = 2_500;
 
 /** Strip-out scope adders */
 export const STRIPOUT_LABOUR_COST = 1_500;   // demo + skip bin + clean waste
 export const WATERPROOFING_COST   =   800;   // membrane for new wet area surfaces
 export const COSMETIC_PREP_COST   =   350;   // surface prep for refresh-only
 
-// ── Tier multipliers (applied to base build estimate) ──────────────
-
-export const TIER_MULTIPLIER: Record<BudgetTier, number> = {
-  value:    0.78,
-  standard: 1.00,
-  premium:  1.28,
-};
-
 // ── Prompt injections ──────────────────────────────────────────────
-
-export const TIER_PROMPT_SUFFIX: Record<BudgetTier, string> = {
-  value:
-    "This is a budget-conscious renovation. Use clean, simple finishes — white subway tiles, " +
-    "chrome tapware, and a streamlined vanity. Neat and functional, like a well-maintained property.",
-  standard: "",   // use normal prompt — no override
-  premium:
-    "This is a luxury premium renovation. Render with brushed brass or matte black tapware, " +
-    "high-end natural stone (marble, travertine, or honed limestone), a hotel-grade frameless " +
-    "or semi-frameless shower screen, and spa-quality staging. Ultra-premium photorealistic finish.",
-};
 
 export const SCOPE_PROMPT_SUFFIX: Record<RenovationScope, string> = {
   "full-stripout":
@@ -92,6 +77,11 @@ export const SCOPE_PROMPT_SUFFIX: Record<RenovationScope, string> = {
     "fixture locations, and room layout. Focus changes on surfaces and finishes only.",
 };
 
+export const PLUMBING_LAYOUT_PROMPT_SUFFIX: Record<PlumbingLayout, string> = {
+  "keep-layout":   "",   // no extra instruction needed — default behaviour
+  "move-plumbing": "Plumbing positions and wall layouts may be optimised for the best result.",
+};
+
 // ── Itemised cost breakdown ────────────────────────────────────────
 
 export interface BriefCostItem {
@@ -99,28 +89,28 @@ export interface BriefCostItem {
   amount:   number;        // AUD inc. GST
   detail?:  string;
   warning?: boolean;       // renders with amber highlight
-  source?:  string;        // e.g. "Asbestos Cleanaway INV2652"
+  source?:  string;        // invoice reference
 }
 
 /**
  * Returns the extra line items driven by the project brief.
- * These are displayed BELOW the existing estimate breakdown.
+ * All figures are conservative mid-range estimates unless sourced from invoices.
  */
 export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
   const items: BriefCostItem[] = [];
 
-  // 1. Asbestos — triggered by pre-1990 build year
+  // 1. Asbestos — only when walls will be disturbed in a pre-1990 home
   if (needsAsbestosCheck(brief)) {
     items.push({
       label:   "Asbestos Testing & Removal",
       amount:  ASBESTOS_COST_INC_GST,
-      detail:  "Full bathroom stripout + testing. Pre-1990 homes in QLD commonly contain asbestos in wet-area sheeting.",
+      detail:  "Full bathroom stripout + testing. Pre-1990 homes commonly contain asbestos in wet-area sheeting.",
       warning: true,
       source:  "Asbestos Cleanaway INV2652, Feb 2026",
     });
   }
 
-  // 2. Scope — demolition or prep
+  // 2. Scope — demolition or light prep
   if (brief.scope === "full-stripout") {
     items.push({
       label:  "Strip-out & Demolition",
@@ -135,26 +125,28 @@ export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
     });
   }
 
-  // 3. Shower screen — tier-based, real invoice anchor for premium
+  // 3. Plumbing relocation (if moving fixtures or walls)
+  if (brief.plumbingLayout === "move-plumbing") {
+    items.push({
+      label:  "Plumbing Relocation",
+      amount: PLUMBING_RELOCATION_COST,
+      detail: "Repositioning drain points and rough-in plumbing. Final cost depends on slab type and move distance.",
+    });
+  }
+
+  // 4. Shower screen — standard mid-range (Millennium Glass invoice anchor)
   items.push({
     label:  "Shower Screen (supply + install)",
-    amount: SHOWER_SCREEN_COST[brief.budgetTier],
-    detail:
-      brief.budgetTier === "premium"
-        ? "Semi-frameless, 6mm toughened glass, brushed brass hardware, Enduro-shield coating"
-        : "Semi-frameless shower screen, supplied and installed",
-    source: brief.budgetTier === "premium" ? "Millennium Glass #27532, Mar 2026" : undefined,
+    amount: SHOWER_SCREEN_COST_STANDARD,
+    detail: "Semi-frameless, choice of finish, supply and install",
+    source: "Based on Millennium Glass #27532, Mar 2026",
   });
 
-  // 4. Fixtures & hardware — tier-based, real invoice anchor for premium
+  // 5. Fixtures & hardware — calibrated to Shelly Slim mixer level
   items.push({
     label:  "Fixtures & Hardware",
-    amount: HARDWARE_COST[brief.budgetTier],
-    detail:
-      brief.budgetTier === "premium"
-        ? "Rimless toilet, floating vanity + ceramic top, brushed gold tapware, heated towel rail, accessories"
-        : "Toilet suite, vanity, tapware, bathroom accessories",
-    source: brief.budgetTier === "premium" ? "BDW Quote #235561, Jan 2026" : undefined,
+    amount: HARDWARE_COST_STANDARD,
+    detail: "Toilet suite, vanity, mid-range tapware (e.g. Shelly Slim mixers ~$232 ea.), bathroom accessories",
   });
 
   return items;

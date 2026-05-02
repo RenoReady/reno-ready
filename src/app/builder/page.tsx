@@ -24,15 +24,28 @@ import {
 } from "@/lib/types";
 import PaywallModal from "@/components/ui/PaywallModal";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
+import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
+import StyleLibrary, { STYLE_PRESETS, type StylePreset } from "@/components/ui/StyleLibrary";
+import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
+import RoomRouter from "@/components/ui/RoomRouter";
+import KitchenSidebar from "@/components/ui/KitchenSidebar";
+import BedroomSidebar from "@/components/ui/BedroomSidebar";
+import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
 import { useUserStatus, bustUserStatusCache } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
 import {
   type ProjectBrief,
+  type PlumbingLayout,
   calcBriefCostItems,
   calcBriefTotal,
   needsAsbestosCheck,
-  TIER_MULTIPLIER,
 } from "@/lib/projectBrief";
+import {
+  type RoomType,
+  ROOM_LABELS,
+  calcKitchenCost,
+  calcBedroomCost,
+} from "@/lib/roomTypes";
 
 // ══════════════════════════════════════════════════════════════════
 //  DESIGN CONCIERGE  — cycling tips during generation
@@ -203,13 +216,20 @@ function TileCard({ tile, selected, onSelect, onInfo }: {
   };
 
   return (
-    <button
+    // div + role="button" avoids the invalid <button> inside <button> nesting
+    // (the info icon is a <button> so the outer must not be one too)
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
       onPointerDown={startLongPress}
       onPointerUp={cancelLongPress}
       onPointerLeave={cancelLongPress}
+      aria-label={`${tile.name} — ${tile.description}`}
+      aria-pressed={selected}
       className={cn(
-        "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none",
+        "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none cursor-pointer",
         selected
           ? "ring-2 ring-terracotta ring-offset-2 shadow-warm scale-[1.04]"
           : "ring-1 ring-sand-200 hover:ring-terracotta/40 hover:shadow-warm-sm hover:scale-[1.02]",
@@ -218,7 +238,7 @@ function TileCard({ tile, selected, onSelect, onInfo }: {
       {/* SVG texture thumbnail */}
       <TileTexture tileId={tile.id} size={80} className="absolute inset-0 w-full h-full" style={{ width: "100%", height: "100%" }} />
 
-      {/* Info icon */}
+      {/* Info icon — proper <button> with no outer button ancestor */}
       <div className="absolute top-1.5 left-1.5 z-10">
         <button
           onClick={(e) => { e.stopPropagation(); onInfo(); }}
@@ -242,7 +262,7 @@ function TileCard({ tile, selected, onSelect, onInfo }: {
           {tile.name}
         </p>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -453,11 +473,9 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           bathroomSize, customLength, customWidth, projectBrief,
           lightingOption } = useBuilderStore();
 
-  const baseCost       = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-  const tierMultiplier = projectBrief ? TIER_MULTIPLIER[projectBrief.budgetTier] : 1;
-  const estimated      = Math.round(
-    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost)
-    * tierMultiplier / 500
+  const baseCost  = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+  const estimated = Math.round(
+    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
   ) * 500;
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
@@ -592,7 +610,7 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           className="flex items-center gap-2 w-full py-2 px-3 rounded-xl text-[10px] font-semibold text-white/30 hover:text-white/50 transition-colors"
         >
           <ClipboardList size={11} />
-          {projectBrief.yearBuilt} · {projectBrief.budgetTier} · {projectBrief.scope === "full-stripout" ? "Full strip-out" : "Cosmetic refresh"}
+          {projectBrief.yearBuilt} · {projectBrief.plumbingLayout === "move-plumbing" ? "Moving plumbing" : "Keep layout"} · {projectBrief.scope === "full-stripout" ? "Full strip-out" : "Cosmetic refresh"}
           {hasAsbestos && <TriangleAlert size={10} className="text-amber-400 ml-1" />}
           <span className="ml-auto underline underline-offset-2">Edit brief</span>
         </button>
@@ -784,16 +802,18 @@ function getRegionLabel(xPct: number, yPct: number): string {
 }
 
 function ArchitectViewport({
-  onGenerate, onViewFullPreview, onRegionClick, isGenerating,
-  viewportState, generateDescription, generateError,
+  onGenerate, onViewFullPreview, onRegionClick, onZoneClick, isGenerating,
+  viewportState, generateDescription, generateError, activeZone,
 }: {
   onGenerate:        () => void;
   onViewFullPreview: () => void;
   onRegionClick:     (region: string) => void;
+  onZoneClick?:      (zone: ZoneId) => void;
   isGenerating:      boolean;
   viewportState:     ViewportState;
   generateDescription: string | null;
   generateError:       string | null;
+  activeZone?:       ZoneId | null;
 }) {
   const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware } = useBuilderStore();
 
@@ -947,21 +967,20 @@ function ArchitectViewport({
       {/* ── Canvas ──────────────────────────────────────────── */}
       <div className="relative w-full flex-1" style={{ minHeight: isFullscreen ? "calc(100vh - 145px)" : "460px" }}>
 
-        {/* Floating "View Full Preview" FAB — appears once generation completes */}
+        {/* Floating "Next → View Full Preview" FAB — appears once generation completes */}
         {hasGenerated && !isGenerating && (
           <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
             <button
               onClick={onViewFullPreview}
               className={cn(
-                "flex items-center gap-2.5 px-5 py-3 rounded-2xl",
-                "bg-terracotta text-white text-sm font-bold",
-                "shadow-[0_8px_32px_rgba(210,125,94,0.45)]",
-                "hover:bg-terracotta/90 hover:scale-105 active:scale-100",
+                "flex items-center gap-2.5 px-6 py-3 rounded-2xl",
+                "bg-blue-600 text-white text-sm font-bold",
+                "shadow-[0_8px_32px_rgba(37,99,235,0.5)]",
+                "hover:bg-blue-700 hover:scale-105 active:scale-100",
                 "transition-all duration-200",
               )}
             >
-              <Sparkles size={15} />
-              View Full Preview
+              Next → View Full Preview
               <ArrowRight size={15} />
             </button>
           </div>
@@ -1046,7 +1065,14 @@ function ArchitectViewport({
         ) : (
           <div className="absolute inset-0">
             {hasGenerated && generatedImageUrl ? (
-              <img src={generatedImageUrl} alt="AI Preview" className="w-full h-full object-cover" />  /* eslint-disable-line */
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={generatedImageUrl} alt="AI Preview" className="w-full h-full object-cover" />
+                {/* Zone swap overlay — click a zone to target refinement */}
+                {!isGenerating && onZoneClick && (
+                  <ZoneSwapOverlay onZoneClick={onZoneClick} activeZone={activeZone} />
+                )}
+              </>
             ) : viewportState === "idle" && !isGenerating ? (
               <BlueprintIdle onGenerate={onGenerate} />
             ) : roomPhotoUrl ? (
@@ -1123,30 +1149,26 @@ function InlineBriefPanel({
   projectBrief,
   onSave,
 }: {
-  projectBrief: import("@/lib/projectBrief").ProjectBrief | null;
-  onSave: (b: import("@/lib/projectBrief").ProjectBrief) => void;
+  projectBrief: ProjectBrief | null;
+  onSave: (b: ProjectBrief) => void;
 }) {
-  const [year,   setYear]   = useState(projectBrief?.yearBuilt  ? String(projectBrief.yearBuilt)  : "");
-  const [tier,   setTier]   = useState<import("@/lib/projectBrief").BudgetTier>(projectBrief?.budgetTier  ?? "standard");
-  const [scope,  setScope]  = useState<import("@/lib/projectBrief").RenovationScope>(projectBrief?.scope ?? "full-stripout");
+  const [year,           setYear]           = useState(projectBrief?.yearBuilt       ? String(projectBrief.yearBuilt) : "");
+  const [plumbingLayout, setPlumbingLayout] = useState<PlumbingLayout>(projectBrief?.plumbingLayout ?? "keep-layout");
+  const [scope,          setScope]          = useState<import("@/lib/projectBrief").RenovationScope>(projectBrief?.scope ?? "full-stripout");
 
-  const { ASBESTOS_THRESHOLD_YEAR } = require("@/lib/projectBrief");
-  const y      = parseInt(year, 10);
-  const valid  = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
-  const isOld  = valid && y < ASBESTOS_THRESHOLD_YEAR;
+  const y     = parseInt(year, 10);
+  const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
+  const isOld = valid && y < 1990;
+
+  // Asbestos triggers when pre-1990 AND walls will be disturbed
+  const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
   // Auto-save whenever any value changes and year is valid
   useEffect(() => {
     if (!valid) return;
-    onSave({ yearBuilt: y, budgetTier: tier, scope });
+    onSave({ yearBuilt: y, plumbingLayout, scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, tier, scope]);
-
-  const TIERS: { key: import("@/lib/projectBrief").BudgetTier; label: string; range: string }[] = [
-    { key: "value",    label: "Value",    range: "$10–18k" },
-    { key: "standard", label: "Standard", range: "$18–30k" },
-    { key: "premium",  label: "Premium",  range: "$30k+"   },
-  ];
+  }, [year, plumbingLayout, scope]);
 
   return (
     <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-5">
@@ -1171,24 +1193,38 @@ function InlineBriefPanel({
         {isOld && (
           <div className="flex items-start gap-1.5 mt-1.5">
             <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-            <p className="text-[10px] text-amber-700 leading-snug">Pre-1990 — asbestos removal added to estimate (~$2,272)</p>
+            <p className="text-[10px] text-amber-700 leading-snug">Pre-1990 — asbestos risk if strip-out or plumbing move</p>
           </div>
         )}
       </div>
 
-      {/* Budget tier */}
+      {/* Plumbing & Layout */}
       <div>
-        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Budget tier</p>
+        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Plumbing &amp; Layout</p>
         <div className="flex flex-col gap-1.5">
-          {TIERS.map(({ key, label, range }) => (
-            <button key={key} onClick={() => setTier(key)}
-              className={cn("flex items-center justify-between px-3 py-2 rounded-xl border-2 text-left transition-all duration-200",
-                tier === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
-              <p className={cn("text-xs font-semibold", tier === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
-              <p className={cn("text-[10px] tabular-nums", tier === key ? "text-terracotta/70" : "text-charcoal/35")}>{range}</p>
+          {([
+            { key: "keep-layout",   label: "Keep Existing Layout", sub: "No plumbing moves",          cost: null        },
+            { key: "move-plumbing", label: "Moving Plumbing/Walls", sub: "Relocating fixtures/drains", cost: "+$2,500" },
+          ] as { key: PlumbingLayout; label: string; sub: string; cost: string | null }[]).map(({ key, label, sub, cost }) => (
+            <button key={key} onClick={() => setPlumbingLayout(key)}
+              className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
+                plumbingLayout === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
+              <div className="min-w-0">
+                <p className={cn("text-xs font-semibold", plumbingLayout === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
+                <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
+              </div>
+              {cost && (
+                <p className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", plumbingLayout === key ? "text-terracotta/70" : "text-charcoal/30")}>{cost}</p>
+              )}
             </button>
           ))}
         </div>
+        {asbestosTriggered && (
+          <div className="flex items-start gap-1.5 mt-1.5">
+            <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+            <p className="text-[10px] text-amber-700 leading-snug">Asbestos removal added to estimate (~$2,272)</p>
+          </div>
+        )}
       </div>
 
       {/* Scope */}
@@ -1196,8 +1232,8 @@ function InlineBriefPanel({
         <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Scope</p>
         <div className="flex flex-col gap-1.5">
           {([
-            { key: "full-stripout",    label: "Full Strip-out",    sub: "Complete gut renovation" },
-            { key: "cosmetic-refresh", label: "Cosmetic Refresh",  sub: "Surfaces & finishes only" },
+            { key: "full-stripout",    label: "Full Strip-out",   sub: "Complete gut renovation"  },
+            { key: "cosmetic-refresh", label: "Cosmetic Refresh", sub: "Surfaces & finishes only" },
           ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string }[]).map(({ key, label, sub }) => (
             <button key={key} onClick={() => setScope(key)}
               className={cn("flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
@@ -1210,7 +1246,7 @@ function InlineBriefPanel({
       </div>
 
       {!valid && (
-        <p className="text-[10px] text-charcoal/35 text-center">Enter year to activate cost estimate</p>
+        <p className="text-[10px] text-charcoal/35 text-center">Enter year built to activate cost estimate</p>
       )}
     </div>
   );
@@ -1278,21 +1314,29 @@ export default function BuilderPage() {
     generateDescription,
     projectBrief,       setProjectBrief,
     lightingOption,     setLightingOption,
+    roomType,           setRoomType,
+    kitchenSelections,  setKitchenSelections,
+    bedroomSelections,  setBedroomSelections,
+    savedRooms,         saveCurrentRoom,
   } = useBuilderStore();
 
   const userStatus = useUserStatus(statusRefreshKey);
 
-  const [isDragging,       setIsDragging]      = useState(false);
-  const [viewportState,    setViewportState]   = useState<ViewportState>("idle");
-  const [isGenerating,     setIsGenerating]    = useState(false);
-  const [generateError,    setGenerateError]   = useState<string | null>(null);
-  const [showAuthModal,    setShowAuthModal]    = useState(false);
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
-  const [showBriefModal,   setShowBriefModal]   = useState(false);
-  const [modalTile,        setModalTile]       = useState<TileOption | null>(null);
-  const [refinementNote,   setRefinementNote]  = useState("");
-  const [isRefining,       setIsRefining]      = useState(false);
-  const [selectedRegion,   setSelectedRegion]  = useState<string | null>(null);
+  const [isDragging,         setIsDragging]        = useState(false);
+  const [viewportState,      setViewportState]     = useState<ViewportState>("idle");
+  const [isGenerating,       setIsGenerating]      = useState(false);
+  const [generateError,      setGenerateError]     = useState<string | null>(null);
+  const [showRoomRouter,     setShowRoomRouter]     = useState(true);
+  const [showAuthModal,      setShowAuthModal]      = useState(false);
+  const [showPaywallModal,   setShowPaywallModal]   = useState(false);
+  const [showBriefModal,     setShowBriefModal]     = useState(false);
+  const [showHygieneModal,   setShowHygieneModal]   = useState(false);
+  const [activeStylePreset,  setActiveStylePreset]  = useState<string | null>(null);
+  const [activeZone,         setActiveZone]         = useState<ZoneId | null>(null);
+  const [modalTile,          setModalTile]          = useState<TileOption | null>(null);
+  const [refinementNote,     setRefinementNote]     = useState("");
+  const [isRefining,         setIsRefining]         = useState(false);
+  const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -1314,6 +1358,33 @@ export default function BuilderPage() {
     };
     reader.readAsDataURL(file);
   }, [setRoomPhotoUrl]);
+
+  // Apply a style library preset to all tile/vanity/tapware selections
+  const handleStylePreset = useCallback((preset: StylePreset) => {
+    const floor = FLOOR_TILES.find((t) => t.id === preset.floorTileId) ?? null;
+    const wall  = WALL_TILES.find((t)  => t.id === preset.wallTileId)  ?? null;
+    if (floor) setFloorTile(floor);
+    if (wall)  setWallTile(wall);
+    setVanity(preset.vanity);
+    setTapware(preset.tapware);
+    setTileStyle(preset.tileStyle);
+    setCustomFloorColor(null);
+    setCustomWallColor(null);
+    setActiveStylePreset(preset.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Zone click → pre-fill refinement text with zone-specific instruction
+  const handleZoneClick = useCallback((zone: ZoneId) => {
+    setActiveZone(zone);
+    const suggestions: Record<ZoneId, string> = {
+      floor:  "Change the floor tiles to ",
+      walls:  "Change the wall tiles to ",
+      vanity: "Replace the vanity with a ",
+    };
+    setRefinementNote(suggestions[zone]);
+    setSelectedRegion(zone.charAt(0).toUpperCase() + zone.slice(1));
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!isAuthed()) {
@@ -1359,8 +1430,11 @@ export default function BuilderPage() {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64:  store.roomPhotoUrl,
-          projectBrief: store.projectBrief,
+          imageBase64:       store.roomPhotoUrl,
+          projectBrief:      store.projectBrief,
+          roomType:          store.roomType,
+          kitchenSelections: store.roomType === "kitchen" ? store.kitchenSelections : undefined,
+          bedroomSelections: store.roomType === "bedroom" ? store.bedroomSelections : undefined,
           prompt,
           selections: {
             floorTile:         store.floorTile,
@@ -1526,9 +1600,47 @@ export default function BuilderPage() {
     <div className="min-h-screen bg-sand">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
 
+        {/* ── Room Router overlay — shown until user confirms a room type ── */}
+        {showRoomRouter && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+            <div className="bg-sand rounded-3xl p-8 w-full max-w-3xl shadow-warm-xl relative">
+              {savedRooms.length > 0 && (
+                <button
+                  onClick={() => setShowRoomRouter(false)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-charcoal/10 flex items-center justify-center text-charcoal/50 hover:bg-charcoal/20 hover:text-charcoal transition-all"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              <RoomRouter
+                selected={roomType}
+                onSelect={(r) => {
+                  setRoomType(r);
+                  setShowRoomRouter(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-charcoal">Bathroom Configurator</h1>
-          <p className="text-charcoal/50 mt-1">Choose your finishes, then generate your AI preview.</p>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-3xl font-bold text-charcoal">
+              {roomType === "kitchen" ? "Kitchen Configurator" : roomType === "bedroom" ? "Bedroom Configurator" : "Bathroom Configurator"}
+            </h1>
+            <button
+              onClick={() => setShowRoomRouter(true)}
+              className="text-[11px] font-bold text-charcoal/40 border border-sand-200 rounded-full px-3 py-1 hover:border-terracotta/40 hover:text-terracotta transition-all"
+            >
+              Change Room ↗
+            </button>
+          </div>
+          <p className="text-charcoal/50">Choose your finishes, then generate your AI preview.</p>
+          {savedRooms.length > 0 && (
+            <p className="text-xs text-terracotta font-semibold mt-1">
+              ✓ {savedRooms.length} room{savedRooms.length > 1 ? "s" : ""} saved to project
+            </p>
+          )}
         </div>
 
         <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start">
@@ -1622,13 +1734,32 @@ export default function BuilderPage() {
               onGenerate={handleGenerate}
               onViewFullPreview={() => router.push("/preview")}
               onRegionClick={(region) => setSelectedRegion(region)}
+              onZoneClick={handleZoneClick}
+              activeZone={activeZone}
               isGenerating={isGenerating}
               viewportState={viewportState}
               generateDescription={generateDescription}
               generateError={generateError}
             />
 
-            {/* ── Refinement panel ── */}
+            {/* ── Secondary Generate CTA — prominent button below viewport when idle ── */}
+            {viewportState === "idle" && !isGenerating && (
+              <button
+                onClick={handleGenerate}
+                className={cn(
+                  "flex items-center justify-center gap-3 w-full py-5 rounded-2xl",
+                  "bg-terracotta text-white text-base font-bold",
+                  "shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100",
+                  "transition-all duration-200",
+                )}
+              >
+                <Sparkles size={20} />
+                Generate AI Preview
+                <ArrowRight size={18} className="ml-1" />
+              </button>
+            )}
+
+          {/* ── Refinement panel ── */}
             {viewportState === "ready" && (
               <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
@@ -1664,11 +1795,133 @@ export default function BuilderPage() {
               </div>
             )}
 
-            <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
+            {/* ── Hidden Cost Advisor — room-specific trade cost alerts ── */}
+            <HiddenCostAdvisor
+              roomType={roomType}
+              hasIsland={kitchenSelections.hasIsland}
+              hasElectrical={bedroomSelections.hasElectricalWork}
+            />
+
+            {/* ── Blue "Next" CTA — appears after generation to drive users to the preview ── */}
+            {viewportState === "ready" && !isGenerating && (
+              <button
+                onClick={() => router.push("/preview")}
+                className={cn(
+                  "flex items-center justify-center gap-3 w-full py-4 rounded-2xl",
+                  "bg-blue-600 text-white text-base font-bold",
+                  "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
+                  "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
+                  "transition-all duration-200",
+                )}
+              >
+                Next → View Full Preview
+                <ArrowRight size={18} />
+              </button>
+            )}
+
+            {/* ── Add Another Room — appears after generation completes ── */}
+            {viewportState === "ready" && !isGenerating && (
+              <button
+                onClick={() => {
+                  saveCurrentRoom();
+                  setViewportState("idle");
+                  setShowRoomRouter(true);
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-2 w-full py-3 rounded-2xl",
+                  "border-2 border-sand-200 bg-white/60 text-charcoal/60 text-sm font-bold",
+                  "hover:border-terracotta/40 hover:text-terracotta hover:bg-terracotta/5",
+                  "transition-all duration-200",
+                )}
+              >
+                + Add Another Room to My Project
+              </button>
+            )}
+
+            {/* ── Cost Summary — room-aware ── */}
+            {roomType === "kitchen" ? (
+              <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
+                <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Kitchen Cost Estimate</p>
+                {(() => {
+                  const { items, total } = calcKitchenCost(kitchenSelections);
+                  return (
+                    <>
+                      <p className="text-3xl font-bold text-white">{formatAUD(Math.round(total / 500) * 500)}</p>
+                      <div className="h-px bg-white/10" />
+                      <div className="flex flex-col gap-3">
+                        {items.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-white/60">{item.label}</p>
+                            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-white/25 leading-snug">Estimates are indicative only. QLD 2026 market rates.</p>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : roomType === "bedroom" ? (
+              <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
+                <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Bedroom Cost Estimate</p>
+                {(() => {
+                  const { items, total } = calcBedroomCost(bedroomSelections);
+                  return (
+                    <>
+                      <p className="text-3xl font-bold text-white">{formatAUD(Math.round(total / 500) * 500)}</p>
+                      <div className="h-px bg-white/10" />
+                      <div className="flex flex-col gap-3">
+                        {items.map((item) => (
+                          <div key={item.label} className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-white/60">{item.label}</p>
+                            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-white/25 leading-snug">Estimates are indicative only. QLD 2026 market rates.</p>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
+            )}
           </div>
 
           {/* ══ RIGHT SIDEBAR — Design Selectors ══════════════════ */}
           <aside className="flex flex-col gap-4 lg:sticky lg:top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-0.5">
+
+            {/* ── Kitchen sidebar ── */}
+            {roomType === "kitchen" && (
+              <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-6">
+                <KitchenSidebar
+                  selections={kitchenSelections}
+                  onChange={setKitchenSelections}
+                />
+              </div>
+            )}
+
+            {/* ── Bedroom sidebar ── */}
+            {roomType === "bedroom" && (
+              <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-6">
+                <BedroomSidebar
+                  selections={bedroomSelections}
+                  onChange={setBedroomSelections}
+                />
+              </div>
+            )}
+
+            {/* ── Bathroom sidebar (existing selectors) ── */}
+            {roomType === "bathroom" && (<>
+
+            {/* Style Library — reference gallery presets */}
+            <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5">
+              <StyleLibrary
+                activePresetId={activeStylePreset}
+                onSelect={handleStylePreset}
+              />
+            </div>
+
             <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-6 flex flex-col gap-6">
 
               {/* 0. Bathroom Size */}
@@ -1746,7 +1999,7 @@ export default function BuilderPage() {
               </SidebarSection>
 
               {/* 1. Room Photo */}
-              <SidebarSection icon={Upload} title="Room Photo — Optional">
+              <SidebarSection icon={Upload} title="Room Photo — Recommended">
                 {roomPhotoUrl ? (
                   <div className="relative rounded-2xl overflow-hidden aspect-video">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2036,6 +2289,45 @@ export default function BuilderPage() {
                 : <><Sparkles size={18} className="mr-2" />Generate AI Preview</>}
             </Button>
 
+            </>)} {/* end bathroom sidebar conditional */}
+
+            {/* ── Shared: free counter + generate button for kitchen/bedroom ── */}
+            {roomType !== "bathroom" && (<>
+              {!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium && (() => {
+                const effectiveCount = userStatus.generationCount + localGenerationBump;
+                const remaining      = Math.max(0, userStatus.freeLimit - effectiveCount);
+                const isExhausted    = effectiveCount >= userStatus.freeLimit;
+                return (
+                  <button
+                    onClick={() => setShowPaywallModal(true)}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold",
+                      "transition-all duration-300",
+                      isExhausted
+                        ? "bg-terracotta/10 text-terracotta border border-terracotta/20 hover:bg-terracotta/15"
+                        : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30 cursor-default",
+                    )}
+                  >
+                    <span>
+                      {isExhausted
+                        ? "Free previews used — tap to upgrade"
+                        : `${remaining} free ${remaining === 1 ? "preview" : "previews"} remaining`}
+                    </span>
+                    {isExhausted && (
+                      <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">
+                        Upgrade ↑
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+              <Button variant="primary" size="lg" fullWidth onClick={handleGenerate} disabled={isGenerating} className="group">
+                {isGenerating
+                  ? <><Loader2 size={18} className="mr-2 animate-spin" />Generating…</>
+                  : <><Sparkles size={18} className="mr-2" />Generate AI Preview</>}
+              </Button>
+            </>)}
+
           </aside>
 
         </div>
@@ -2068,9 +2360,19 @@ export default function BuilderPage() {
       {showBriefModal && (
         <ProjectBriefModal
           initial={projectBrief}
-          onSave={(brief) => { setProjectBrief(brief); setShowBriefModal(false); }}
+          onSave={(brief) => {
+            setProjectBrief(brief);
+            setShowBriefModal(false);
+            if (brief.bathroomCount === 1) setShowHygieneModal(true);
+          }}
           onClose={() => setShowBriefModal(false)}
+          onSingleBathroom={() => setShowHygieneModal(true)}
         />
+      )}
+
+      {/* Hygiene Advisory modal (single bathroom) */}
+      {showHygieneModal && (
+        <HygieneAdvisoryModal onDismiss={() => setShowHygieneModal(false)} />
       )}
 
       {/* Tile detail modal */}

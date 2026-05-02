@@ -15,16 +15,34 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default:  "Reno Ready — Renovation planning made simple.",
+    default:  "Reno Ready — AI Bathroom Design & Cost Estimator Australia",
     template: "%s | Reno Ready",
   },
   description:
-    "Design your bathroom, know the cost, then talk to a builder. Australia's smartest renovation planning tool.",
-  keywords: ["bathroom renovation", "bathroom design", "renovation cost", "Australian renovation"],
+    "Design your Australian bathroom renovation with AI, get an instant cost estimate, then connect with local builders. Free bathroom design tool — no architect needed.",
+  keywords: [
+    "bathroom renovation Australia",
+    "bathroom design tool",
+    "AI bathroom design",
+    "bathroom renovation cost estimator",
+    "bathroom renovation cost Australia",
+    "bathroom reno design",
+    "where to start bathroom renovation",
+    "bathroom renovation hidden costs",
+    "bathroom design AI Australia",
+    "renovation planning tool",
+    "bathroom renovation ideas Australia",
+  ],
+  openGraph: {
+    title:       "Reno Ready — AI Bathroom Design & Cost Estimator Australia",
+    description: "Design your Australian bathroom renovation with AI, get an instant cost estimate, then connect with local builders.",
+    type:        "website",
+    locale:      "en_AU",
+  },
   icons: {
-    icon:             [{ url: "/logo.png", type: "image/png" }],
-    apple:            [{ url: "/logo.png", type: "image/png" }],
-    shortcut:         "/logo.png",
+    icon:    [{ url: "/logo.png", type: "image/png" }],
+    apple:   [{ url: "/logo.png", type: "image/png" }],
+    shortcut: "/logo.png",
   },
 };
 

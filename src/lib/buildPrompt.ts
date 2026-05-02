@@ -17,13 +17,23 @@ import {
 } from "./types";
 import {
   type ProjectBrief,
-  TIER_PROMPT_SUFFIX,
   SCOPE_PROMPT_SUFFIX,
+  PLUMBING_LAYOUT_PROMPT_SUFFIX,
 } from "./projectBrief";
+import {
+  type RoomType,
+  type KitchenSelections,
+  type BedroomSelections,
+  buildKitchenPrompt,
+  buildBedroomPrompt,
+} from "./roomTypes";
 
 interface PromptInput {
   imageBase64?: string | null;       // present if user uploaded a photo
   projectBrief?: ProjectBrief | null;
+  roomType?: RoomType;               // defaults to "bathroom"
+  kitchenSelections?: KitchenSelections | null;
+  bedroomSelections?: BedroomSelections | null;
   selections: {
     floorTile?:         { id: string; name: string } | TileOption | null;
     wallTile?:          { id: string; name: string } | TileOption | null;
@@ -50,6 +60,15 @@ const TILE_STYLE_PHRASES: Record<string, string> = {
 };
 
 export function buildGeminiPrompt(req: PromptInput): string {
+  // ── Route to room-specific prompt builders ─────────────────────
+  if (req.roomType === "kitchen" && req.kitchenSelections) {
+    return buildKitchenPrompt(req.kitchenSelections, !!req.imageBase64);
+  }
+  if (req.roomType === "bedroom" && req.bedroomSelections) {
+    return buildBedroomPrompt(req.bedroomSelections, !!req.imageBase64);
+  }
+
+  // ── Bathroom (default) ─────────────────────────────────────────
   const { selections } = req;
 
   const floorName  = selections.floorTile?.name  ?? "neutral stone tile";
@@ -127,11 +146,11 @@ export function buildGeminiPrompt(req: PromptInput): string {
     : "";
 
   // ── Project brief injections ──────────────────────────────────
-  const tierSuffix  = req.projectBrief ? TIER_PROMPT_SUFFIX[req.projectBrief.budgetTier]  : "";
-  const scopeSuffix = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope] : "";
-  const briefSection =
-    (tierSuffix || scopeSuffix)
-      ? `\n\nProject brief context: ${[scopeSuffix, tierSuffix].filter(Boolean).join(" ")}`
+  const scopeSuffix    = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope]                         : "";
+  const plumbingSuffix = req.projectBrief ? PLUMBING_LAYOUT_PROMPT_SUFFIX[req.projectBrief.plumbingLayout]      : "";
+  const briefSection   =
+    (scopeSuffix || plumbingSuffix)
+      ? `\n\nProject brief context: ${[scopeSuffix, plumbingSuffix].filter(Boolean).join(" ")}`
       : "";
 
   // No-photo fallback

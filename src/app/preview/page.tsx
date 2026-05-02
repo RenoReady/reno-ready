@@ -12,6 +12,8 @@ import {
   Share2,
   Download,
   Eye,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -28,7 +30,6 @@ import {
   calcBriefCostItems,
   calcBriefTotal,
   needsAsbestosCheck,
-  TIER_MULTIPLIER,
 } from "@/lib/projectBrief";
 import { cn, formatAUD } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
@@ -49,16 +50,21 @@ export default function PreviewPage() {
     projectBrief,
     generatedImageUrl,
     generateDescription,
+    roomPhotoUrl,
+    customNote,
+    customFloorColor,
+    customWallColor,
+    tileStyle,
+    lightingOption,
+    useCustomDimensions,
   } = useBuilderStore();
 
   const hasImage = !!generatedImageUrl;
 
-  // Base estimate — uses bathroom size and tier multiplier from brief
-  const baseCost       = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-  const tierMultiplier = projectBrief ? TIER_MULTIPLIER[projectBrief.budgetTier] : 1;
-  const estimatedCost  = Math.round(
-    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost)
-    * tierMultiplier / 500
+  // Base estimate — uses bathroom size (no tier multiplier; cost engine is conservative by default)
+  const baseCost      = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+  const estimatedCost = Math.round(
+    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
   ) * 500;
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;
@@ -77,6 +83,53 @@ export default function PreviewPage() {
   const tapwareLabel = TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware;
 
   const [downloadHover, setDownloadHover] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (isGeneratingPDF) return;
+    setIsGeneratingPDF(true);
+    try {
+      const { generateProReportPDF } = await import("@/lib/generateProReportPDF");
+      const baseCostForPDF = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+      const estimatedCostForPDF = Math.round(
+        calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCostForPDF) / 500
+      ) * 500;
+      const briefTotalForPDF = projectBrief ? calcBriefTotal(projectBrief) : 0;
+      await generateProReportPDF({
+        selections: {
+          roomPhotoUrl,
+          floorTile,
+          wallTile,
+          vanity,
+          tapware,
+          budget,
+          customNote,
+          customFloorColor,
+          customWallColor,
+          tileStyle,
+          structuralChanges,
+          projectBrief,
+          lightingOption,
+          bathroomSize,
+          useCustomDimensions,
+          customLength,
+          customWidth,
+          generatedImageUrl,
+          generateDescription,
+        },
+        projectBrief,
+        generatedImageUrl,
+        roomPhotoUrl,
+        grandTotal: estimatedCostForPDF + briefTotalForPDF,
+        estimatedCost: estimatedCostForPDF,
+      });
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Could not generate PDF. Please try again.");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (!generatedImageUrl) return;
@@ -376,6 +429,23 @@ export default function PreviewPage() {
                 <ArrowRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
+
+            {/* Pro Report PDF download */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF}
+              className={cn(
+                "w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl",
+                "border-2 border-charcoal/15 bg-charcoal/3 text-sm font-bold text-charcoal",
+                "hover:border-charcoal/30 hover:bg-charcoal/6 transition-all duration-200",
+                isGeneratingPDF && "opacity-60 cursor-not-allowed",
+              )}
+            >
+              {isGeneratingPDF
+                ? <><Loader2 size={16} className="animate-spin" /> Generating PDF…</>
+                : <><FileText size={16} /> Download Pro Report <span className="text-charcoal/40 font-normal text-xs">(PDF · A4)</span></>
+              }
+            </button>
 
             {/* Action buttons */}
             <div className="flex gap-3">

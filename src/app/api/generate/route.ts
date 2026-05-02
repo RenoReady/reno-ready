@@ -39,6 +39,12 @@ interface GenerateRequest {
   imageBase64?: string | null;
   /** Optional project brief from the 3-question modal */
   projectBrief?: { yearBuilt: number; budgetTier: string; scope: string } | null;
+  /** Which room is being generated */
+  roomType?: "bathroom" | "kitchen" | "bedroom";
+  /** Kitchen-specific selections (present when roomType === "kitchen") */
+  kitchenSelections?: Record<string, unknown> | null;
+  /** Bedroom-specific selections (present when roomType === "bedroom") */
+  bedroomSelections?: Record<string, unknown> | null;
   /** Human-readable prompt derived from the user's selections */
   prompt: string;
   /** Structured selections for logging / prompt enrichment */
@@ -88,10 +94,15 @@ function isMockMode(): boolean {
 /** Build the system instruction + user prompt from structured selections */
 function buildGeminiPrompt(req: GenerateRequest): string {
   return buildSharedPrompt({
-    imageBase64:  req.imageBase64,
+    imageBase64:       req.imageBase64,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    projectBrief: req.projectBrief as any,
-    selections:   req.selections,
+    projectBrief:      req.projectBrief as any,
+    roomType:          req.roomType,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    kitchenSelections: req.kitchenSelections as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    bedroomSelections: req.bedroomSelections as any,
+    selections:        req.selections,
   });
 }
 

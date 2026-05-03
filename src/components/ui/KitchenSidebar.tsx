@@ -43,7 +43,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ cabinetry: opt.id })}
+                onClick={() => onChange({ cabinetry: selections.cabinetry === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -80,7 +80,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ benchtop: opt.id })}
+                onClick={() => onChange({ benchtop: selections.benchtop === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -119,7 +119,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ mixer: opt.id })}
+                onClick={() => onChange({ mixer: selections.mixer === opt.id ? null : opt.id })}
                 className={cn(
                   "flex flex-col items-center gap-2 p-3 rounded-2xl border-2 text-center transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -144,7 +144,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ splashback: opt.id })}
+                onClick={() => onChange({ splashback: selections.splashback === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",

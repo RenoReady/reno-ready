@@ -52,10 +52,10 @@ export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
 
 export interface KitchenSelections {
-  cabinetry:            CabinetryStyle;
-  benchtop:             BenchtopMaterial;
-  mixer:                MixerFinish;
-  splashback:           SplashbackStyle;
+  cabinetry:            CabinetryStyle   | null;  // null = deselected
+  benchtop:             BenchtopMaterial | null;
+  mixer:                MixerFinish      | null;
+  splashback:           SplashbackStyle  | null;
   cooktop:              CooktopType;
   dishwasher:           DishwasherType;
   ceilingStyle:         CeilingStyle;
@@ -165,15 +165,25 @@ export interface RoomCostItem {
 export const KITCHEN_BASE_COST = 22_000; // Demo, install labour, electrical, plumbing base
 
 export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]; total: number } {
+  const cabinetryOpt  = sel.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)  : null;
+  const benchtopOpt   = sel.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)   : null;
+  const splashbackOpt = sel.splashback ? SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback) : null;
+  const mixerOpt      = sel.mixer      ? MIXER_OPTIONS.find((o)      => o.id === sel.mixer)      : null;
+
   const items: RoomCostItem[] = [
-    { label: "Demo & Installation Labour",   amount: 8_500,  detail: "Full kitchen stripout, wall prep, install, waterproofing" },
-    { label: "Cabinetry Supply & Install",   amount: 8_000 + (CABINETRY_OPTIONS.find((o) => o.id === sel.cabinetry)?.costAdj ?? 0),
-      detail: CABINETRY_OPTIONS.find((o) => o.id === sel.cabinetry)?.label + " doors + carcasses, floor-to-ceiling" },
-    { label: "Benchtop Supply & Fabricate",  amount: 3_200 + (BENCHTOP_OPTIONS.find((o) => o.id === sel.benchtop)?.costAdj ?? 0),
-      detail: BENCHTOP_OPTIONS.find((o) => o.id === sel.benchtop)?.label },
-    { label: "Splashback Supply & Install",  amount: 1_200 + (SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback)?.costAdj ?? 0),
-      detail: SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback)?.label },
-    { label: "Gooseneck Mixer & Sink",       amount: 1_450, detail: `${MIXER_OPTIONS.find((o) => o.id === sel.mixer)?.label ?? ""} under-mount sink set` },
+    { label: "Demo & Installation Labour",
+      amount: 8_500, detail: "Full kitchen stripout, wall prep, install, waterproofing" },
+    { label: `Cabinetry — ${cabinetryOpt?.label ?? "Not yet selected"}`,
+      amount: 8_000 + (cabinetryOpt?.costAdj ?? 0),
+      detail: cabinetryOpt ? cabinetryOpt.label + " doors + carcasses, floor-to-ceiling" : "Select a cabinetry style to refine this estimate" },
+    { label: `Benchtop — ${benchtopOpt?.label ?? "Not yet selected"}`,
+      amount: 3_200 + (benchtopOpt?.costAdj ?? 0),
+      detail: benchtopOpt?.label ?? "Select a benchtop material to refine this estimate" },
+    { label: `Splashback — ${splashbackOpt?.label ?? "Not yet selected"}`,
+      amount: 1_200 + (splashbackOpt?.costAdj ?? 0),
+      detail: splashbackOpt?.label ?? "Select a splashback to refine this estimate" },
+    { label: `Mixer & Sink — ${mixerOpt?.label ?? "Not yet selected"}`,
+      amount: 1_450, detail: mixerOpt ? `${mixerOpt.label} gooseneck, under-mount sink set` : "Select a mixer finish to refine this estimate" },
     { label: sel.cooktop === "induction" ? "Induction Cooktop" : "Gas Cooktop + Lines",
       amount: sel.cooktop === "induction" ? 1_800 : 2_400,
       detail: sel.cooktop === "induction" ? "60cm zone induction + installation" : "900mm gas cooktop + gas line certification" },
@@ -216,11 +226,11 @@ export type StorageOption      = "built-in-mirror-sliders" | "custom-wir";
 export type WindowTreatment    = "floor-ceiling-sheers" | "blockout-roller";
 
 export interface BedroomSelections {
-  flooring:          BedroomFlooring;
-  wallTreatment:     WallTreatment;
-  lighting:          BedroomLighting;
-  storage:           StorageOption;
-  windowTreatment:   WindowTreatment;
+  flooring:          BedroomFlooring  | null;  // null = deselected
+  wallTreatment:     WallTreatment    | null;
+  lighting:          BedroomLighting  | null;
+  storage:           StorageOption    | null;
+  windowTreatment:   WindowTreatment  | null;
   ceilingStyle:      CeilingStyle;
   hasElectricalWork: boolean;  // bedside pendants / re-wiring → advisory
   hasVJWall:         boolean;  // VJ feature wall (structural add)
@@ -376,19 +386,30 @@ export const WINDOW_TREATMENT_OPTIONS: { id: WindowTreatment; label: string; sub
 export const BEDROOM_BASE_COST = 3_500; // Prep, painting, access, skip bin
 
 export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]; total: number } {
-  const flooringOpt = BEDROOM_FLOORING_OPTIONS.find((o) => o.id === sel.flooring);
-  const wallOpt     = WALL_TREATMENT_OPTIONS.find((o)   => o.id === sel.wallTreatment);
-  const lightOpt    = BEDROOM_LIGHTING_OPTIONS.find((o) => o.id === sel.lighting);
-  const storageOpt  = STORAGE_OPTIONS.find((o)          => o.id === sel.storage);
-  const windowOpt   = WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment);
+  const flooringOpt = sel.flooring       ? BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === sel.flooring)       : null;
+  const wallOpt     = sel.wallTreatment  ? WALL_TREATMENT_OPTIONS.find((o)    => o.id === sel.wallTreatment)  : null;
+  const lightOpt    = sel.lighting       ? BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)       : null;
+  const storageOpt  = sel.storage        ? STORAGE_OPTIONS.find((o)           => o.id === sel.storage)        : null;
+  const windowOpt   = sel.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment) : null;
 
   const items: RoomCostItem[] = [
-    { label: "Preparation & Plastering",              amount: BEDROOM_BASE_COST,       detail: "Wall prep, skirting removal, painting base coats" },
-    { label: `Flooring — ${flooringOpt?.label ?? ""}`, amount: flooringOpt?.cost ?? 0, detail: "Supply + lay, approx 4m × 4m room (16m²)" },
-    { label: `Wall — ${wallOpt?.label ?? ""}`,         amount: wallOpt?.cost ?? 0,     detail: wallOpt?.sub },
-    { label: `Lighting — ${lightOpt?.label ?? ""}`,    amount: lightOpt?.cost ?? 0,    detail: lightOpt?.sub },
-    { label: `Storage — ${storageOpt?.label ?? ""}`,   amount: storageOpt?.cost ?? 0,  detail: storageOpt?.sub },
-    { label: `Window — ${windowOpt?.label ?? ""}`,     amount: windowOpt?.cost ?? 0,   detail: windowOpt?.sub },
+    { label: "Preparation & Plastering",
+      amount: BEDROOM_BASE_COST, detail: "Wall prep, skirting removal, painting base coats" },
+    { label: `Flooring — ${flooringOpt?.label ?? "Not yet selected"}`,
+      amount: flooringOpt?.cost ?? 0,
+      detail: flooringOpt ? "Supply + lay, approx 4m × 4m room (16m²)" : "Select a flooring option to include in your estimate" },
+    { label: `Wall — ${wallOpt?.label ?? "Not yet selected"}`,
+      amount: wallOpt?.cost ?? 0,
+      detail: wallOpt?.sub ?? "Select a wall treatment to include in your estimate" },
+    { label: `Lighting — ${lightOpt?.label ?? "Not yet selected"}`,
+      amount: lightOpt?.cost ?? 0,
+      detail: lightOpt?.sub ?? "Select a lighting option to include in your estimate" },
+    { label: `Storage — ${storageOpt?.label ?? "Not yet selected"}`,
+      amount: storageOpt?.cost ?? 0,
+      detail: storageOpt?.sub ?? "Select a storage option to include in your estimate" },
+    { label: `Window — ${windowOpt?.label ?? "Not yet selected"}`,
+      amount: windowOpt?.cost ?? 0,
+      detail: windowOpt?.sub ?? "Select a window treatment to include in your estimate" },
   ];
 
   const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
@@ -443,10 +464,10 @@ export const HIDDEN_COST_ADVISORIES: Record<RoomType, { condition: string; messa
 // ── Room-aware AI prompt builders ─────────────────────────────────────────────
 
 export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): string {
-  const cabinet  = CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)?.label  ?? sel.cabinetry;
-  const benchtop = BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)?.label   ?? sel.benchtop;
-  const mixer    = MIXER_OPTIONS.find((o)       => o.id === sel.mixer)?.label      ?? sel.mixer;
-  const splash   = SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback)?.label ?? sel.splashback;
+  const cabinet  = sel.cabinetry  ? (CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)?.label  ?? sel.cabinetry)  : null;
+  const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)?.label   ?? sel.benchtop)   : null;
+  const mixer    = sel.mixer      ? (MIXER_OPTIONS.find((o)      => o.id === sel.mixer)?.label      ?? sel.mixer)      : null;
+  const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback)?.label ?? sel.splashback) : null;
   const cooktop  = sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop";
   const dw       = sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher";
   const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
@@ -456,10 +477,10 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
     "Modify the photo to show the new kitchen design while maintaining the structural layout unless requested.",
     "Remove all personal items from benchtops. Produce a high-end architectural photography result.",
     "",
-    `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.`,
-    `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`,
-    `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`,
-    `Splashback: ${splash}.`,
+    cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
+    benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
+    mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`               : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
+    splash   ? `Splashback: ${splash}.`                                                       : "Splashback: select a material that complements the cabinetry.",
     `Appliances: ${cooktop}, ${dw}.`,
     `Ceiling: ${ceiling}.`,
     // Phase 4 implied logic — always render fridge + dishwasher so the kitchen looks complete
@@ -494,30 +515,31 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
 }
 
 export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): string {
-  const flooring = BEDROOM_FLOORING_OPTIONS.find((o) => o.id === sel.flooring)?.label ?? sel.flooring;
-  const wall     = WALL_TREATMENT_OPTIONS.find((o)   => o.id === sel.wallTreatment)?.label ?? sel.wallTreatment;
-  const light    = BEDROOM_LIGHTING_OPTIONS.find((o) => o.id === sel.lighting)?.label ?? sel.lighting;
-  const storage  = STORAGE_OPTIONS.find((o)          => o.id === sel.storage)?.label ?? sel.storage;
-  const window_  = WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment)?.label ?? sel.windowTreatment;
-  const ceiling  = CEILING_OPTIONS.find((o)          => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
+  const flooring = sel.flooring        ? (BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === sel.flooring)?.label        ?? sel.flooring)        : null;
+  const wall     = sel.wallTreatment   ? (WALL_TREATMENT_OPTIONS.find((o)    => o.id === sel.wallTreatment)?.label   ?? sel.wallTreatment)   : null;
+  const light    = sel.lighting        ? (BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)?.label        ?? sel.lighting)        : null;
+  const storage  = sel.storage         ? (STORAGE_OPTIONS.find((o)           => o.id === sel.storage)?.label         ?? sel.storage)         : null;
+  const window_  = sel.windowTreatment ? (WINDOW_TREATMENT_OPTIONS.find((o)  => o.id === sel.windowTreatment)?.label ?? sel.windowTreatment) : null;
+  const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
 
-  const lightDesc =
-    sel.lighting === "led-cove"
-      ? "Concealed LED strip cove lighting in ceiling recesses casting a warm ambient glow"
-      : sel.lighting === "architectural-downlights"
-      ? "Recessed architectural dimmable downlights throughout"
-      : "Designer statement pendant lights flanking the bedhead";
+  const lightDesc = !light
+    ? "quality ambient lighting appropriate to the style"
+    : sel.lighting === "led-cove"
+    ? "Concealed LED strip cove lighting in ceiling recesses casting a warm ambient glow"
+    : sel.lighting === "architectural-downlights"
+    ? "Recessed architectural dimmable downlights throughout"
+    : "Designer statement pendant lights flanking the bedhead";
 
   const base = [
     "You are a professional interior design visualizer for a luxury bedroom renovation.",
     "Modify the bedroom photo to reflect the selected materials. Maintain structural layout.",
     "Remove all personal items. Produce a high-end architectural photography result.",
     "",
-    `Flooring: ${flooring} — lay full room width.`,
-    `Wall treatment: ${wall} — apply to feature wall behind bedhead.`,
+    flooring ? `Flooring: ${flooring} — lay full room width.`                            : "Flooring: choose a premium flooring appropriate to the style.",
+    wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`         : "Wall treatment: designer's choice appropriate to the room palette.",
     `Lighting: ${lightDesc}.`,
-    `Storage: ${storage} — full-height, floor-to-ceiling.`,
-    `Window treatment: ${window_} — floor-length, ceiling-mounted track.`,
+    storage  ? `Storage: ${storage} — full-height, floor-to-ceiling.`                   : "Storage: appropriate built-in wardrobe solution for the space.",
+    window_  ? `Window treatment: ${window_} — floor-length, ceiling-mounted track.`    : "Window treatment: quality window covering appropriate to the style.",
     `Ceiling: ${ceiling}.`,
     "Style: warm natural Australian light, editorial photography, high-fidelity 2K render.",
   ].join("\n");

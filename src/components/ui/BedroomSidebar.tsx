@@ -42,7 +42,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ flooring: opt.id })}
+                onClick={() => onChange({ flooring: selections.flooring === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -78,7 +78,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ wallTreatment: opt.id })}
+                onClick={() => onChange({ wallTreatment: selections.wallTreatment === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -110,10 +110,10 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
               <button
                 key={opt.id}
                 onClick={() => {
+                  const deselecting = selections.lighting === opt.id;
                   onChange({
-                    lighting: opt.id,
-                    // Auto-flag electrical work for options that need it
-                    hasElectricalWork: !!opt.triggerElectrical,
+                    lighting: deselecting ? null : opt.id,
+                    hasElectricalWork: deselecting ? false : !!opt.triggerElectrical,
                   });
                 }}
                 className={cn(
@@ -153,7 +153,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ storage: opt.id })}
+                onClick={() => onChange({ storage: selections.storage === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -184,7 +184,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ windowTreatment: opt.id })}
+                onClick={() => onChange({ windowTreatment: selections.windowTreatment === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",

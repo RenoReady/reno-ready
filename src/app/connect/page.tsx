@@ -18,6 +18,7 @@ import {
   Wrench,
   ImageOff,
   Info,
+  Ruler,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
@@ -31,6 +32,21 @@ import {
   buildItemisedCosts,
   getBathroomBaseCost,
 } from "@/lib/types";
+import {
+  calcKitchenCost,
+  calcBedroomCost,
+  CABINETRY_OPTIONS,
+  BENCHTOP_OPTIONS,
+  SPLASHBACK_OPTIONS,
+  MIXER_OPTIONS,
+  BEDROOM_FLOORING_OPTIONS,
+  WALL_TREATMENT_OPTIONS,
+  BEDROOM_LIGHTING_OPTIONS,
+  STORAGE_OPTIONS,
+  WINDOW_TREATMENT_OPTIONS,
+  KITCHEN_SIZE_OPTIONS,
+  BEDROOM_SIZE_OPTIONS,
+} from "@/lib/roomTypes";
 import { buildGeminiPrompt } from "@/lib/buildPrompt";
 import { submitConnectForm } from "@/app/actions/contact";
 import { cn, formatAUD } from "@/lib/utils";
@@ -72,6 +88,9 @@ function TrustBadge({ children }: { children: React.ReactNode }) {
 export default function ConnectPage() {
   const router = useRouter();
   const {
+    roomType,
+    kitchenSelections,
+    bedroomSelections,
     floorTile, wallTile,
     customFloorColor, customWallColor,
     tileStyle,
@@ -81,6 +100,10 @@ export default function ConnectPage() {
     generatedImageUrl,
     roomPhotoUrl,
     bathroomSize, customLength, customWidth,
+    projectBrief,
+    lightingOption,
+    useCustomDimensions,
+    generateDescription,
   } = useBuilderStore();
 
   const hasGeneratedImage = !!generatedImageUrl;
@@ -91,25 +114,111 @@ export default function ConnectPage() {
     ? TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.label ?? tileStyle
     : null;
 
-  const baseCost      = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-  const estimatedCost = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
-  const itemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
+  // ── Room-aware cost engine ────────────────────────────────────────────────
+  const { estimatedCost, itemisedCosts } = useMemo(() => {
+    if (roomType === "kitchen") {
+      const r = calcKitchenCost(kitchenSelections);
+      return { estimatedCost: Math.round(r.total / 500) * 500, itemisedCosts: r.items };
+    }
+    if (roomType === "bedroom") {
+      const r = calcBedroomCost(bedroomSelections);
+      return { estimatedCost: Math.round(r.total / 500) * 500, itemisedCosts: r.items };
+    }
+    // Bathroom
+    const baseCost = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+    return {
+      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost),
+      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost),
+    };
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth]);
 
   // Build the raw AI prompt that would be (or was) sent to Gemini
   const aiPrompt = useMemo(() => buildGeminiPrompt({
-    imageBase64: roomPhotoUrl,
+    imageBase64:       roomPhotoUrl,
+    roomType,
+    kitchenSelections,
+    bedroomSelections,
     selections: {
       floorTile, wallTile, vanity, tapware,
       customNote, customFloorColor, customWallColor,
       tileStyle, structuralChanges,
     },
   }), [
-    roomPhotoUrl, floorTile, wallTile, vanity, tapware,
+    roomPhotoUrl, roomType, kitchenSelections, bedroomSelections,
+    floorTile, wallTile, vanity, tapware,
     customNote, customFloorColor, customWallColor, tileStyle, structuralChanges,
   ]);
 
-  // Active structural changes summarised as labels for the design brief
+  // ── Room-aware selection rows for "What gets sent" ───────────────────────
+  const selectionRows = useMemo(() => {
+    if (roomType === "kitchen") {
+      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : null;
+      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : null;
+      const splash   = kitchenSelections.splashback ? SPLASHBACK_OPTIONS.find((o) => o.id === kitchenSelections.splashback)?.label ?? kitchenSelections.splashback : null;
+      const mixer    = kitchenSelections.mixer      ? MIXER_OPTIONS.find((o)      => o.id === kitchenSelections.mixer)?.label      ?? kitchenSelections.mixer      : null;
+      const sizeOpt  = KITCHEN_SIZE_OPTIONS.find((o) => o.id === kitchenSelections.roomSize);
+      const sizeLabel = kitchenSelections.roomSize === "custom" && kitchenSelections.customLength > 0 && kitchenSelections.customWidth > 0
+        ? `${kitchenSelections.customLength}m × ${kitchenSelections.customWidth}m custom`
+        : sizeOpt?.label ?? kitchenSelections.roomSize;
+      return [
+        { label: "Kitchen Size",  value: sizeLabel },
+        { label: "Cabinetry",     value: cabinet  ?? "Not selected" },
+        { label: "Benchtop",      value: benchtop ?? "Not selected" },
+        { label: "Splashback",    value: splash   ?? "Not selected" },
+        { label: "Mixer",         value: mixer    ?? "Not selected" },
+        { label: "Cooktop",       value: kitchenSelections.cooktop === "induction" ? "Induction" : "Gas" },
+        { label: "Dishwasher",    value: kitchenSelections.dishwasher === "integrated" ? "Integrated" : "Freestanding" },
+      ];
+    }
+    if (roomType === "bedroom") {
+      const flooring = bedroomSelections.flooring       ? BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === bedroomSelections.flooring)?.label       ?? bedroomSelections.flooring       : null;
+      const wall_    = bedroomSelections.wallTreatment  ? WALL_TREATMENT_OPTIONS.find((o)    => o.id === bedroomSelections.wallTreatment)?.label   ?? bedroomSelections.wallTreatment  : null;
+      const light    = bedroomSelections.lighting       ? BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === bedroomSelections.lighting)?.label        ?? bedroomSelections.lighting       : null;
+      const storage  = bedroomSelections.storage        ? STORAGE_OPTIONS.find((o)           => o.id === bedroomSelections.storage)?.label         ?? bedroomSelections.storage        : null;
+      const window_  = bedroomSelections.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o) => o.id === bedroomSelections.windowTreatment)?.label ?? bedroomSelections.windowTreatment : null;
+      const sizeOpt  = BEDROOM_SIZE_OPTIONS.find((o) => o.id === bedroomSelections.roomSize);
+      const sizeLabel = bedroomSelections.roomSize === "custom" && bedroomSelections.customLength > 0 && bedroomSelections.customWidth > 0
+        ? `${bedroomSelections.customLength}m × ${bedroomSelections.customWidth}m custom`
+        : sizeOpt?.label ?? bedroomSelections.roomSize;
+      return [
+        { label: "Bedroom Size",      value: sizeLabel },
+        { label: "Flooring",          value: flooring ?? "Not selected" },
+        { label: "Wall Treatment",    value: wall_    ?? "Not selected" },
+        { label: "Lighting",          value: light    ?? "Not selected" },
+        { label: "Storage",           value: storage  ?? "Not selected" },
+        { label: "Window Treatment",  value: window_  ?? "Not selected" },
+      ];
+    }
+    // Bathroom
+    return [
+      { label: "Floor Tile", value: floorTile?.name ?? "Not selected", color: customFloorColor },
+      { label: "Wall Tile",  value: wallTile?.name  ?? "Not selected", color: customWallColor  },
+      { label: "Vanity",     value: vanityLabel },
+      { label: "Tapware",    value: tapwareLabel },
+      ...(tileStyleLabel ? [{ label: "Tile Layout", value: tileStyleLabel }] : []),
+    ];
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel]);
+
+  // ── Room-aware structural labels ──────────────────────────────────────────
   const structuralLabels = useMemo(() => {
+    if (roomType === "kitchen") {
+      const arr: string[] = [];
+      if (kitchenSelections.hasIsland)           arr.push("Kitchen Island");
+      if (kitchenSelections.hasApplianceRoughin) arr.push("Appliance Rough-in");
+      if (kitchenSelections.hasSinkRoughin)      arr.push("Sink Rough-in");
+      if (kitchenSelections.hasWallChange)       arr.push("Open-Plan Wall Removal");
+      if (kitchenSelections.hasButlersPantry)    arr.push("Butler's Pantry / Scullery");
+      return arr;
+    }
+    if (roomType === "bedroom") {
+      const arr: string[] = [];
+      if (bedroomSelections.hasElectricalWork)  arr.push("Electrical Re-wiring");
+      if (bedroomSelections.hasVJWall)          arr.push("VJ Feature Wall");
+      if (bedroomSelections.hasMediaJoinery)    arr.push("Built-in Media Joinery");
+      if (bedroomSelections.hasPendantRoughin)  arr.push("Pendant / Sconce Rough-in");
+      return arr;
+    }
+    // Bathroom
     const arr: string[] = [];
     const sc = structuralChanges;
     if (sc.removeBathtub)             arr.push("Bathtub Removal");
@@ -120,7 +229,44 @@ export default function ConnectPage() {
     if (sc.showerNiche === "double")  arr.push("Double Shower Niche");
     if (sc.showerFixtures === "dual") arr.push("Dual Shower Heads (Rain + Handheld)");
     return arr;
-  }, [structuralChanges]);
+  }, [roomType, kitchenSelections, bedroomSelections, structuralChanges]);
+
+  // ── Right-panel brief rows ────────────────────────────────────────────────
+  const briefRows = useMemo(() => {
+    if (roomType === "kitchen") {
+      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : "Not selected";
+      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : "Not selected";
+      return [
+        { icon: Layers,     label: "Cabinetry",     value: cabinet  },
+        { icon: Layers,     label: "Benchtop",      value: benchtop },
+        { icon: DollarSign, label: "Budget Target",  value: formatAUD(budget) },
+        { icon: DollarSign, label: "Estimated Cost", value: formatAUD(estimatedCost), bold: true },
+      ];
+    }
+    if (roomType === "bedroom") {
+      const flooring = bedroomSelections.flooring ? BEDROOM_FLOORING_OPTIONS.find((o) => o.id === bedroomSelections.flooring)?.label ?? bedroomSelections.flooring : "Not selected";
+      const wall_    = bedroomSelections.wallTreatment ? WALL_TREATMENT_OPTIONS.find((o) => o.id === bedroomSelections.wallTreatment)?.label ?? bedroomSelections.wallTreatment : "Not selected";
+      return [
+        { icon: Layers,     label: "Flooring",      value: flooring },
+        { icon: Layers,     label: "Wall Treatment", value: wall_    },
+        { icon: DollarSign, label: "Budget Target",  value: formatAUD(budget) },
+        { icon: DollarSign, label: "Estimated Cost", value: formatAUD(estimatedCost), bold: true },
+      ];
+    }
+    // Bathroom
+    return [
+      { icon: Layers,     label: "Floor Tile",     value: floorTile?.name ?? "Not selected", accent: customFloorColor },
+      { icon: Layers,     label: "Wall Tile",       value: wallTile?.name  ?? "Not selected", accent: customWallColor  },
+      { icon: Layers,     label: "Vanity",          value: vanityLabel },
+      { icon: Droplets,   label: "Tapware",         value: tapwareLabel },
+      { icon: DollarSign, label: "Budget Target",   value: formatAUD(budget) },
+      { icon: DollarSign, label: "Estimated Cost",  value: formatAUD(estimatedCost), bold: true },
+    ];
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, budget, estimatedCost]);
+
+  const roomLabel = roomType === "kitchen" ? "Kitchen"
+    : roomType === "bedroom" ? "Bedroom"
+    : "Bathroom";
 
   const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", message: "" });
   const [errors, setErrors]       = useState<FormErrors>({});
@@ -363,56 +509,54 @@ export default function ConnectPage() {
               </Button>
             </form>
 
-            {/* ── Information Summary ─────────────────────────────── */}
+            {/* ── What gets sent ──────────────────────────────────────── */}
             <Card variant="default" padding="lg">
               <div className="flex items-center gap-2 mb-5">
                 <Sparkles size={14} className="text-terracotta" />
                 <h2 className="text-lg font-bold text-charcoal">What gets sent</h2>
               </div>
 
-              {/* Selected Tiles */}
+              {/* Your Selections — room-aware */}
               <div className="mb-6">
-                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">Selected Tiles</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-sand-50 border border-sand-200">
-                    <div className="w-9 h-9 rounded-lg flex-shrink-0 ring-1 ring-black/10"
-                         style={{ background: customFloorColor ?? undefined }}>
-                      {!customFloorColor && (
-                        <div className={cn("w-full h-full rounded-lg", floorTile?.bgClass ?? "bg-sand-100")} />
+                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">
+                  {roomLabel} Selections
+                </h3>
+                <div className="rounded-xl border border-sand-200 overflow-hidden">
+                  {selectionRows.map((row, i) => (
+                    <div
+                      key={row.label}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-2.5",
+                        i % 2 === 0 ? "bg-sand-50" : "bg-white",
                       )}
+                    >
+                      <p className="text-[11px] font-bold text-charcoal/45 uppercase tracking-wider w-28 flex-shrink-0">
+                        {row.label}
+                      </p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {"color" in row && row.color && (
+                          <span
+                            className="w-3 h-3 rounded-sm ring-1 ring-black/10 flex-shrink-0"
+                            style={{ background: row.color }}
+                          />
+                        )}
+                        <p className="text-sm font-semibold text-charcoal truncate">{row.value}</p>
+                        {"color" in row && row.color && (
+                          <p className="text-[10px] font-mono text-terracotta flex-shrink-0">{row.color}</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-charcoal/45 font-bold uppercase tracking-wider">Floor</p>
-                      <p className="text-xs font-bold text-charcoal truncate">{floorTile?.name ?? "Not selected"}</p>
-                      {customFloorColor && <p className="text-[10px] font-mono text-terracotta">{customFloorColor}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-sand-50 border border-sand-200">
-                    <div className="w-9 h-9 rounded-lg flex-shrink-0 ring-1 ring-black/10"
-                         style={{ background: customWallColor ?? undefined }}>
-                      {!customWallColor && (
-                        <div className={cn("w-full h-full rounded-lg", wallTile?.bgClass ?? "bg-sand-100")} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-charcoal/45 font-bold uppercase tracking-wider">Wall</p>
-                      <p className="text-xs font-bold text-charcoal truncate">{wallTile?.name ?? "Not selected"}</p>
-                      {customWallColor && <p className="text-[10px] font-mono text-terracotta">{customWallColor}</p>}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                {tileStyleLabel && (
-                  <p className="mt-2.5 text-xs text-charcoal/55">
-                    Layout: <span className="font-semibold text-charcoal">{tileStyleLabel}</span>
-                  </p>
-                )}
               </div>
 
-              {/* Structural Changes */}
+              {/* Structural / Feature Changes — room-aware */}
               <div className="mb-6">
-                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">Structural Changes</h3>
+                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">
+                  {roomType === "bathroom" ? "Structural Changes" : "Structural & Feature Additions"}
+                </h3>
                 {structuralLabels.length === 0 ? (
-                  <p className="text-sm text-charcoal/45 italic">No structural changes requested.</p>
+                  <p className="text-sm text-charcoal/45 italic">None selected.</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {structuralLabels.map((label) => (
@@ -465,13 +609,9 @@ export default function ConnectPage() {
                 <h3 className="text-sm font-bold text-charcoal">Your Design Brief</h3>
               </div>
               <div className="flex flex-col gap-3.5">
-                <SummaryItem icon={Layers}     label="Floor Tile" value={floorTile?.name ?? "Not selected"} accent={customFloorColor} />
-                <SummaryItem icon={Layers}     label="Wall Tile"  value={wallTile?.name  ?? "Not selected"} accent={customWallColor} />
-                <SummaryItem icon={Layers}     label="Vanity"     value={vanityLabel} />
-                <SummaryItem icon={Droplets}   label="Tapware"    value={tapwareLabel} />
-                <div className="h-px bg-sand-200 my-1" />
-                <SummaryItem icon={DollarSign} label="Budget Target" value={formatAUD(budget)} />
-                <SummaryItem icon={DollarSign} label="Estimated Cost" value={formatAUD(estimatedCost)} bold />
+                {briefRows.map(({ icon, label, value, accent, bold }) => (
+                  <SummaryItem key={label} icon={icon} label={label} value={value} accent={accent} bold={bold} />
+                ))}
               </div>
             </Card>
 

@@ -31,6 +31,10 @@ import {
   calcBriefTotal,
   needsAsbestosCheck,
 } from "@/lib/projectBrief";
+import {
+  calcKitchenCost,
+  calcBedroomCost,
+} from "@/lib/roomTypes";
 import { cn, formatAUD } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
 
@@ -38,6 +42,9 @@ import { TriangleAlert } from "lucide-react";
 export default function PreviewPage() {
   const router = useRouter();
   const {
+    roomType,
+    kitchenSelections,
+    bedroomSelections,
     floorTile,
     wallTile,
     vanity,
@@ -61,26 +68,46 @@ export default function PreviewPage() {
 
   const hasImage = !!generatedImageUrl;
 
-  // Base estimate — uses bathroom size (no tier multiplier; cost engine is conservative by default)
-  const baseCost      = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-  const estimatedCost = Math.round(
-    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
-  ) * 500;
+  // ── Room-aware cost engine ──────────────────────────────────────────────────
+  let estimatedCost: number;
+  let baseItemisedCosts: { label: string; detail?: string; amount: number }[];
+
+  if (roomType === "kitchen") {
+    const result  = calcKitchenCost(kitchenSelections);
+    estimatedCost = Math.round(result.total / 500) * 500;
+    baseItemisedCosts = result.items;
+  } else if (roomType === "bedroom") {
+    const result  = calcBedroomCost(bedroomSelections);
+    estimatedCost = Math.round(result.total / 500) * 500;
+    baseItemisedCosts = result.items;
+  } else {
+    // Bathroom
+    const baseCost = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+    estimatedCost  = Math.round(
+      calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
+    ) * 500;
+    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
+  }
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;
   const high = Math.round(estimatedCost * 1.12 / 500) * 500;
 
-  // Itemised base breakdown + brief-driven verified items
-  const baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
-  const briefItems        = projectBrief ? calcBriefCostItems(projectBrief) : [];
-  const briefTotal        = projectBrief ? calcBriefTotal(projectBrief)     : 0;
-  const grandTotal        = estimatedCost + briefTotal;
+  // Brief-driven verified items (bathroom only — brief not used for kitchen/bedroom)
+  const briefItems  = projectBrief ? calcBriefCostItems(projectBrief) : [];
+  const briefTotal  = projectBrief ? calcBriefTotal(projectBrief)     : 0;
+  const grandTotal  = estimatedCost + briefTotal;
 
   const overBudget  = grandTotal > budget;
   const budgetDelta = Math.abs(grandTotal - budget);
 
   const vanityLabel  = VANITY_OPTIONS.find((v) => v.id === vanity)?.label  ?? vanity;
   const tapwareLabel = TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware;
+
+  // Room-specific page title
+  const roomLabel =
+    roomType === "kitchen" ? "Kitchen"
+    : roomType === "bedroom" ? "Bedroom"
+    : "Bathroom";
 
   const [downloadHover, setDownloadHover] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -90,10 +117,6 @@ export default function PreviewPage() {
     setIsGeneratingPDF(true);
     try {
       const { generateProReportPDF } = await import("@/lib/generateProReportPDF");
-      const baseCostForPDF = getBathroomBaseCost(bathroomSize, customLength, customWidth);
-      const estimatedCostForPDF = Math.round(
-        calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCostForPDF) / 500
-      ) * 500;
       const briefTotalForPDF = projectBrief ? calcBriefTotal(projectBrief) : 0;
       await generateProReportPDF({
         selections: {
@@ -120,8 +143,11 @@ export default function PreviewPage() {
         projectBrief,
         generatedImageUrl,
         roomPhotoUrl,
-        grandTotal: estimatedCostForPDF + briefTotalForPDF,
-        estimatedCost: estimatedCostForPDF,
+        grandTotal:    estimatedCost + briefTotalForPDF,
+        estimatedCost: estimatedCost,
+        roomType,
+        kitchenSelections,
+        bedroomSelections,
       });
     } catch (err) {
       console.error("PDF generation failed:", err);
@@ -185,7 +211,7 @@ export default function PreviewPage() {
             )}
           </div>
           <h1 className="text-4xl lg:text-5xl font-bold text-charcoal">
-            {hasImage ? "Your Bathroom Preview" : "Sample Bathroom Preview"}
+            {hasImage ? `Your ${roomLabel} Preview` : `Sample ${roomLabel} Preview`}
           </h1>
           <p className="text-charcoal/50 mt-2 text-lg">
             {hasImage
@@ -205,7 +231,7 @@ export default function PreviewPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={generatedImageUrl!}
-                  alt="Your AI-generated bathroom preview"
+                  alt={`Your AI-generated ${roomLabel.toLowerCase()} preview`}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 <div className="absolute top-5 left-5">
@@ -214,7 +240,7 @@ export default function PreviewPage() {
                   </div>
                 </div>
                 <div className="absolute bottom-5 left-5 flex flex-wrap gap-2">
-                  {[
+                  {roomType === "bathroom" && [
                     floorTile && `Floor: ${floorTile.name}`,
                     wallTile  && `Wall: ${wallTile.name}`,
                   ].filter(Boolean).map((label) => (
@@ -225,6 +251,16 @@ export default function PreviewPage() {
                       {label}
                     </span>
                   ))}
+                  {roomType === "kitchen" && kitchenSelections.cabinetry && (
+                    <span className="bg-charcoal/70 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-xs font-semibold">
+                      Cabinetry: {kitchenSelections.cabinetry}
+                    </span>
+                  )}
+                  {roomType === "bedroom" && bedroomSelections.flooring && (
+                    <span className="bg-charcoal/70 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-xs font-semibold">
+                      Flooring: {bedroomSelections.flooring}
+                    </span>
+                  )}
                 </div>
               </div>
             ) : (
@@ -408,12 +444,24 @@ export default function PreviewPage() {
             <Card variant="default" padding="md">
               <h3 className="text-sm font-bold text-charcoal mb-3">Your Selections</h3>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Floor",   value: floorTile?.name  ?? "Not selected" },
-                  { label: "Wall",    value: wallTile?.name   ?? "Not selected" },
-                  { label: "Vanity",  value: vanityLabel },
-                  { label: "Tapware", value: tapwareLabel },
-                ].map(({ label, value }) => (
+                {(
+                  roomType === "kitchen" ? [
+                    { label: "Cabinetry",  value: kitchenSelections.cabinetry  ?? "Not selected" },
+                    { label: "Benchtop",   value: kitchenSelections.benchtop   ?? "Not selected" },
+                    { label: "Splashback", value: kitchenSelections.splashback ?? "Not selected" },
+                    { label: "Cooktop",    value: kitchenSelections.cooktop },
+                  ] : roomType === "bedroom" ? [
+                    { label: "Flooring",  value: bedroomSelections.flooring      ?? "Not selected" },
+                    { label: "Wall",      value: bedroomSelections.wallTreatment ?? "Not selected" },
+                    { label: "Lighting",  value: bedroomSelections.lighting      ?? "Not selected" },
+                    { label: "Storage",   value: bedroomSelections.storage       ?? "Not selected" },
+                  ] : [
+                    { label: "Floor",   value: floorTile?.name ?? "Not selected" },
+                    { label: "Wall",    value: wallTile?.name  ?? "Not selected" },
+                    { label: "Vanity",  value: vanityLabel },
+                    { label: "Tapware", value: tapwareLabel },
+                  ]
+                ).map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-sand-50 border border-sand-200 px-3 py-2.5">
                     <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-wider mb-0.5">{label}</p>
                     <p className="text-xs font-semibold text-charcoal leading-tight truncate">{value}</p>
@@ -425,7 +473,7 @@ export default function PreviewPage() {
             {/* Primary CTA — Connect (always visible) */}
             <Link href="/connect">
               <Button variant="primary" size="lg" fullWidth className="group">
-                {hasImage ? "Connect with a Builder" : "Save Selections / Connect"}
+                {hasImage ? `Connect with a Builder` : "Save Selections / Connect"}
                 <ArrowRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>

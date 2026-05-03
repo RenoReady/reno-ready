@@ -104,6 +104,9 @@ export function restoreBuilderStateFromAuth(): boolean {
 
 // ── Default kitchen selections ────────────────────────────────────────────────
 const defaultKitchenSelections: KitchenSelections = {
+  roomSize:            "standard",
+  customLength:        0,
+  customWidth:         0,
   cabinetry:           "shaker",
   benchtop:            "engineered-stone",
   mixer:               "brushed-brass",
@@ -121,6 +124,9 @@ const defaultKitchenSelections: KitchenSelections = {
 
 // ── Default bedroom selections ────────────────────────────────────────────────
 const defaultBedroomSelections: BedroomSelections = {
+  roomSize:          "master",
+  customLength:      0,
+  customWidth:       0,
   flooring:          "engineered-oak-herringbone",
   wallTreatment:     "feature-paint",
   lighting:          "architectural-downlights",

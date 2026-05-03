@@ -9,6 +9,8 @@
 import { cn } from "@/lib/utils";
 import {
   type BedroomSelections,
+  type BedroomRoomSize,
+  BEDROOM_SIZE_OPTIONS,
   BEDROOM_FLOORING_OPTIONS,
   WALL_TREATMENT_OPTIONS,
   BEDROOM_LIGHTING_OPTIONS,
@@ -16,7 +18,7 @@ import {
   WINDOW_TREATMENT_OPTIONS,
   CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { TriangleAlert } from "lucide-react";
+import { TriangleAlert, Ruler } from "lucide-react";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -32,6 +34,69 @@ interface BedroomSidebarProps {
 export default function BedroomSidebar({ selections, onChange }: BedroomSidebarProps) {
   return (
     <div className="flex flex-col gap-6">
+
+      {/* 0 — Room Size */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Ruler size={12} className="text-charcoal/40" />
+          <SectionLabel>0 — Room Size</SectionLabel>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {BEDROOM_SIZE_OPTIONS.map((opt) => {
+            const active = selections.roomSize === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ roomSize: opt.id as BedroomRoomSize, customLength: 0, customWidth: 0 })}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200",
+                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                )}
+              >
+                <p className={cn("text-xs font-bold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
+                <p className="text-[10px] text-charcoal/45 leading-snug">{opt.sub}</p>
+                {opt.approxSqm && (
+                  <p className={cn("text-[10px] font-semibold mt-0.5", active ? "text-terracotta/70" : "text-charcoal/35")}>{opt.approxSqm}</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom dimension inputs */}
+        {selections.roomSize === "custom" && (
+          <div className="flex flex-col gap-2 mt-3">
+            <p className="text-[11px] text-charcoal/50 font-medium">Enter dimensions (metres):</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Length</label>
+                <input
+                  type="number" min={1} max={30} step={0.1}
+                  value={selections.customLength || ""}
+                  onChange={(e) => onChange({ customLength: Number(e.target.value) })}
+                  placeholder="e.g. 4.5"
+                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Width</label>
+                <input
+                  type="number" min={1} max={30} step={0.1}
+                  value={selections.customWidth || ""}
+                  onChange={(e) => onChange({ customWidth: Number(e.target.value) })}
+                  placeholder="e.g. 3.5"
+                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
+                />
+              </div>
+            </div>
+            {selections.customLength > 0 && selections.customWidth > 0 && (
+              <p className="text-[11px] text-terracotta font-semibold">
+                {(selections.customLength * selections.customWidth).toFixed(1)} m² — AI will maintain these exact proportions
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 1 — Flooring */}
       <div>

@@ -44,6 +44,7 @@ export const CEILING_OPTIONS: { id: CeilingStyle; label: string; sub: string; co
 
 // ── Kitchen types ─────────────────────────────────────────────────────────────
 
+export type KitchenRoomSize  = "galley" | "standard" | "large" | "custom";
 export type CabinetryStyle   = "shaker" | "shaker-sage" | "matte-black" | "flat-panel" | "flat-panel-beige" | "natural-timber";
 export type BenchtopMaterial = "engineered-stone" | "porcelain-slab" | "timber";
 export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome";
@@ -51,7 +52,25 @@ export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab"
 export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
 
+export interface KitchenSizeOption {
+  id:       KitchenRoomSize;
+  label:    string;
+  sub:      string;
+  approxSqm: string;
+  baseCost: number;
+}
+
+export const KITCHEN_SIZE_OPTIONS: KitchenSizeOption[] = [
+  { id: "galley",   label: "Galley / Small",    sub: "Single-run or narrow galley",     approxSqm: "< 12m²",  baseCost: 22_000 },
+  { id: "standard", label: "Standard",           sub: "L-shape, U-shape or island",      approxSqm: "12–20m²", baseCost: 32_000 },
+  { id: "large",    label: "Large / Open-Plan",  sub: "Expansive open-plan or chef kitchen", approxSqm: "20m²+",  baseCost: 48_000 },
+  { id: "custom",   label: "Custom Size",        sub: "Enter your exact dimensions",     approxSqm: "",        baseCost: 0      },
+];
+
 export interface KitchenSelections {
+  roomSize:             KitchenRoomSize;
+  customLength:         number;   // metres — used when roomSize === "custom"
+  customWidth:          number;
   cabinetry:            CabinetryStyle   | null;  // null = deselected
   benchtop:             BenchtopMaterial | null;
   mixer:                MixerFinish      | null;
@@ -219,13 +238,32 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
 
 // ── Bedroom types ─────────────────────────────────────────────────────────────
 
+export type BedroomRoomSize    = "standard" | "master" | "large" | "custom";
 export type BedroomFlooring    = "engineered-oak-herringbone" | "herringbone-stone-grey" | "herringbone-stone-white" | "ash-rustic" | "ash" | "beech" | "hybrid-plank" | "polished-concrete" | "wool-carpet";
 export type WallTreatment      = "vj-paneling" | "feature-paint" | "designer-wallpaper";
 export type BedroomLighting    = "led-cove" | "architectural-downlights" | "statement-pendant";
 export type StorageOption      = "built-in-mirror-sliders" | "custom-wir";
 export type WindowTreatment    = "floor-ceiling-sheers" | "blockout-roller";
 
+export interface BedroomSizeOption {
+  id:        BedroomRoomSize;
+  label:     string;
+  sub:       string;
+  approxSqm: string;
+  baseSqm:   number;  // used for flooring area estimate
+}
+
+export const BEDROOM_SIZE_OPTIONS: BedroomSizeOption[] = [
+  { id: "standard", label: "Standard Bedroom", sub: "Single or double — typical spare room", approxSqm: "10–14m²", baseSqm: 12 },
+  { id: "master",   label: "Master Bedroom",   sub: "Main bedroom with ensuite potential",   approxSqm: "14–20m²", baseSqm: 16 },
+  { id: "large",    label: "Large Suite",       sub: "Expansive master or combined living",   approxSqm: "20m²+",   baseSqm: 24 },
+  { id: "custom",   label: "Custom Size",       sub: "Enter your exact dimensions",          approxSqm: "",        baseSqm: 0  },
+];
+
 export interface BedroomSelections {
+  roomSize:          BedroomRoomSize;
+  customLength:      number;   // metres — used when roomSize === "custom"
+  customWidth:       number;
   flooring:          BedroomFlooring  | null;  // null = deselected
   wallTreatment:     WallTreatment    | null;
   lighting:          BedroomLighting  | null;
@@ -392,12 +430,22 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   const storageOpt  = sel.storage        ? STORAGE_OPTIONS.find((o)           => o.id === sel.storage)        : null;
   const windowOpt   = sel.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment) : null;
 
+  // Resolve floor area for cost and labels
+  const sizeOpt  = BEDROOM_SIZE_OPTIONS.find((o) => o.id === sel.roomSize);
+  const sqm = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
+    ? sel.customLength * sel.customWidth
+    : (sizeOpt?.baseSqm ?? 16);
+  const sqmLabel = `approx ${sqm.toFixed(0)}m²`;
+
+  // Scale flooring cost by area (base cost is per 16m²)
+  const flooringCost = flooringOpt ? Math.round((flooringOpt.cost * sqm) / 16 / 100) * 100 : 0;
+
   const items: RoomCostItem[] = [
     { label: "Preparation & Plastering",
       amount: BEDROOM_BASE_COST, detail: "Wall prep, skirting removal, painting base coats" },
     { label: `Flooring — ${flooringOpt?.label ?? "Not yet selected"}`,
-      amount: flooringOpt?.cost ?? 0,
-      detail: flooringOpt ? "Supply + lay, approx 4m × 4m room (16m²)" : "Select a flooring option to include in your estimate" },
+      amount: flooringCost,
+      detail: flooringOpt ? `Supply + lay, ${sqmLabel}` : "Select a flooring option to include in your estimate" },
     { label: `Wall — ${wallOpt?.label ?? "Not yet selected"}`,
       amount: wallOpt?.cost ?? 0,
       detail: wallOpt?.sub ?? "Select a wall treatment to include in your estimate" },
@@ -472,10 +520,20 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const dw       = sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher";
   const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
 
+  // Dimension directive — prevents AI from expanding/contracting the space
+  const dimDirective = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
+    ? `CRITICAL — Room dimensions: ${sel.customLength}m × ${sel.customWidth}m (${(sel.customLength * sel.customWidth).toFixed(1)}m²). Do NOT add extra benchtop runs, extend walls, or invent space not visible in the original photo. Maintain exact proportions.`
+    : sel.roomSize === "galley"
+    ? "CRITICAL — This is a galley or small kitchen (< 12m²). Keep it compact — do not add a large island or extend the room footprint."
+    : sel.roomSize === "large"
+    ? "CRITICAL — This is a large open-plan kitchen (20m²+). Show a spacious, generous layout."
+    : "CRITICAL — Maintain the original room proportions exactly. Do not extend walls, add benchtop runs, or invent space not present in the photo.";
+
   const base = [
     "You are a professional interior design visualizer. Receive a kitchen photo and material selections.",
     "Modify the photo to show the new kitchen design while maintaining the structural layout unless requested.",
     "Remove all personal items from benchtops. Produce a high-end architectural photography result.",
+    dimDirective,
     "",
     cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
     benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
@@ -530,10 +588,20 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     ? "Recessed architectural dimmable downlights throughout"
     : "Designer statement pendant lights flanking the bedhead";
 
+  // Dimension directive — prevents AI from expanding the space
+  const dimDirective = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
+    ? `CRITICAL — Room dimensions: ${sel.customLength}m × ${sel.customWidth}m (${(sel.customLength * sel.customWidth).toFixed(1)}m²). Do NOT extend walls, widen the room, or invent space not visible in the original photo. Maintain exact proportions.`
+    : sel.roomSize === "standard"
+    ? "CRITICAL — This is a standard bedroom (10–14m²). Keep proportions compact and realistic — do not extend the room footprint."
+    : sel.roomSize === "large"
+    ? "CRITICAL — This is a large bedroom suite (20m²+). Show a spacious, generous layout with room to breathe."
+    : "CRITICAL — Maintain the original room proportions exactly. Do not extend walls or invent space not present in the photo.";
+
   const base = [
     "You are a professional interior design visualizer for a luxury bedroom renovation.",
     "Modify the bedroom photo to reflect the selected materials. Maintain structural layout.",
     "Remove all personal items. Produce a high-end architectural photography result.",
+    dimDirective,
     "",
     flooring ? `Flooring: ${flooring} — lay full room width.`                            : "Flooring: choose a premium flooring appropriate to the style.",
     wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`         : "Wall treatment: designer's choice appropriate to the room palette.",

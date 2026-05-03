@@ -1614,6 +1614,7 @@ export default function BuilderPage() {
               )}
               <RoomRouter
                 selected={roomType}
+                savedRooms={savedRooms}
                 onSelect={(r) => {
                   setRoomType(r);
                   setShowRoomRouter(false);
@@ -1822,12 +1823,70 @@ export default function BuilderPage() {
                 })}
               </>)}
 
-              {/* ── Bedroom placeholder (structural in right sidebar) ── */}
-              {roomType === "bedroom" && (
-                <p className="text-[10px] text-charcoal/40 leading-snug">
-                  Bedroom structural features — VJ feature wall, media joinery and pendant rough-ins — are configured in the design panel on the right.
-                </p>
-              )}
+              {/* ── Bedroom structural toggles ── */}
+              {roomType === "bedroom" && (<>
+
+                {/* VJ Feature Wall */}
+                <button
+                  onClick={() => setBedroomSelections({ hasVJWall: !bedroomSelections.hasVJWall })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    bedroomSelections.hasVJWall ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", bedroomSelections.hasVJWall ? "text-amber-800" : "text-charcoal/70")}>VJ Feature Wall</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Vertical-join panelling on one feature wall</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {bedroomSelections.hasVJWall && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasVJWall ? "bg-amber-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasVJWall ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Built-in Media Joinery */}
+                <button
+                  onClick={() => setBedroomSelections({ hasMediaJoinery: !bedroomSelections.hasMediaJoinery })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    bedroomSelections.hasMediaJoinery ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", bedroomSelections.hasMediaJoinery ? "text-blue-800" : "text-charcoal/70")}>Built-in Media Joinery</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Custom TV unit with shelving &amp; cable management</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {bedroomSelections.hasMediaJoinery && <span className="text-[10px] font-bold text-blue-600">+$4,500</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasMediaJoinery ? "bg-blue-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasMediaJoinery ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Bedside Pendant Rough-ins */}
+                <button
+                  onClick={() => setBedroomSelections({ hasPendantRoughin: !bedroomSelections.hasPendantRoughin })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    bedroomSelections.hasPendantRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", bedroomSelections.hasPendantRoughin ? "text-amber-800" : "text-charcoal/70")}>Bedside Pendant Rough-ins</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Electrician rough-in for two bedside pendants</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {bedroomSelections.hasPendantRoughin && <span className="text-[10px] font-bold text-amber-600">+$850</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasPendantRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasPendantRoughin ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+              </>)}
             </div>
           </aside>
 

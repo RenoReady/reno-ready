@@ -11,19 +11,103 @@ import { cn } from "@/lib/utils";
 import {
   type KitchenSelections,
   type KitchenRoomSize,
+  type KitchenFloorFinish,
   KITCHEN_SIZE_OPTIONS,
+  KITCHEN_FLOOR_OPTIONS,
   CABINETRY_OPTIONS,
   BENCHTOP_OPTIONS,
   MIXER_OPTIONS,
   SPLASHBACK_OPTIONS,
   CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler } from "lucide-react";
-import { useState } from "react";
+import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, Palette } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-2">{children}</p>
+  );
+}
+
+// ── Inline colour picker swatch (self-contained) ──────────────────────────────
+function KitchenColourSwatch({ label, value, onChange }: {
+  label:    string;
+  value:    string | null;
+  onChange: (c: string | null) => void;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [hex,  setHex]    = useState(value ?? "#D2B48C");
+  const btnRef            = useRef<HTMLButtonElement>(null);
+  const popRef            = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (popRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen((o) => !o)}
+        title={label}
+        className={cn(
+          "w-10 h-10 rounded-lg overflow-hidden ring-1 ring-black/10 transition-all",
+          value ? "ring-2 ring-terracotta ring-offset-1" : "hover:ring-terracotta/40",
+        )}
+      >
+        {value ? (
+          <div className="w-full h-full" style={{ background: value }} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: "conic-gradient(from 0deg, #ff3b30, #ff9500, #ffcc00, #34c759, #007aff, #af52de, #ff3b30)" }}>
+            <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
+              <Palette size={10} className="text-charcoal/60" />
+            </div>
+          </div>
+        )}
+      </button>
+      {open && (
+        <div ref={popRef} className="absolute left-0 top-12 z-[200] w-52 p-3 rounded-2xl bg-white border border-sand-200 shadow-warm-xl">
+          <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wider mb-2">{label}</p>
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="color" value={hex}
+              onChange={(e) => { setHex(e.target.value); onChange(e.target.value); }}
+              className="w-9 h-9 rounded-lg cursor-pointer border-2 border-sand-200 bg-transparent p-0.5 flex-shrink-0"
+            />
+            <input
+              type="text" value={hex} maxLength={7} placeholder="#D2B48C"
+              onChange={(e) => {
+                setHex(e.target.value);
+                const n = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`;
+                if (/^#[0-9A-Fa-f]{6}$/.test(n)) { onChange(n); setHex(n); }
+              }}
+              className="flex-1 text-xs font-mono px-2 py-1.5 rounded-lg border-2 border-sand-200 focus:border-terracotta/60 focus:outline-none text-charcoal/80"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onChange(hex); setOpen(false); }}
+              className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-terracotta text-white hover:bg-terracotta/90"
+            >Apply</button>
+            {value && (
+              <button
+                onClick={() => { onChange(null); setHex("#D2B48C"); setOpen(false); }}
+                className="px-2 text-xs text-charcoal/40 hover:text-charcoal"
+              >Clear</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -233,9 +317,78 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 5 — Appliance Integration */}
+      {/* 5 — Floor & Wall Colour */}
       <div>
-        <SectionLabel>5 — Appliance Integration</SectionLabel>
+        <SectionLabel>5 — Floor &amp; Wall Colour</SectionLabel>
+
+        {/* Floor finish */}
+        <p className="text-[10px] font-semibold text-charcoal/50 mb-2">Kitchen Floor</p>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {KITCHEN_FLOOR_OPTIONS.map((opt) => {
+            const active = selections.floorFinish === opt.id && !selections.floorColor;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ floorFinish: selections.floorFinish === opt.id && !selections.floorColor ? null : opt.id as KitchenFloorFinish, floorColor: null })}
+                title={opt.sub}
+                className={cn(
+                  "relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-200",
+                  active ? "border-terracotta shadow-warm-sm scale-[1.03]" : "border-sand-200 hover:border-terracotta/40",
+                )}
+              >
+                <div className="w-10 h-10 rounded-lg ring-1 ring-black/10" style={{ background: opt.color }} />
+                <p className="text-[9px] font-semibold text-charcoal/70 text-center leading-tight truncate w-full">{opt.label}</p>
+                {opt.costAdj > 0 && (
+                  <p className={cn("text-[8px] font-bold", active ? "text-terracotta" : "text-charcoal/30")}>
+                    +${(opt.costAdj / 1000).toFixed(1)}k
+                  </p>
+                )}
+                {active && (
+                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-terracotta flex items-center justify-center">
+                    <CheckCircle2 size={9} className="text-white" strokeWidth={3} />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Custom colour swatch */}
+          <KitchenColourSwatch
+            label="Custom Floor Colour"
+            value={selections.floorColor ?? null}
+            onChange={(c) => onChange({ floorColor: c, floorFinish: c ? null : selections.floorFinish })}
+          />
+        </div>
+
+        {/* Wall paint colour */}
+        <p className="text-[10px] font-semibold text-charcoal/50 mb-2 mt-4">Wall Paint Colour</p>
+        <div className="flex items-center gap-3">
+          <KitchenColourSwatch
+            label="Custom Wall Colour"
+            value={selections.wallColor ?? null}
+            onChange={(c) => onChange({ wallColor: c })}
+          />
+          <div className="flex-1">
+            <p className="text-[11px] text-charcoal/60 leading-snug">
+              {selections.wallColor
+                ? <><span className="inline-block w-3 h-3 rounded-sm ring-1 ring-black/10 mr-1 align-middle" style={{ background: selections.wallColor }} />{selections.wallColor}</>
+                : "Click the colour wheel to set a wall paint colour for AI rendering."}
+            </p>
+            {selections.wallColor && (
+              <button
+                onClick={() => onChange({ wallColor: null })}
+                className="text-[10px] text-charcoal/35 hover:text-charcoal mt-1"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 6 — Appliance Integration */}
+      <div>
+        <SectionLabel>6 — Appliance Integration</SectionLabel>
 
         {/* Cooktop */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-1.5">Cooktop</p>
@@ -321,9 +474,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </button>
       </div>
 
-      {/* 6 — Ceiling Style */}
+      {/* 7 — Ceiling Style */}
       <div>
-        <SectionLabel>6 — Ceiling Treatment</SectionLabel>
+        <SectionLabel>7 — Ceiling Treatment</SectionLabel>
         <div className="flex flex-col gap-2">
           {CEILING_OPTIONS.map((opt) => {
             const active = selections.ceilingStyle === opt.id;

@@ -51,6 +51,7 @@ export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome";
 export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab" | "mirrored" | "vj-panel" | "slab-match";
 export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
+export type KitchenFloorFinish = "large-white" | "large-grey" | "large-charcoal" | "timber-oak" | "polished-concrete" | "terrazzo";
 
 export interface KitchenSizeOption {
   id:       KitchenRoomSize;
@@ -75,6 +76,9 @@ export interface KitchenSelections {
   benchtop:             BenchtopMaterial | null;
   mixer:                MixerFinish      | null;
   splashback:           SplashbackStyle  | null;
+  floorFinish:          KitchenFloorFinish | null; // kitchen floor tile/finish
+  floorColor:           string | null;             // custom hex override for floor
+  wallColor:            string | null;             // painted wall colour
   cooktop:              CooktopType;
   dishwasher:           DishwasherType;
   ceilingStyle:         CeilingStyle;
@@ -172,6 +176,15 @@ export const SPLASHBACK_OPTIONS: { id: SplashbackStyle; label: string; sub: stri
   { id: "slab-match",     label: "Benchtop Slab Match",     sub: "Seamless stone continuation — the most dramatic look",        costAdj: 2_200 },
 ];
 
+export const KITCHEN_FLOOR_OPTIONS: { id: KitchenFloorFinish; label: string; sub: string; color: string; costAdj: number }[] = [
+  { id: "large-white",       label: "Large Format White",    sub: "600×1200mm white porcelain — bright, clean, timeless",               color: "#F5F0E8", costAdj: 0      },
+  { id: "large-grey",        label: "Large Format Grey",     sub: "600×1200mm grey stone-look — contemporary and versatile",            color: "#C0BCBA", costAdj: 0      },
+  { id: "large-charcoal",    label: "Large Format Charcoal", sub: "Dark porcelain slab — dramatic, hides everyday dirt and scuffs",     color: "#4A4A4A", costAdj: 500    },
+  { id: "timber-oak",        label: "Timber-Look Oak",       sub: "Plank-format oak-look — warmth of timber, durability of porcelain",  color: "#C4956A", costAdj: 800    },
+  { id: "polished-concrete", label: "Polished Concrete",     sub: "Grind-and-seal existing slab — industrial-luxe, effortless to clean", color: "#ABABAB", costAdj: 1_200 },
+  { id: "terrazzo",          label: "Terrazzo",              sub: "Chip-speckled surface — retro luxe, increasingly popular in kitchens", color: "#D4C8B8", costAdj: 2_500 },
+];
+
 // ── Kitchen cost engine (mid-range QLD 2026) ─────────────────────────────────
 
 export interface RoomCostItem {
@@ -184,10 +197,11 @@ export interface RoomCostItem {
 export const KITCHEN_BASE_COST = 22_000; // Demo, install labour, electrical, plumbing base
 
 export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]; total: number } {
-  const cabinetryOpt  = sel.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)  : null;
-  const benchtopOpt   = sel.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)   : null;
-  const splashbackOpt = sel.splashback ? SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback) : null;
-  const mixerOpt      = sel.mixer      ? MIXER_OPTIONS.find((o)      => o.id === sel.mixer)      : null;
+  const cabinetryOpt  = sel.cabinetry   ? CABINETRY_OPTIONS.find((o)     => o.id === sel.cabinetry)   : null;
+  const benchtopOpt   = sel.benchtop    ? BENCHTOP_OPTIONS.find((o)      => o.id === sel.benchtop)    : null;
+  const splashbackOpt = sel.splashback  ? SPLASHBACK_OPTIONS.find((o)    => o.id === sel.splashback)  : null;
+  const mixerOpt      = sel.mixer       ? MIXER_OPTIONS.find((o)         => o.id === sel.mixer)       : null;
+  const floorOpt      = sel.floorFinish ? KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish) : null;
 
   const items: RoomCostItem[] = [
     { label: "Demo & Installation Labour",
@@ -201,6 +215,9 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
     { label: `Splashback — ${splashbackOpt?.label ?? "Not yet selected"}`,
       amount: 1_200 + (splashbackOpt?.costAdj ?? 0),
       detail: splashbackOpt?.label ?? "Select a splashback to refine this estimate" },
+    { label: `Kitchen Floor — ${floorOpt?.label ?? "Not yet selected"}`,
+      amount: 2_800 + (floorOpt?.costAdj ?? 0),
+      detail: floorOpt?.sub ?? "Select a floor finish to refine this estimate" },
     { label: `Mixer & Sink — ${mixerOpt?.label ?? "Not yet selected"}`,
       amount: 1_450, detail: mixerOpt ? `${mixerOpt.label} gooseneck, under-mount sink set` : "Select a mixer finish to refine this estimate" },
     { label: sel.cooktop === "induction" ? "Induction Cooktop" : "Gas Cooktop + Lines",
@@ -240,7 +257,17 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
 
 export type BedroomRoomSize    = "standard" | "master" | "large" | "custom";
 export type BedroomFlooring    = "engineered-oak-herringbone" | "herringbone-stone-grey" | "herringbone-stone-white" | "ash-rustic" | "ash" | "beech" | "hybrid-plank" | "polished-concrete" | "wool-carpet";
-export type WallTreatment      = "vj-paneling" | "feature-paint" | "designer-wallpaper";
+export type WallTreatment      =
+  | "feature-paint"
+  | "limewash-paint"
+  | "microcement"
+  | "venetian-plaster"
+  | "vj-paneling"
+  | "shiplap-paneling"
+  | "timber-battens"
+  | "designer-wallpaper"
+  | "botanical-wallpaper"
+  | "stone-veneer";
 export type BedroomLighting    = "led-cove" | "architectural-downlights" | "statement-pendant";
 export type StorageOption      = "built-in-mirror-sliders" | "custom-wir";
 export type WindowTreatment    = "floor-ceiling-sheers" | "blockout-roller";
@@ -347,22 +374,64 @@ export const BEDROOM_FLOORING_OPTIONS: { id: BedroomFlooring; label: string; sub
 
 export const WALL_TREATMENT_OPTIONS: { id: WallTreatment; label: string; sub: string; cost: number }[] = [
   {
+    id:    "feature-paint",
+    label: "Feature Wall Paint",
+    sub:   "Bold statement colour on one or all walls — most budget-friendly impact",
+    cost:  850,
+  },
+  {
+    id:    "limewash-paint",
+    label: "Limewash Paint",
+    sub:   "Textured matte wash — organic, aged patina; popular in coastal & Mediterranean styles",
+    cost:  1_400,
+  },
+  {
+    id:    "microcement",
+    label: "Microcement / Concrete Finish",
+    sub:   "Seamless poured look — contemporary, industrial-luxe, no grout lines",
+    cost:  4_200,
+  },
+  {
+    id:    "venetian-plaster",
+    label: "Venetian Plaster",
+    sub:   "Artisanal Italian plaster — luminous marble-like depth, applied in multiple layers",
+    cost:  5_500,
+  },
+  {
     id:    "vj-paneling",
     label: "VJ Paneling (Vertical Joint)",
     sub:   "Tongue-and-groove vertical boards — coastal, hamptons or contemporary",
     cost:  3_500,
   },
   {
-    id:    "feature-paint",
-    label: "Feature Wall Paint",
-    sub:   "Bold statement colour — most budget-friendly impact",
-    cost:  850,
+    id:    "shiplap-paneling",
+    label: "Shiplap / Horizontal Boards",
+    sub:   "Overlapping horizontal timber panels — rustic, Hamptons, or industrial depending on finish",
+    cost:  3_200,
+  },
+  {
+    id:    "timber-battens",
+    label: "Timber Batten Feature Wall",
+    sub:   "Vertical raw timber battens on a dark backing — warm, architectural, three-dimensional",
+    cost:  2_800,
   },
   {
     id:    "designer-wallpaper",
-    label: "Designer Wallpaper",
-    sub:   "Textured or printed wallpaper — adds personality and depth",
+    label: "Designer Wallpaper — Textured",
+    sub:   "Woven, grasscloth or embossed wallpaper — subtle texture for a refined, tactile finish",
     cost:  2_200,
+  },
+  {
+    id:    "botanical-wallpaper",
+    label: "Botanical / Mural Wallpaper",
+    sub:   "Large-format printed mural or botanical print — bold, artistic focal point",
+    cost:  2_800,
+  },
+  {
+    id:    "stone-veneer",
+    label: "Stone Feature Wall",
+    sub:   "Thin-set travertine, slate or marble tile feature — luxury hotel aesthetic",
+    cost:  6_500,
   },
 ];
 
@@ -569,10 +638,13 @@ const SPATIAL_REMINDER = [
 ].join("\n");
 
 export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): string {
-  const cabinet  = sel.cabinetry  ? (CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)?.label  ?? sel.cabinetry)  : null;
-  const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)?.label   ?? sel.benchtop)   : null;
-  const mixer    = sel.mixer      ? (MIXER_OPTIONS.find((o)      => o.id === sel.mixer)?.label      ?? sel.mixer)      : null;
-  const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o) => o.id === sel.splashback)?.label ?? sel.splashback) : null;
+  const cabinet  = sel.cabinetry  ? (CABINETRY_OPTIONS.find((o)      => o.id === sel.cabinetry)?.label   ?? sel.cabinetry)  : null;
+  const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)       => o.id === sel.benchtop)?.label    ?? sel.benchtop)   : null;
+  const mixer    = sel.mixer      ? (MIXER_OPTIONS.find((o)          => o.id === sel.mixer)?.label       ?? sel.mixer)      : null;
+  const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o)     => o.id === sel.splashback)?.label  ?? sel.splashback) : null;
+  const floor    = sel.floorFinish ? (KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish)?.label ?? sel.floorFinish): null;
+  const floorColorNote = sel.floorColor ? ` in the exact colour ${sel.floorColor}` : "";
+  const wallColorNote  = sel.wallColor  ? `Kitchen walls: Paint all visible walls in the exact colour ${sel.wallColor}.` : null;
   const cooktop  = sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop";
   const dw       = sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher";
   const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
@@ -592,8 +664,10 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
       "",
       cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
       benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
-      mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`               : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
-      splash   ? `Splashback: ${splash}.`                                                       : "Splashback: select a material that complements the cabinetry.",
+      mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`                    : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
+      splash   ? `Splashback: ${splash}.`                                                            : "Splashback: select a material that complements the cabinetry.",
+      floor    ? `Kitchen Floor: ${floor}${floorColorNote}.`                                         : "Kitchen Floor: large format neutral porcelain or timber-look planks.",
+      wallColorNote ?? "Kitchen Walls: clean white or warm neutral paint.",
       `Appliances: ${cooktop}, ${dw}. Include a counter-depth integrated refrigerator.`,
       `Ceiling: ${ceiling}.`,
       "Style: warm Australian natural light, realistic textures, high-fidelity 2K render.",
@@ -613,10 +687,12 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const materials = [
     "",
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`        : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
-    benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`  : "Benchtop: apply a premium material that complements the cabinetry.",
-    mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`      : "Sink & Mixer: replace with a quality gooseneck mixer.",
-    splash   ? `Splashback: Re-surface the splashback with ${splash}.`                         : "Splashback: choose a finish that suits the cabinetry.",
+    cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`                : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
+    benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`          : "Benchtop: apply a premium material that complements the cabinetry.",
+    mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`              : "Sink & Mixer: replace with a quality gooseneck mixer.",
+    splash   ? `Splashback: Re-surface the splashback with ${splash}.`                                 : "Splashback: choose a finish that suits the cabinetry.",
+    floor    ? `Kitchen Floor: Re-texture the floor with ${floor}${floorColorNote}.`                   : "Kitchen Floor: retain the existing floor or choose a clean, neutral finish.",
+    wallColorNote ?? "Kitchen Walls: Retain existing wall colour unless specified.",
     `Appliances: ${cooktop}, ${dw}. Fit into the existing appliance spaces — do not add new ones outside the existing footprint.`,
     `Ceiling: ${ceiling}.`,
     "Remove all personal items, appliances on benchtops, and clutter.",

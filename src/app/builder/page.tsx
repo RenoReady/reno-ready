@@ -1148,33 +1148,51 @@ function ArchitectViewport({
 function InlineBriefPanel({
   projectBrief,
   onSave,
+  onClear,
 }: {
   projectBrief: ProjectBrief | null;
-  onSave: (b: ProjectBrief) => void;
+  onSave:  (b: ProjectBrief) => void;
+  onClear: () => void;
 }) {
-  const [year,           setYear]           = useState(projectBrief?.yearBuilt       ? String(projectBrief.yearBuilt) : "");
-  const [plumbingLayout, setPlumbingLayout] = useState<PlumbingLayout>(projectBrief?.plumbingLayout ?? "keep-layout");
-  const [scope,          setScope]          = useState<import("@/lib/projectBrief").RenovationScope>(projectBrief?.scope ?? "full-stripout");
+  const [year,           setYear]           = useState(projectBrief?.yearBuilt ? String(projectBrief.yearBuilt) : "");
+  const [plumbingLayout, setPlumbingLayout] = useState<PlumbingLayout | null>(projectBrief?.plumbingLayout ?? null);
+  const [scope,          setScope]          = useState<import("@/lib/projectBrief").RenovationScope | null>(projectBrief?.scope ?? null);
 
   const y     = parseInt(year, 10);
   const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
   const isOld = valid && y < 1990;
 
+  // All three fields must be filled before the brief activates
+  const canSave = valid && plumbingLayout !== null && scope !== null;
+
   // Asbestos triggers when pre-1990 AND walls will be disturbed
   const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  // Auto-save whenever any value changes and year is valid
+  // Auto-save whenever all fields are set and year is valid
   useEffect(() => {
-    if (!valid) return;
+    if (!canSave || !plumbingLayout || !scope) return;
     onSave({ yearBuilt: y, plumbingLayout, scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, plumbingLayout, scope]);
+
+  const isFilled = projectBrief !== null;
 
   return (
     <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-5">
       <div className="flex items-center gap-2.5">
         <ClipboardList size={14} className="text-charcoal/50" />
-        <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Project Brief</p>
+        <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest flex-1">Project Brief</p>
+        {isFilled && (
+          <button
+            onClick={() => {
+              setYear(""); setPlumbingLayout(null); setScope(null);
+              onClear();
+            }}
+            className="text-[10px] text-charcoal/35 hover:text-charcoal/60 font-semibold transition-colors"
+          >
+            Clear ×
+          </button>
+        )}
       </div>
 
       {/* Year built */}
@@ -1203,10 +1221,11 @@ function InlineBriefPanel({
         <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Plumbing &amp; Layout</p>
         <div className="flex flex-col gap-1.5">
           {([
-            { key: "keep-layout",   label: "Keep Existing Layout", sub: "No plumbing moves",          cost: null        },
-            { key: "move-plumbing", label: "Moving Plumbing/Walls", sub: "Relocating fixtures/drains", cost: "+$2,500" },
+            { key: "keep-layout",   label: "Keep Existing Layout",  sub: "No plumbing moves",           cost: null      },
+            { key: "move-plumbing", label: "Moving Plumbing/Walls", sub: "Relocating fixtures/drains",  cost: "+$2,500" },
           ] as { key: PlumbingLayout; label: string; sub: string; cost: string | null }[]).map(({ key, label, sub, cost }) => (
-            <button key={key} onClick={() => setPlumbingLayout(key)}
+            <button key={key}
+              onClick={() => setPlumbingLayout(plumbingLayout === key ? null : key)}
               className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
                 plumbingLayout === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
               <div className="min-w-0">
@@ -1235,7 +1254,8 @@ function InlineBriefPanel({
             { key: "full-stripout",    label: "Full Strip-out",   sub: "Complete gut renovation"  },
             { key: "cosmetic-refresh", label: "Cosmetic Refresh", sub: "Surfaces & finishes only" },
           ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string }[]).map(({ key, label, sub }) => (
-            <button key={key} onClick={() => setScope(key)}
+            <button key={key}
+              onClick={() => setScope(scope === key ? null : key)}
               className={cn("flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
                 scope === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
               <p className={cn("text-xs font-semibold", scope === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
@@ -1245,8 +1265,10 @@ function InlineBriefPanel({
         </div>
       </div>
 
-      {!valid && (
-        <p className="text-[10px] text-charcoal/35 text-center">Enter year built to activate cost estimate</p>
+      {!canSave && (
+        <p className="text-[10px] text-charcoal/35 text-center">
+          {!valid ? "Enter year built to activate brief" : "Select plumbing layout and scope to complete brief"}
+        </p>
       )}
     </div>
   );
@@ -1652,6 +1674,7 @@ export default function BuilderPage() {
             <InlineBriefPanel
               projectBrief={projectBrief}
               onSave={setProjectBrief}
+              onClear={() => setProjectBrief(null)}
             />
 
             {/* Structural Needs — room-aware */}
@@ -2568,6 +2591,7 @@ export default function BuilderPage() {
             setShowBriefModal(false);
             if (brief.bathroomCount === 1) setShowHygieneModal(true);
           }}
+          onClear={() => { setProjectBrief(null); setShowBriefModal(false); }}
           onClose={() => setShowBriefModal(false)}
           onSingleBathroom={() => setShowHygieneModal(true)}
         />

@@ -21,9 +21,10 @@ import {
 } from "@/lib/projectBrief";
 
 interface ProjectBriefModalProps {
-  initial?: ProjectBrief | null;
-  onSave:  (brief: ProjectBrief) => void;
-  onClose: () => void;
+  initial?:   ProjectBrief | null;
+  onSave:     (brief: ProjectBrief) => void;
+  onClear?:   () => void;
+  onClose:    () => void;
   /** Called after save when bathroomCount === 1 so parent can show hygiene modal */
   onSingleBathroom?: () => void;
 }
@@ -76,11 +77,11 @@ const BATHROOM_COUNT_OPTIONS: { count: 1 | 2 | 3; label: string; sub: string }[]
   { count: 3, label: "3+",          sub: "Multiple bathrooms / ensuite setup"  },
 ];
 
-export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBathroom }: ProjectBriefModalProps) {
+export default function ProjectBriefModal({ initial, onSave, onClear, onClose, onSingleBathroom }: ProjectBriefModalProps) {
   const [yearBuilt,       setYearBuilt]       = useState<string>(initial?.yearBuilt ? String(initial.yearBuilt) : "");
-  const [plumbingLayout,  setPlumbingLayout]  = useState<PlumbingLayout>(initial?.plumbingLayout  ?? "keep-layout");
-  const [scope,           setScope]           = useState<RenovationScope>(initial?.scope ?? "full-stripout");
-  const [bathroomCount,   setBathroomCount]   = useState<1 | 2 | 3>(initial?.bathroomCount ?? 1);
+  const [plumbingLayout,  setPlumbingLayout]  = useState<PlumbingLayout | null>(initial?.plumbingLayout ?? null);
+  const [scope,           setScope]           = useState<RenovationScope | null>(initial?.scope ?? null);
+  const [bathroomCount,   setBathroomCount]   = useState<1 | 2 | 3 | null>(initial?.bathroomCount ?? null);
 
   const year      = parseInt(yearBuilt, 10);
   const validYear = !isNaN(year) && year >= 1900 && year <= new Date().getFullYear();
@@ -89,10 +90,11 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
   // Asbestos is triggered when walls will be disturbed in a pre-1990 home
   const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  const canSave = validYear;
+  // All fields must be filled to save
+  const canSave = validYear && plumbingLayout !== null && scope !== null && bathroomCount !== null;
 
   function handleSave() {
-    if (!canSave) return;
+    if (!canSave || !plumbingLayout || !scope || !bathroomCount) return;
     onSave({ yearBuilt: year, plumbingLayout, scope, bathroomCount });
     if (bathroomCount === 1) {
       onSingleBathroom?.();
@@ -119,12 +121,22 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
               4 quick questions — sharpens your cost estimate and AI rendering
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-white/40 hover:text-white hover:bg-white/8 transition-all"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {onClear && initial && (
+              <button
+                onClick={() => { onClear(); onClose(); }}
+                className="text-[11px] font-semibold text-white/40 hover:text-white/70 border border-white/15 hover:border-white/30 rounded-lg px-2.5 py-1 transition-all"
+              >
+                Clear brief
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-white/40 hover:text-white hover:bg-white/8 transition-all"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 flex flex-col gap-6">
@@ -184,7 +196,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
                 return (
                   <button
                     key={key}
-                    onClick={() => setPlumbingLayout(key)}
+                    onClick={() => setPlumbingLayout(plumbingLayout === key ? null : key)}
                     className={cn(
                       "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left",
                       active
@@ -237,7 +249,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
                 return (
                   <button
                     key={key}
-                    onClick={() => setScope(key)}
+                    onClick={() => setScope(scope === key ? null : key)}
                     className={cn(
                       "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 text-left",
                       active
@@ -276,7 +288,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
                 return (
                   <button
                     key={count}
-                    onClick={() => setBathroomCount(count)}
+                    onClick={() => setBathroomCount(bathroomCount === count ? null : count)}
                     className={cn(
                       "flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border-2 transition-all duration-200 text-center",
                       active
@@ -296,7 +308,7 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
                 );
               })}
             </div>
-            {bathroomCount === 1 && (
+            {bathroomCount !== null && bathroomCount === 1 && (
               <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
                 <p className="text-[11px] text-amber-700 leading-snug">
@@ -319,8 +331,10 @@ export default function ProjectBriefModal({ initial, onSave, onClose, onSingleBa
           >
             {canSave ? (
               <>Save Brief &amp; Update Estimate <ArrowRight size={15} /></>
-            ) : (
+            ) : !validYear ? (
               "Enter year of construction to continue"
+            ) : (
+              "Select all options above to continue"
             )}
           </button>
 

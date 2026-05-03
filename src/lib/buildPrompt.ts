@@ -85,25 +85,52 @@ export function buildGeminiPrompt(req: PromptInput): string {
     ? `${wallName} in ${selections.customWallColor}`
     : wallName;
 
-  const systemInstruction = [
-    "You are a professional interior design visualizer. You will receive a photo of a bathroom",
-    "and a set of material selections. Your task is to modify the photo to reflect these",
-    "selections while maintaining the exact structural layout (sink, toilet, and window positions)",
-    "unless specific structural changes are requested below.",
+  // ── No-photo mode: simpler prompt, no spatial constraints needed ──
+  const isPhotoMode = !!req.imageBase64;
+
+  const systemInstruction = isPhotoMode ? [
+    // ── Hard spatial lock — placed FIRST ────────────────────────────────────
+    "SURFACE RETEXTURING TASK — NOT a redesign or reimagining.",
+    "You are given a reference photo of a real bathroom. Your ONLY job is to re-texture and",
+    "re-colour the existing visible surfaces (tiles, vanity, tapware, floor) in-place.",
     "",
-    "Before applying the new materials, digitally remove all personal clutter, towels, and",
-    "toiletries from the surfaces. Ensure the final image looks like a professional staging",
-    "for a real estate listing.",
+    "HARD CONSTRAINTS — these are immutable and override everything else:",
+    "1. ROOM SIZE IS FIXED. The bathroom footprint, wall positions, and ceiling height shown",
+    "   in the reference photo must not change by even one centimetre. Do not make it look larger.",
+    "2. CAMERA IS LOCKED. Reproduce the exact camera angle, distance, field of view, and",
+    "   perspective from the reference photo. Do not zoom out, pan, or change the viewpoint.",
+    "3. NO NEW SPACE. Every surface you modify must already exist in the reference photo.",
+    "   Do not add walls, fixtures, or fittings outside the existing frame.",
+    "4. STRUCTURAL LAYOUT IS FROZEN. Sink, toilet, shower/bath, and window positions stay",
+    "   identical to the reference photo unless a structural change is explicitly listed below.",
+    "5. ONLY SURFACES CHANGE. Textures, colours, and material finishes may change. Geometry may not.",
     "",
+    // ── Materials ────────────────────────────────────────────────────────────
+    "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
+    `Floor tiles: Re-texture the existing floor with ${floorDesc}.`,
+    `Wall tiles: Re-texture the existing wall surfaces with ${wallDesc}.`,
+    `Tapware: Replace visible tapware with ${tapwareFmt} finish fittings.`,
+    `Vanity: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity." : "Replace with a freestanding / floor-mounted vanity."}`,
+    "",
+    "Remove all personal clutter, towels, and toiletries. The result should look like a",
+    "professional real-estate staging photo.",
     "Style: High-end architectural photography, natural Australian lighting, realistic textures.",
-    `Materials to apply: Floor: ${floorDesc}, Wall: ${wallDesc}, Tapware: ${tapwareFmt}.`,
-    `Vanity: ${selections.vanity === "floating" ? "floating / wall-mounted" : "freestanding / floor-mounted"}.`,
+    "Output: high-fidelity 2K image.",
+  ].join("\n") : [
+    // ── No-photo: generate from scratch ─────────────────────────────────────
+    "You are a professional interior design visualizer. Generate a photorealistic bathroom from scratch.",
+    "Compose the scene as an interior architect would: slightly elevated angle centred on the vanity,",
+    "showing both the floor and at least two walls. Render at 2K resolution.",
     "",
-    "Output the result as a high-fidelity 2K image.",
+    `Floor: ${floorDesc}. Wall: ${wallDesc}. Tapware: ${tapwareFmt}.`,
+    `Vanity: ${selections.vanity === "floating" ? "floating / wall-mounted" : "freestanding / floor-mounted"}.`,
+    "Style: High-end architectural photography, natural Australian lighting, realistic textures.",
   ].join("\n");
 
-  // ── Tile style / layout ──────────────────────────────────────
+  // ── Tile style / layout ──────────────────────────────────────────────────
   const tileStyleId = typeof selections.tileStyle === "string" ? selections.tileStyle : selections.tileStyle ?? "";
+
+  // ── Tile style / layout (only meaningful when tiles are being changed) ──
   const tileStyleSection = tileStyleId && TILE_STYLE_PHRASES[tileStyleId]
     ? `\n\nTile layout: Apply the tiles using ${TILE_STYLE_PHRASES[tileStyleId]}.`
     : "";
@@ -119,18 +146,18 @@ export function buildGeminiPrompt(req: PromptInput): string {
   // ── Structural change instructions ───────────────────────────
   const sc = selections.structuralChanges;
   const structuralLines: string[] = [];
-  if (sc?.removeBathtub)   structuralLines.push("Remove the existing bathtub entirely and replace the space with clean wall tiles.");
-  if (sc?.addWalkinShower) structuralLines.push("Add a frameless walk-in shower with a fixed glass panel in the space where possible.");
-  if (sc?.replaceToilet)   structuralLines.push("Replace the existing toilet with a modern wall-hung rimless toilet suite.");
-  if (sc?.inWallCistern)   structuralLines.push("Install an in-wall concealed cistern system — the toilet suite should have a wall-hung pan with no visible cistern.");
+  if (sc?.removeBathtub)   structuralLines.push("PERMITTED structural change: remove the existing bathtub and replace the space with clean wall tiles.");
+  if (sc?.addWalkinShower) structuralLines.push("PERMITTED structural change: add a frameless walk-in shower with a fixed glass panel in the available space.");
+  if (sc?.replaceToilet)   structuralLines.push("PERMITTED structural change: replace the existing toilet with a modern wall-hung rimless toilet suite.");
+  if (sc?.inWallCistern)   structuralLines.push("PERMITTED structural change: install an in-wall concealed cistern — wall-hung pan with no visible cistern.");
   if (sc?.showerNiche === "single")
-    structuralLines.push("Incorporate a recessed single tiled shower niche into the shower wall — sized approximately 300×300mm, tiled to match the wall tiles.");
+    structuralLines.push("PERMITTED structural change: incorporate a recessed single tiled shower niche (approx 300×300mm) into the shower wall.");
   if (sc?.showerNiche === "double")
-    structuralLines.push("Incorporate a recessed double tiled shower niche into the shower wall — two shelves approximately 300×200mm each, tiled to match the wall tiles.");
+    structuralLines.push("PERMITTED structural change: incorporate a recessed double tiled shower niche (two shelves approx 300×200mm) into the shower wall.");
   if (sc?.showerFixtures === "dual")
-    structuralLines.push("Install dual shower fixtures — a ceiling-mounted rain shower head plus a separate handheld shower on a slide rail, both fed by a diverter on the same shower wall.");
+    structuralLines.push("PERMITTED structural change: install dual shower fixtures — ceiling rain head plus a handheld on a slide rail.");
   const structuralSection = structuralLines.length > 0
-    ? "\n\nStructural changes to apply:\n" + structuralLines.map(l => `- ${l}`).join("\n")
+    ? "\n\nPermitted structural changes (only these — no others):\n" + structuralLines.map(l => `- ${l}`).join("\n")
     : "";
 
   // ── Custom design note ────────────────────────────────────────
@@ -146,24 +173,22 @@ export function buildGeminiPrompt(req: PromptInput): string {
     : "";
 
   // ── Project brief injections ──────────────────────────────────
-  const scopeSuffix    = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope]                         : "";
-  const plumbingSuffix = req.projectBrief ? PLUMBING_LAYOUT_PROMPT_SUFFIX[req.projectBrief.plumbingLayout]      : "";
+  const scopeSuffix    = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope]                    : "";
+  const plumbingSuffix = req.projectBrief ? PLUMBING_LAYOUT_PROMPT_SUFFIX[req.projectBrief.plumbingLayout] : "";
   const briefSection   =
     (scopeSuffix || plumbingSuffix)
       ? `\n\nProject brief context: ${[scopeSuffix, plumbingSuffix].filter(Boolean).join(" ")}`
       : "";
 
-  // No-photo fallback
-  const noPhotoContext = !req.imageBase64
+  // ── Final spatial reminder (photo mode only — placed LAST for maximum weight) ──
+  const spatialReminder = isPhotoMode
     ? [
         "",
-        "",
-        "No existing room photo has been provided.",
-        "Generate a complete photorealistic bathroom from scratch using the materials above.",
-        "Compose the scene as an interior architect would: slightly elevated angle, centred on the vanity,",
-        "showing both the floor and at least two walls. Render at 2K resolution.",
+        "FINAL SPATIAL CHECK (read before generating): The output must show the same room size,",
+        "camera angle, and structural layout as the reference photo. Only materials and textures",
+        "should have changed. The bathroom must not look bigger or different in shape than the reference.",
       ].join("\n")
     : "";
 
-  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + lightingSection + customNoteSection + briefSection + noPhotoContext;
+  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + lightingSection + customNoteSection + briefSection + spatialReminder;
 }

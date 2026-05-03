@@ -511,6 +511,63 @@ export const HIDDEN_COST_ADVISORIES: Record<RoomType, { condition: string; messa
 
 // ── Room-aware AI prompt builders ─────────────────────────────────────────────
 
+/**
+ * Hard spatial lock block — prepended to every photo-mode prompt.
+ * Frames the task as a surface retexturing job, NOT a redesign.
+ * Placed FIRST so the model reads it before any other instruction.
+ */
+function photoSpatialLock(roomWord: string, dimNote: string): string {
+  return [
+    `SURFACE RETEXTURING TASK — NOT a redesign or reimagining.`,
+    `You are given a reference photo of a real ${roomWord}. Your ONLY job is to re-texture and re-colour`,
+    `the existing visible surfaces (cabinetry, benchtop, splashback, walls, floor, ceiling) in-place.`,
+    ``,
+    `HARD CONSTRAINTS — these are immutable and override everything else:`,
+    `1. ROOM SIZE IS FIXED. The physical footprint, floor area, wall positions, and ceiling height shown`,
+    `   in the reference photo must not change by even one centimetre. Do not make the room look larger.`,
+    `2. CAMERA IS LOCKED. Reproduce the exact same camera angle, distance, field of view, and perspective`,
+    `   as the reference photo. Do not zoom out, pan, tilt, or change the viewpoint in any way.`,
+    `3. NO NEW SPACE. Do not add benchtop runs, cabinetry, walls, or appliances that are not already`,
+    `   visible within the reference photo's frame. Every surface you modify must already exist in the photo.`,
+    `4. STRUCTURAL LAYOUT IS FROZEN. Every window, door, and load-bearing element stays in the same`,
+    `   position as the reference photo unless a structural change is explicitly listed below.`,
+    `5. ONLY SURFACES CHANGE. Textures, colours, materials, and finishes may change. Spatial geometry may not.`,
+    dimNote,
+  ].filter(Boolean).join("\n");
+}
+
+/** Per-size dimension note added to the spatial lock block */
+function kitchenDimNote(sel: KitchenSelections): string {
+  if (sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0) {
+    const sqm = (sel.customLength * sel.customWidth).toFixed(1);
+    return `SIZE CONTEXT: The user has confirmed this kitchen is ${sel.customLength}m × ${sel.customWidth}m (${sqm}m²). ` +
+           `Do not render a room that looks larger than this.`;
+  }
+  if (sel.roomSize === "galley") return `SIZE CONTEXT: This is a galley/small kitchen (under 12m²). The room must feel compact — do not add an island or extra benchtop runs.`;
+  if (sel.roomSize === "large")  return `SIZE CONTEXT: This is a large open-plan kitchen (20m²+). The existing spacious layout should be preserved.`;
+  return `SIZE CONTEXT: Preserve the exact room proportions from the reference photo — do not add or remove any space.`;
+}
+
+function bedroomDimNote(sel: BedroomSelections): string {
+  if (sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0) {
+    const sqm = (sel.customLength * sel.customWidth).toFixed(1);
+    return `SIZE CONTEXT: The user has confirmed this bedroom is ${sel.customLength}m × ${sel.customWidth}m (${sqm}m²). ` +
+           `Do not render a room that looks larger than this.`;
+  }
+  if (sel.roomSize === "standard") return `SIZE CONTEXT: This is a standard bedroom (10–14m²). Keep the proportions compact — do not expand the room footprint.`;
+  if (sel.roomSize === "large")    return `SIZE CONTEXT: This is a large bedroom suite (20m²+). The existing spacious layout should be preserved.`;
+  return `SIZE CONTEXT: Preserve the exact room proportions from the reference photo — do not add or remove any space.`;
+}
+
+/** Final reminder appended at the END of every photo-mode prompt (models weight beginnings and ends) */
+const SPATIAL_REMINDER = [
+  ``,
+  `FINAL SPATIAL CHECK (read before generating): The output image must show the same room size,`,
+  `camera angle, and structural layout as the reference photo. If anything spatial looks different`,
+  `from the reference photo, discard and regenerate. Only materials, textures, and colours should`,
+  `have changed. The room must not look bigger, wider, taller, or deeper than in the reference photo.`,
+].join("\n");
+
 export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): string {
   const cabinet  = sel.cabinetry  ? (CABINETRY_OPTIONS.find((o)  => o.id === sel.cabinetry)?.label  ?? sel.cabinetry)  : null;
   const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)   => o.id === sel.benchtop)?.label   ?? sel.benchtop)   : null;
@@ -520,56 +577,68 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const dw       = sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher";
   const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
 
-  // Dimension directive — prevents AI from expanding/contracting the space
-  const dimDirective = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
-    ? `CRITICAL — Room dimensions: ${sel.customLength}m × ${sel.customWidth}m (${(sel.customLength * sel.customWidth).toFixed(1)}m²). Do NOT add extra benchtop runs, extend walls, or invent space not visible in the original photo. Maintain exact proportions.`
-    : sel.roomSize === "galley"
-    ? "CRITICAL — This is a galley or small kitchen (< 12m²). Keep it compact — do not add a large island or extend the room footprint."
-    : sel.roomSize === "large"
-    ? "CRITICAL — This is a large open-plan kitchen (20m²+). Show a spacious, generous layout."
-    : "CRITICAL — Maintain the original room proportions exactly. Do not extend walls, add benchtop runs, or invent space not present in the photo.";
+  // ── No-photo mode: generate from scratch ─────────────────────────────────
+  if (!hasPhoto) {
+    const sizeDesc = sel.roomSize === "galley" ? "a compact galley kitchen"
+      : sel.roomSize === "large" ? "a large open-plan kitchen"
+      : sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
+        ? `a kitchen approximately ${sel.customLength}m × ${sel.customWidth}m`
+      : "a standard residential kitchen";
 
-  const base = [
-    "You are a professional interior design visualizer. Receive a kitchen photo and material selections.",
-    "Modify the photo to show the new kitchen design while maintaining the structural layout unless requested.",
-    "Remove all personal items from benchtops. Produce a high-end architectural photography result.",
-    dimDirective,
+    const lines = [
+      "You are a professional interior design visualizer. Generate a photorealistic kitchen render from scratch.",
+      `Compose ${sizeDesc} from a slightly elevated angle showing cabinetry, benchtop, splashback and appliances.`,
+      "Remove all clutter. Produce a high-end architectural photography result at 2K resolution.",
+      "",
+      cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
+      benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
+      mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`               : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
+      splash   ? `Splashback: ${splash}.`                                                       : "Splashback: select a material that complements the cabinetry.",
+      `Appliances: ${cooktop}, ${dw}. Include a counter-depth integrated refrigerator.`,
+      `Ceiling: ${ceiling}.`,
+      "Style: warm Australian natural light, realistic textures, high-fidelity 2K render.",
+    ];
+
+    if (sel.hasIsland)       lines.push("\nIsland bench: Include a freestanding kitchen island with matching benchtop and waterfall edges.");
+    if (sel.hasWallChange)   lines.push("Open-plan connection: Show an open-plan kitchen-living space.");
+    if (sel.hasButlersPantry) lines.push("Include a butler's pantry scullery adjacent to the main kitchen with matching cabinetry.");
+    if (sel.customNote?.trim()) lines.push(`\nAdditional request: "${sel.customNote.trim()}"`);
+
+    return lines.join("\n");
+  }
+
+  // ── Photo mode: surface retexturing only ─────────────────────────────────
+  const spatialLock = photoSpatialLock("kitchen", kitchenDimNote(sel));
+
+  const materials = [
     "",
-    cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
-    benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
-    mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`               : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
-    splash   ? `Splashback: ${splash}.`                                                       : "Splashback: select a material that complements the cabinetry.",
-    `Appliances: ${cooktop}, ${dw}.`,
+    "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
+    cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`        : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
+    benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`  : "Benchtop: apply a premium material that complements the cabinetry.",
+    mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`      : "Sink & Mixer: replace with a quality gooseneck mixer.",
+    splash   ? `Splashback: Re-surface the splashback with ${splash}.`                         : "Splashback: choose a finish that suits the cabinetry.",
+    `Appliances: ${cooktop}, ${dw}. Fit into the existing appliance spaces — do not add new ones outside the existing footprint.`,
     `Ceiling: ${ceiling}.`,
-    // Phase 4 implied logic — always render fridge + dishwasher so the kitchen looks complete
-    "IMPORTANT: Always render a realistic integrated counter-depth refrigerator and a built-in dishwasher on a functional kitchen wall — these are essential for a complete kitchen render.",
+    "Remove all personal items, appliances on benchtops, and clutter.",
     "Style: warm Australian natural light, realistic textures, high-fidelity 2K render.",
   ].join("\n");
 
   const islandNote = sel.hasIsland
-    ? "\nIsland bench: Include a freestanding kitchen island with matching benchtop and waterfall edges."
+    ? "\nIsland bench: Only add an island if there is already clear floor space for one in the reference photo."
     : "";
 
   const structuralNotes: string[] = [];
-  if (sel.hasWallChange)    structuralNotes.push("Open-plan wall has been removed — show an open-plan kitchen-living connection.");
-  if (sel.hasButlersPantry) structuralNotes.push("Show a butler's pantry scullery adjacent to the main kitchen with matching cabinetry.");
+  if (sel.hasWallChange)    structuralNotes.push("PERMITTED structural change: the user has requested an open-plan wall removal — show an open kitchen-living connection.");
+  if (sel.hasButlersPantry) structuralNotes.push("PERMITTED structural change: show a butler's pantry scullery adjacent to the kitchen with matching cabinetry.");
   const structuralSection = structuralNotes.length > 0
-    ? "\n\nStructural changes: " + structuralNotes.join(" ")
+    ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
   const noteSection = sel.customNote?.trim()
-    ? `\n\nAdditional request: "${sel.customNote.trim()}"`
+    ? `\n\nAdditional client request: "${sel.customNote.trim()}"`
     : "";
 
-  const noPhoto = !hasPhoto
-    ? [
-        "",
-        "No room photo provided. Generate a complete photorealistic kitchen from scratch.",
-        "Compose from a slightly elevated angle showing cabinetry, benchtop, splashback and appliances. 2K resolution.",
-      ].join("\n")
-    : "";
-
-  return base + islandNote + structuralSection + noteSection + noPhoto;
+  return spatialLock + materials + islandNote + structuralSection + noteSection + SPATIAL_REMINDER;
 }
 
 export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): string {
@@ -588,49 +657,63 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     ? "Recessed architectural dimmable downlights throughout"
     : "Designer statement pendant lights flanking the bedhead";
 
-  // Dimension directive — prevents AI from expanding the space
-  const dimDirective = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
-    ? `CRITICAL — Room dimensions: ${sel.customLength}m × ${sel.customWidth}m (${(sel.customLength * sel.customWidth).toFixed(1)}m²). Do NOT extend walls, widen the room, or invent space not visible in the original photo. Maintain exact proportions.`
-    : sel.roomSize === "standard"
-    ? "CRITICAL — This is a standard bedroom (10–14m²). Keep proportions compact and realistic — do not extend the room footprint."
-    : sel.roomSize === "large"
-    ? "CRITICAL — This is a large bedroom suite (20m²+). Show a spacious, generous layout with room to breathe."
-    : "CRITICAL — Maintain the original room proportions exactly. Do not extend walls or invent space not present in the photo.";
+  // ── No-photo mode: generate from scratch ─────────────────────────────────
+  if (!hasPhoto) {
+    const sizeDesc = sel.roomSize === "standard" ? "a standard bedroom (approx 12m²)"
+      : sel.roomSize === "large" ? "a large bedroom suite (20m²+)"
+      : sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
+        ? `a bedroom approximately ${sel.customLength}m × ${sel.customWidth}m`
+      : "a master bedroom";
 
-  const base = [
-    "You are a professional interior design visualizer for a luxury bedroom renovation.",
-    "Modify the bedroom photo to reflect the selected materials. Maintain structural layout.",
-    "Remove all personal items. Produce a high-end architectural photography result.",
-    dimDirective,
+    const lines = [
+      "You are a professional interior design visualizer. Generate a photorealistic bedroom render from scratch.",
+      `Compose ${sizeDesc} showing the bedhead feature wall, flooring, storage and window treatments at 2K resolution.`,
+      "Remove all clutter and personal items. Produce a high-end editorial photography result.",
+      "",
+      flooring ? `Flooring: ${flooring} — lay full room width.`                             : "Flooring: choose a premium flooring appropriate to the style.",
+      wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`          : "Wall treatment: designer's choice appropriate to the room palette.",
+      `Lighting: ${lightDesc}.`,
+      storage  ? `Storage: ${storage} — full-height, floor-to-ceiling.`                    : "Storage: appropriate built-in wardrobe solution for the space.",
+      window_  ? `Window treatment: ${window_} — floor-length, ceiling-mounted track.`     : "Window treatment: quality window covering appropriate to the style.",
+      `Ceiling: ${ceiling}.`,
+      "Style: warm natural Australian light, editorial photography, high-fidelity 2K render.",
+    ];
+
+    if (sel.hasVJWall)       lines.push("Add a floor-to-ceiling VJ paneled feature wall behind the bedhead.");
+    if (sel.hasMediaJoinery) lines.push("Include a custom built-in media unit with TV recess, flanking shelves and integrated storage.");
+    if (sel.hasPendantRoughin) lines.push("Show bedside wall-hung pendant sconces on each side of the bedhead.");
+    if (sel.customNote?.trim()) lines.push(`\nAdditional request: "${sel.customNote.trim()}"`);
+
+    return lines.join("\n");
+  }
+
+  // ── Photo mode: surface retexturing only ─────────────────────────────────
+  const spatialLock = photoSpatialLock("bedroom", bedroomDimNote(sel));
+
+  const materials = [
     "",
-    flooring ? `Flooring: ${flooring} — lay full room width.`                            : "Flooring: choose a premium flooring appropriate to the style.",
-    wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`         : "Wall treatment: designer's choice appropriate to the room palette.",
-    `Lighting: ${lightDesc}.`,
-    storage  ? `Storage: ${storage} — full-height, floor-to-ceiling.`                   : "Storage: appropriate built-in wardrobe solution for the space.",
-    window_  ? `Window treatment: ${window_} — floor-length, ceiling-mounted track.`    : "Window treatment: quality window covering appropriate to the style.",
+    "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
+    flooring ? `Flooring: Replace the existing floor surface with ${flooring} — cover the full visible floor area.`  : "Flooring: apply a premium flooring material appropriate to the style.",
+    wall     ? `Wall treatment: Apply ${wall} to the feature wall behind where the bedhead would be.`               : "Wall treatment: designer's choice appropriate to the room palette.",
+    `Lighting: ${lightDesc} — fit within the existing ceiling structure.`,
+    storage  ? `Storage: Replace or re-face existing wardrobe/storage with ${storage}.`                             : "Storage: retain existing storage and apply a quality finish.",
+    window_  ? `Window treatment: Replace window coverings with ${window_} — floor-length, ceiling-mounted track.`  : "Window treatment: apply quality window covering appropriate to the style.",
     `Ceiling: ${ceiling}.`,
+    "Remove all personal items, clothes, and clutter.",
     "Style: warm natural Australian light, editorial photography, high-fidelity 2K render.",
   ].join("\n");
 
   const structuralNotes: string[] = [];
-  if (sel.hasVJWall)       structuralNotes.push("Add a floor-to-ceiling VJ paneled feature wall behind the bedhead.");
-  if (sel.hasMediaJoinery) structuralNotes.push("Include a custom built-in media unit with TV recess, flanking shelves and integrated storage.");
-  if (sel.hasPendantRoughin) structuralNotes.push("Show bedside wall-hung pendant sconces on each side of the bedhead.");
+  if (sel.hasVJWall)       structuralNotes.push("PERMITTED structural change: add a floor-to-ceiling VJ paneled feature wall behind the bedhead.");
+  if (sel.hasMediaJoinery) structuralNotes.push("PERMITTED structural change: add a custom built-in media unit with TV recess into an existing wall.");
+  if (sel.hasPendantRoughin) structuralNotes.push("PERMITTED change: show bedside wall-hung pendant sconces on each side of the bedhead.");
   const structuralSection = structuralNotes.length > 0
-    ? "\n\nStructural/feature additions: " + structuralNotes.join(" ")
+    ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
   const noteSection = sel.customNote?.trim()
-    ? `\n\nAdditional request: "${sel.customNote.trim()}"`
+    ? `\n\nAdditional client request: "${sel.customNote.trim()}"`
     : "";
 
-  const noPhoto = !hasPhoto
-    ? [
-        "",
-        "No room photo provided. Generate a complete photorealistic master bedroom from scratch.",
-        "Compose showing the bedhead feature wall, flooring, storage and window treatments. 2K resolution.",
-      ].join("\n")
-    : "";
-
-  return base + structuralSection + noteSection + noPhoto;
+  return spatialLock + materials + structuralSection + noteSection + SPATIAL_REMINDER;
 }

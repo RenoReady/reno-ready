@@ -14,8 +14,9 @@ import {
   BENCHTOP_OPTIONS,
   MIXER_OPTIONS,
   SPLASHBACK_OPTIONS,
+  CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { Flame, Zap, CheckCircle2, ToggleLeft, Info } from "lucide-react";
+import { Flame, Zap, CheckCircle2, ToggleLeft, Info, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -253,6 +254,142 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             </div>
           </div>
         </button>
+      </div>
+
+      {/* 6 — Ceiling Style */}
+      <div>
+        <SectionLabel>6 — Ceiling Treatment</SectionLabel>
+        <div className="flex flex-col gap-2">
+          {CEILING_OPTIONS.map((opt) => {
+            const active = selections.ceilingStyle === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ ceilingStyle: opt.id })}
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
+                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
+                )}
+              >
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
+                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {opt.cost > 0 && (
+                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
+                      +${(opt.cost / 1000).toFixed(1)}k
+                    </span>
+                  )}
+                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 7 — Structural & Services */}
+      <div>
+        <SectionLabel>7 — Structural &amp; Services</SectionLabel>
+        <div className="flex flex-col gap-2 mb-3">
+
+          {/* Appliance Rough-ins */}
+          <button
+            onClick={() => onChange({ hasApplianceRoughin: !selections.hasApplianceRoughin })}
+            className={cn(
+              "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200",
+              selections.hasApplianceRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+            )}
+          >
+            <div className="min-w-0 text-left">
+              <p className={cn("text-xs font-bold", selections.hasApplianceRoughin ? "text-amber-800" : "text-charcoal/70")}>
+                New Appliance Rough-ins
+              </p>
+              <p className="text-[10px] text-charcoal/40 mt-0.5">New gas point or 15-amp circuit for induction</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {selections.hasApplianceRoughin && <span className="text-[10px] font-bold text-amber-600">+$1,800</span>}
+              <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", selections.hasApplianceRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", selections.hasApplianceRoughin ? "left-[18px]" : "left-0.5")} />
+              </div>
+            </div>
+          </button>
+
+          {/* Sink Rough-in */}
+          <button
+            onClick={() => onChange({ hasSinkRoughin: !selections.hasSinkRoughin })}
+            className={cn(
+              "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200",
+              selections.hasSinkRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+            )}
+          >
+            <div className="min-w-0 text-left">
+              <p className={cn("text-xs font-bold", selections.hasSinkRoughin ? "text-amber-800" : "text-charcoal/70")}>
+                New Sink Rough-in
+              </p>
+              <p className="text-[10px] text-charcoal/40 mt-0.5">Moving existing drain & water supply to new position</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {selections.hasSinkRoughin && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
+              <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", selections.hasSinkRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", selections.hasSinkRoughin ? "left-[18px]" : "left-0.5")} />
+              </div>
+            </div>
+          </button>
+
+          {/* Wall Change */}
+          <button
+            onClick={() => onChange({ hasWallChange: !selections.hasWallChange })}
+            className={cn(
+              "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200",
+              selections.hasWallChange ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+            )}
+          >
+            <div className="min-w-0 text-left">
+              <p className={cn("text-xs font-bold", selections.hasWallChange ? "text-amber-800" : "text-charcoal/70")}>
+                Wall Removal / Open-Plan
+              </p>
+              <p className="text-[10px] text-charcoal/40 mt-0.5">Structural engineer, demolition, lintel, patch & paint</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {selections.hasWallChange && <span className="text-[10px] font-bold text-amber-600">+$6,500</span>}
+              <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", selections.hasWallChange ? "bg-amber-500" : "bg-sand-300")}>
+                <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", selections.hasWallChange ? "left-[18px]" : "left-0.5")} />
+              </div>
+            </div>
+          </button>
+
+          {/* Butler's Pantry */}
+          <button
+            onClick={() => onChange({ hasButlersPantry: !selections.hasButlersPantry })}
+            className={cn(
+              "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200",
+              selections.hasButlersPantry ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+            )}
+          >
+            <div className="min-w-0 text-left">
+              <p className={cn("text-xs font-bold", selections.hasButlersPantry ? "text-blue-800" : "text-charcoal/70")}>
+                Butler&apos;s Pantry
+              </p>
+              <p className="text-[10px] text-charcoal/40 mt-0.5">Separate prep space with cabinetry, sink & storage</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {selections.hasButlersPantry && <span className="text-[10px] font-bold text-blue-600">+$8,000</span>}
+              <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", selections.hasButlersPantry ? "bg-blue-500" : "bg-sand-300")}>
+                <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", selections.hasButlersPantry ? "left-[18px]" : "left-0.5")} />
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Hidden cost pro-tip */}
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+          <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-[10px] text-amber-800 leading-snug">
+            <span className="font-bold">Pro-Tip:</span> Standard kitchen appliance rough-ins and simple cabinet modification can still result in hidden costs up to <span className="font-bold">$5,000+</span> once walls are opened.
+          </p>
+        </div>
       </div>
 
       {/* Custom note */}

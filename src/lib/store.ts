@@ -104,14 +104,19 @@ export function restoreBuilderStateFromAuth(): boolean {
 
 // ── Default kitchen selections ────────────────────────────────────────────────
 const defaultKitchenSelections: KitchenSelections = {
-  cabinetry:  "shaker",
-  benchtop:   "engineered-stone",
-  mixer:      "brushed-brass",
-  splashback: "subway-vertical",
-  cooktop:    "induction",
-  dishwasher: "integrated",
-  hasIsland:  false,
-  customNote: "",
+  cabinetry:           "shaker",
+  benchtop:            "engineered-stone",
+  mixer:               "brushed-brass",
+  splashback:          "white-subway",
+  cooktop:             "induction",
+  dishwasher:          "integrated",
+  ceilingStyle:        "standard-white",
+  hasIsland:           false,
+  hasApplianceRoughin: false,
+  hasSinkRoughin:      false,
+  hasWallChange:       false,
+  hasButlersPantry:    false,
+  customNote:          "",
 };
 
 // ── Default bedroom selections ────────────────────────────────────────────────
@@ -121,7 +126,11 @@ const defaultBedroomSelections: BedroomSelections = {
   lighting:          "architectural-downlights",
   storage:           "built-in-mirror-sliders",
   windowTreatment:   "floor-ceiling-sheers",
+  ceilingStyle:      "standard-white",
   hasElectricalWork: false,
+  hasVJWall:         false,
+  hasMediaJoinery:   false,
+  hasPendantRoughin: false,
   customNote:        "",
 };
 

@@ -1653,78 +1653,181 @@ export default function BuilderPage() {
               onSave={setProjectBrief}
             />
 
-            {/* Structural Needs */}
+            {/* Structural Needs — room-aware */}
             <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-4">
               <div className="flex items-center gap-2.5">
                 <Wrench size={14} className="text-charcoal/50" />
-                <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Structural Needs</p>
+                <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Structural &amp; Services</p>
               </div>
 
-              {activeStructuralCount >= 2 && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
-                  <Zap size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-[10px] text-amber-700 leading-snug">
-                    Multiple structural changes — generation may take up to 60 s. One at a time gives better results.
+              {/* ── Kitchen structural controls ── */}
+              {roomType === "kitchen" && (<>
+
+                {/* Appliance Rough-ins */}
+                <button
+                  onClick={() => setKitchenSelections({ hasApplianceRoughin: !kitchenSelections.hasApplianceRoughin })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    kitchenSelections.hasApplianceRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", kitchenSelections.hasApplianceRoughin ? "text-amber-800" : "text-charcoal/70")}>New Appliance Rough-ins</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">New gas point or 15-amp circuit for induction</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {kitchenSelections.hasApplianceRoughin && <span className="text-[10px] font-bold text-amber-600">+$1,800</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasApplianceRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasApplianceRoughin ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Sink Rough-in */}
+                <button
+                  onClick={() => setKitchenSelections({ hasSinkRoughin: !kitchenSelections.hasSinkRoughin })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    kitchenSelections.hasSinkRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", kitchenSelections.hasSinkRoughin ? "text-amber-800" : "text-charcoal/70")}>New Sink Rough-in</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Moving existing drain &amp; water supply to new position</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {kitchenSelections.hasSinkRoughin && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasSinkRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasSinkRoughin ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Wall Change */}
+                <button
+                  onClick={() => setKitchenSelections({ hasWallChange: !kitchenSelections.hasWallChange })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    kitchenSelections.hasWallChange ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", kitchenSelections.hasWallChange ? "text-amber-800" : "text-charcoal/70")}>Wall Removal / Open-Plan</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Structural engineer, demolition, lintel, patch &amp; paint</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {kitchenSelections.hasWallChange && <span className="text-[10px] font-bold text-amber-600">+$6,500</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasWallChange ? "bg-amber-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasWallChange ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Butler's Pantry */}
+                <button
+                  onClick={() => setKitchenSelections({ hasButlersPantry: !kitchenSelections.hasButlersPantry })}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                    kitchenSelections.hasButlersPantry ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn("text-xs font-bold", kitchenSelections.hasButlersPantry ? "text-blue-800" : "text-charcoal/70")}>Butler&apos;s Pantry</p>
+                    <p className="text-[10px] text-charcoal/40 mt-0.5">Separate prep space with cabinetry, sink &amp; storage</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {kitchenSelections.hasButlersPantry && <span className="text-[10px] font-bold text-blue-600">+$8,000</span>}
+                    <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasButlersPantry ? "bg-blue-500" : "bg-sand-300")}>
+                      <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasButlersPantry ? "left-[18px]" : "left-0.5")} />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Hidden cost pro-tip */}
+                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-amber-800 leading-snug">
+                    <span className="font-bold">Pro-Tip:</span> Standard kitchen appliance rough-ins and simple cabinet modification can still result in hidden costs up to <span className="font-bold">$5,000+</span> once walls are opened.
                   </p>
                 </div>
-              )}
+              </>)}
 
-              {/* Shower Niche */}
-              <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
-                structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
-                <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/70")}>
-                  Shower Niche · {structuralChanges.showerNiche === "single" ? "+$600" : structuralChanges.showerNiche === "double" ? "+$1,000" : "No niche"}
-                </p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(["none", "single", "double"] as ShowerNiche[]).map((v) => (
-                    <button key={v} onClick={() => setStructuralChanges({ showerNiche: v })}
-                      className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
-                        structuralChanges.showerNiche === v ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
-                      {v === "none" ? "None" : v === "single" ? "Single" : "Double"}
-                    </button>
-                  ))}
+              {/* ── Bathroom structural controls ── */}
+              {roomType === "bathroom" && (<>
+
+                {activeStructuralCount >= 2 && (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+                    <Zap size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-amber-700 leading-snug">
+                      Multiple structural changes — generation may take up to 60 s. One at a time gives better results.
+                    </p>
+                  </div>
+                )}
+
+                {/* Shower Niche */}
+                <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                  structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                  <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/70")}>
+                    Shower Niche · {structuralChanges.showerNiche === "single" ? "+$600" : structuralChanges.showerNiche === "double" ? "+$1,000" : "No niche"}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(["none", "single", "double"] as ShowerNiche[]).map((v) => (
+                      <button key={v} onClick={() => setStructuralChanges({ showerNiche: v })}
+                        className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                          structuralChanges.showerNiche === v ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                        {v === "none" ? "None" : v === "single" ? "Single" : "Double"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Shower Fixtures */}
-              <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
-                structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
-                <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/70")}>
-                  Shower Fixtures · {structuralChanges.showerFixtures === "dual" ? "+$1,200 · Rain + Handheld" : "Single head"}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {([{ value: "single", label: "Single" }, { value: "dual", label: "Dual" }] as { value: ShowerFixtures; label: string }[]).map(({ value, label }) => (
-                    <button key={value} onClick={() => setStructuralChanges({ showerFixtures: value })}
-                      className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
-                        structuralChanges.showerFixtures === value ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
-                      {label}
-                    </button>
-                  ))}
+                {/* Shower Fixtures */}
+                <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                  structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                  <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/70")}>
+                    Shower Fixtures · {structuralChanges.showerFixtures === "dual" ? "+$1,200 · Rain + Handheld" : "Single head"}
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([{ value: "single", label: "Single" }, { value: "dual", label: "Dual" }] as { value: ShowerFixtures; label: string }[]).map(({ value, label }) => (
+                      <button key={value} onClick={() => setStructuralChanges({ showerFixtures: value })}
+                        className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                          structuralChanges.showerFixtures === value ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Boolean toggles */}
-              {booleanToggles.map(({ key, label, sub }) => {
-                const checked = structuralChanges[key] as boolean;
-                return (
-                  <label key={key} className={cn(
-                    "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-200",
-                    checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40")}>
-                    <div>
-                      <p className={cn("text-xs font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
-                      <p className="text-[10px] text-charcoal/40">{sub}</p>
-                    </div>
-                    <div className="relative flex-shrink-0">
-                      <input type="checkbox" className="sr-only" checked={checked}
-                             onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
-                      <div className={cn("w-9 h-5 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
-                          checked ? "translate-x-4" : "translate-x-0.5")} />
+                {/* Boolean toggles */}
+                {booleanToggles.map(({ key, label, sub }) => {
+                  const checked = structuralChanges[key] as boolean;
+                  return (
+                    <label key={key} className={cn(
+                      "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-200",
+                      checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40")}>
+                      <div>
+                        <p className={cn("text-xs font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
+                        <p className="text-[10px] text-charcoal/40">{sub}</p>
                       </div>
-                    </div>
-                  </label>
-                );
-              })}
+                      <div className="relative flex-shrink-0">
+                        <input type="checkbox" className="sr-only" checked={checked}
+                               onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
+                        <div className={cn("w-9 h-5 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
+                            checked ? "translate-x-4" : "translate-x-0.5")} />
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </>)}
+
+              {/* ── Bedroom placeholder (structural in right sidebar) ── */}
+              {roomType === "bedroom" && (
+                <p className="text-[10px] text-charcoal/40 leading-snug">
+                  Bedroom structural features — VJ feature wall, media joinery and pendant rough-ins — are configured in the design panel on the right.
+                </p>
+              )}
             </div>
           </aside>
 

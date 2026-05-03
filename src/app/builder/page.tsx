@@ -1994,39 +1994,46 @@ export default function BuilderPage() {
           {/* ══ RIGHT SIDEBAR — Design Selectors ══════════════════ */}
           <aside className="flex flex-col gap-4 lg:sticky lg:top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-0.5">
 
-            {/* ── Phase 1: Shared photo upload (Kitchen & Bedroom) ── */}
+            {/* Hidden file input — always in DOM so fileRef works for all room types */}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+
+            {/* ── Shared photo upload (Kitchen & Bedroom) — always-rendered input below ── */}
             {(roomType === "kitchen" || roomType === "bedroom") && (
-              <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5">
-                <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-3">
-                  Step 1 — Document Your Current Space
-                </p>
-                {roomPhotoUrl ? (
-                  <div className="relative rounded-2xl overflow-hidden aspect-video">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={roomPhotoUrl} alt="Current room" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => setRoomPhotoUrl(null)}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-charcoal/60 hover:bg-charcoal flex items-center justify-center transition-colors"
+              <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-6 flex flex-col gap-4">
+                <SidebarSection icon={Upload} title="Room Photo — Recommended">
+                  {roomPhotoUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden aspect-video">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={roomPhotoUrl} alt="Current room" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => setRoomPhotoUrl(null)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-charcoal/60 hover:bg-charcoal flex items-center justify-center transition-colors"
+                      >
+                        <X size={13} className="text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
+                      onClick={() => fileRef.current?.click()}
+                      className={cn(
+                        "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-200",
+                        isDragging ? "border-terracotta bg-terracotta/5" : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
+                      )}
                     >
-                      <X size={12} className="text-white" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                    onDragLeave={() => setIsDragging(false)}
-                    onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-                    onClick={() => fileRef.current?.click()}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed aspect-video cursor-pointer transition-all duration-200",
-                      isDragging ? "border-terracotta bg-terracotta/5" : "border-sand-300 bg-sand-50/50 hover:border-terracotta/50 hover:bg-terracotta/5",
-                    )}
-                  >
-                    <ImagePlus size={20} className="text-charcoal/30" />
-                    <p className="text-xs font-semibold text-charcoal/50">Upload your current room photo</p>
-                    <p className="text-[10px] text-charcoal/30">Drag & drop or click — JPG, PNG, HEIC</p>
-                  </div>
-                )}
+                      <div className="w-10 h-10 rounded-xl bg-sand-100 flex items-center justify-center">
+                        <ImagePlus size={18} className="text-charcoal/40" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-charcoal/70">Drop a photo or <span className="text-terracotta">browse</span></p>
+                        <p className="text-xs text-charcoal/40 mt-0.5">Used for AI overlay · JPG, PNG, WEBP</p>
+                      </div>
+                    </div>
+                  )}
+                </SidebarSection>
               </div>
             )}
 
@@ -2168,8 +2175,6 @@ export default function BuilderPage() {
                     </div>
                   </div>
                 )}
-                <input ref={fileRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
               </SidebarSection>
 
               {/* 2. Floor Tiles */}

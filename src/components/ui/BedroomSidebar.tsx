@@ -47,7 +47,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ roomSize: opt.id as BedroomRoomSize, customLength: 0, customWidth: 0 })}
+                onClick={() => onChange({ roomSize: selections.roomSize === opt.id ? null : opt.id as BedroomRoomSize, customLength: 0, customWidth: 0 })}
                 className={cn(
                   "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
@@ -280,7 +280,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ ceilingStyle: opt.id })}
+                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",

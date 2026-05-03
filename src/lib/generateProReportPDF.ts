@@ -180,8 +180,8 @@ function buildMatRows(
   }
 
   // Bathroom
-  const vanityLabel  = VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity;
-  const tapwareLabel = TAPWARE_OPTIONS.find((t)  => t.id === sel.tapware)?.label ?? sel.tapware;
+  const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : "Not selected";
+  const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : "Not selected";
   const rows: MatRow[] = [
     { label: "Floor Tile",    value: sel.floorTile?.name  ?? "Not selected" },
     { label: "Wall Tile",     value: sel.wallTile?.name   ?? "Not selected" },
@@ -216,8 +216,8 @@ function buildCostItems(
     return calcBedroomCost(bedroom).items;
   }
   // Bathroom
-  const baseCost = getBathroomBaseCost(sel.bathroomSize, sel.customLength, sel.customWidth);
-  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity, sel.tapware, sel.structuralChanges, baseCost);
+  const baseCost = getBathroomBaseCost(sel.bathroomSize ?? "medium", sel.customLength, sel.customWidth);
+  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity ?? "floating", sel.tapware ?? "chrome", sel.structuralChanges, baseCost);
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

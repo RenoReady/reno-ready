@@ -79,12 +79,12 @@ export function restoreBuilderStateFromAuth(): boolean {
     const saved = JSON.parse(raw) as Record<string, unknown>;
     const store = useBuilderStore.getState();
     if (saved.projectBrief   !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
-    if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption);
+    if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption | null);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);
     if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
     if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
-    if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType);
-    if (saved.tapware       !== undefined) store.setTapware(saved.tapware as TapwareFinish);
+    if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType | null);
+    if (saved.tapware       !== undefined) store.setTapware(saved.tapware as TapwareFinish | null);
     if (saved.budget        !== undefined) store.setBudget(saved.budget as number);
     if (saved.customNote    !== undefined) store.setCustomNote(saved.customNote as string);
     if (saved.customFloorColor !== undefined) store.setCustomFloorColor(saved.customFloorColor as string | null);
@@ -92,7 +92,7 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.tileStyle     !== undefined) store.setTileStyle(saved.tileStyle as TileStyle | null);
     if (saved.structuralChanges !== undefined)
       store.setStructuralChanges(saved.structuralChanges as Partial<StructuralChanges>);
-    if (saved.bathroomSize        !== undefined) store.setBathroomSize(saved.bathroomSize as BathroomSize);
+    if (saved.bathroomSize        !== undefined) store.setBathroomSize(saved.bathroomSize as BathroomSize | null);
     if (saved.useCustomDimensions !== undefined) store.setUseCustomDimensions(saved.useCustomDimensions as boolean);
     if (saved.customLength        !== undefined) store.setCustomLength(saved.customLength as number);
     if (saved.customWidth         !== undefined) store.setCustomWidth(saved.customWidth as number);
@@ -104,19 +104,19 @@ export function restoreBuilderStateFromAuth(): boolean {
 
 // ── Default kitchen selections ────────────────────────────────────────────────
 const defaultKitchenSelections: KitchenSelections = {
-  roomSize:            "standard",
+  roomSize:            null,
   customLength:        0,
   customWidth:         0,
-  cabinetry:           "shaker",
-  benchtop:            "engineered-stone",
-  mixer:               "brushed-brass",
-  splashback:          "white-subway",
+  cabinetry:           null,
+  benchtop:            null,
+  mixer:               null,
+  splashback:          null,
   floorFinish:         null,
   floorColor:          null,
   wallColor:           null,
-  cooktop:             "induction",
-  dishwasher:          "integrated",
-  ceilingStyle:        "standard-white",
+  cooktop:             null,
+  dishwasher:          null,
+  ceilingStyle:        null,
   hasIsland:           false,
   hasApplianceRoughin: false,
   hasSinkRoughin:      false,
@@ -127,15 +127,15 @@ const defaultKitchenSelections: KitchenSelections = {
 
 // ── Default bedroom selections ────────────────────────────────────────────────
 const defaultBedroomSelections: BedroomSelections = {
-  roomSize:          "master",
+  roomSize:          null,
   customLength:      0,
   customWidth:       0,
-  flooring:          "engineered-oak-herringbone",
-  wallTreatment:     "feature-paint",
-  lighting:          "architectural-downlights",
-  storage:           "built-in-mirror-sliders",
-  windowTreatment:   "floor-ceiling-sheers",
-  ceilingStyle:      "standard-white",
+  flooring:          null,
+  wallTreatment:     null,
+  lighting:          null,
+  storage:           null,
+  windowTreatment:   null,
+  ceilingStyle:      null,
   hasElectricalWork: false,
   hasVJWall:         false,
   hasMediaJoinery:   false,
@@ -166,8 +166,8 @@ interface BuilderStore extends BuilderSelections {
   setRoomPhotoUrl:        (url: string | null)            => void;
   setFloorTile:           (tile: TileOption | null)        => void;
   setWallTile:            (tile: TileOption | null)        => void;
-  setVanity:              (v: VanityType)                  => void;
-  setTapware:             (t: TapwareFinish)               => void;
+  setVanity:              (v: VanityType | null)            => void;
+  setTapware:             (t: TapwareFinish | null)        => void;
   setBudget:              (n: number)                      => void;
   setCustomNote:          (note: string)                   => void;
   setCustomFloorColor:    (color: string | null)           => void;
@@ -175,8 +175,8 @@ interface BuilderStore extends BuilderSelections {
   setTileStyle:           (style: TileStyle | null)        => void;
   setStructuralChanges:   (c: Partial<StructuralChanges>)  => void;
   setProjectBrief:        (b: ProjectBrief | null)         => void;
-  setLightingOption:      (o: LightingOption)              => void;
-  setBathroomSize:        (s: BathroomSize)                => void;
+  setLightingOption:      (o: LightingOption | null)       => void;
+  setBathroomSize:        (s: BathroomSize | null)         => void;
   setUseCustomDimensions: (v: boolean)                     => void;
   setCustomLength:        (n: number)                      => void;
   setCustomWidth:         (n: number)                      => void;
@@ -191,16 +191,16 @@ const DEFAULT_BUDGET = Math.round(
 
 const defaults: BuilderSelections = {
   projectBrief:        null,
-  lightingOption:      "standard",
+  lightingOption:      null,
   roomPhotoUrl:        null,
-  bathroomSize:        "medium",
+  bathroomSize:        null,
   useCustomDimensions: false,
   customLength:        0,
   customWidth:         0,
   floorTile:           null,
   wallTile:            null,
-  vanity:              "floating",
-  tapware:             "chrome",
+  vanity:              null,
+  tapware:             null,
   budget:              DEFAULT_BUDGET,
   customNote:          "",
   customFloorColor:    null,

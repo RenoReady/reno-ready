@@ -14,6 +14,7 @@ import {
   type KitchenFloorFinish,
   KITCHEN_SIZE_OPTIONS,
   KITCHEN_FLOOR_OPTIONS,
+  KITCHEN_WALL_OPTIONS,
   CABINETRY_OPTIONS,
   BENCHTOP_OPTIONS,
   MIXER_OPTIONS,
@@ -132,7 +133,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ roomSize: opt.id as KitchenRoomSize, customLength: 0, customWidth: 0 })}
+                onClick={() => onChange({ roomSize: selections.roomSize === opt.id ? null : opt.id as KitchenRoomSize, customLength: 0, customWidth: 0 })}
                 className={cn(
                   "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
@@ -362,27 +363,36 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
 
         {/* Wall paint colour */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-2 mt-4">Wall Paint Colour</p>
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          {KITCHEN_WALL_OPTIONS.map((opt) => {
+            const active = selections.wallColor === opt.color;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ wallColor: selections.wallColor === opt.color ? null : opt.color })}
+                title={opt.sub}
+                className={cn(
+                  "relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-200",
+                  active ? "border-terracotta shadow-warm-sm scale-[1.03]" : "border-sand-200 hover:border-terracotta/40",
+                )}
+              >
+                <div className="w-10 h-10 rounded-lg ring-1 ring-black/10" style={{ background: opt.color }} />
+                <p className="text-[9px] font-semibold text-charcoal/70 text-center leading-tight truncate w-full">{opt.label}</p>
+                {active && (
+                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-terracotta flex items-center justify-center">
+                    <CheckCircle2 size={9} className="text-white" strokeWidth={3} />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Custom colour wheel */}
           <KitchenColourSwatch
             label="Custom Wall Colour"
             value={selections.wallColor ?? null}
             onChange={(c) => onChange({ wallColor: c })}
           />
-          <div className="flex-1">
-            <p className="text-[11px] text-charcoal/60 leading-snug">
-              {selections.wallColor
-                ? <><span className="inline-block w-3 h-3 rounded-sm ring-1 ring-black/10 mr-1 align-middle" style={{ background: selections.wallColor }} />{selections.wallColor}</>
-                : "Click the colour wheel to set a wall paint colour for AI rendering."}
-            </p>
-            {selections.wallColor && (
-              <button
-                onClick={() => onChange({ wallColor: null })}
-                className="text-[10px] text-charcoal/35 hover:text-charcoal mt-1"
-              >
-                Clear
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
@@ -401,7 +411,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ cooktop: opt.id })}
+                onClick={() => onChange({ cooktop: selections.cooktop === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -428,7 +438,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ dishwasher: opt.id })}
+                onClick={() => onChange({ dishwasher: selections.dishwasher === opt.id ? null : opt.id })}
                 className={cn(
                   "flex flex-col px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
@@ -483,7 +493,7 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
             return (
               <button
                 key={opt.id}
-                onClick={() => onChange({ ceilingStyle: opt.id })}
+                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
                 className={cn(
                   "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",

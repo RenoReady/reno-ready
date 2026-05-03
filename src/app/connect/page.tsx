@@ -108,8 +108,8 @@ export default function ConnectPage() {
 
   const hasGeneratedImage = !!generatedImageUrl;
 
-  const vanityLabel  = VANITY_OPTIONS.find((v) => v.id === vanity)?.label  ?? vanity;
-  const tapwareLabel = TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware;
+  const vanityLabel  = vanity  ? (VANITY_OPTIONS.find((v)  => v.id === vanity)?.label  ?? vanity)  : "Not selected";
+  const tapwareLabel = tapware ? (TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware) : "Not selected";
   const tileStyleLabel = tileStyle
     ? TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.label ?? tileStyle
     : null;
@@ -125,10 +125,10 @@ export default function ConnectPage() {
       return { estimatedCost: Math.round(r.total / 500) * 500, itemisedCosts: r.items };
     }
     // Bathroom
-    const baseCost = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+    const baseCost = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
     return {
-      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost),
-      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost),
+      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost),
+      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost),
     };
   }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth]);
 
@@ -139,7 +139,9 @@ export default function ConnectPage() {
     kitchenSelections,
     bedroomSelections,
     selections: {
-      floorTile, wallTile, vanity, tapware,
+      floorTile, wallTile,
+      vanity:  vanity  ?? "floating",
+      tapware: tapware ?? "chrome",
       customNote, customFloorColor, customWallColor,
       tileStyle, structuralChanges,
     },
@@ -301,11 +303,11 @@ export default function ConnectPage() {
         design: {
           floorTile:        floorTile ? { id: floorTile.id, name: floorTile.name } : null,
           wallTile:         wallTile  ? { id: wallTile.id,  name: wallTile.name  } : null,
-          customFloorColor,
-          customWallColor,
+          customFloorColor: customFloorColor ?? null,
+          customWallColor:  customWallColor ?? null,
           tileStyle:        tileStyle ?? null,
-          vanity,
-          tapware,
+          vanity:           vanity  ?? "Not selected",
+          tapware:          tapware ?? "Not selected",
           budget,
           estimatedCost,
           customNote:       customNote || undefined,

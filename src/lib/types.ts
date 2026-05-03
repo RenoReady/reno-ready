@@ -134,17 +134,17 @@ export function getBathroomBaseCost(
 export interface BuilderSelections {
   /** Optional pre-generation project brief (3 questions) */
   projectBrief:    import("./projectBrief").ProjectBrief | null;
-  lightingOption:  LightingOption;
+  lightingOption:  LightingOption | null;
   roomPhotoUrl:         string | null;
   /** Bathroom size selection */
-  bathroomSize:         BathroomSize;
+  bathroomSize:         BathroomSize | null;
   useCustomDimensions:  boolean;
   customLength:         number;   // metres
   customWidth:          number;   // metres
   floorTile:            TileOption | null;
   wallTile:             TileOption | null;
-  vanity:               VanityType;
-  tapware:              TapwareFinish;
+  vanity:               VanityType | null;
+  tapware:              TapwareFinish | null;
   budget:               number;             // AUD — user's target/limit
   customNote:           string;             // free-text design note → Gemini prompt
   customFloorColor:     string | null;      // hex colour for floor (custom picker)

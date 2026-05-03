@@ -69,7 +69,7 @@ export const KITCHEN_SIZE_OPTIONS: KitchenSizeOption[] = [
 ];
 
 export interface KitchenSelections {
-  roomSize:             KitchenRoomSize;
+  roomSize:             KitchenRoomSize | null;
   customLength:         number;   // metres — used when roomSize === "custom"
   customWidth:          number;
   cabinetry:            CabinetryStyle   | null;  // null = deselected
@@ -79,9 +79,9 @@ export interface KitchenSelections {
   floorFinish:          KitchenFloorFinish | null; // kitchen floor tile/finish
   floorColor:           string | null;             // custom hex override for floor
   wallColor:            string | null;             // painted wall colour
-  cooktop:              CooktopType;
-  dishwasher:           DishwasherType;
-  ceilingStyle:         CeilingStyle;
+  cooktop:              CooktopType | null;
+  dishwasher:           DishwasherType | null;
+  ceilingStyle:         CeilingStyle | null;
   hasIsland:            boolean;  // triggers gas/plumbing advisory
   hasApplianceRoughin:  boolean;  // new gas point / 15-amp circuit
   hasSinkRoughin:       boolean;  // moving the plumbing stack
@@ -185,6 +185,15 @@ export const KITCHEN_FLOOR_OPTIONS: { id: KitchenFloorFinish; label: string; sub
   { id: "terrazzo",          label: "Terrazzo",              sub: "Chip-speckled surface — retro luxe, increasingly popular in kitchens", color: "#D4C8B8", costAdj: 2_500 },
 ];
 
+export const KITCHEN_WALL_OPTIONS: { id: string; label: string; sub: string; color: string }[] = [
+  { id: "wall-warm-white",  label: "Warm White",   sub: "Soft white with warm undertones",        color: "#F8F5F0" },
+  { id: "wall-soft-grey",   label: "Soft Grey",    sub: "Cool neutral — pairs with any cabinet",  color: "#D4D8DC" },
+  { id: "wall-sage-green",  label: "Sage Green",   sub: "Muted earthy green — organic & fresh",   color: "#9EB89A" },
+  { id: "wall-warm-taupe",  label: "Warm Taupe",   sub: "Sandy neutral — timeless and versatile", color: "#C4A882" },
+  { id: "wall-navy",        label: "Deep Navy",    sub: "Bold dark blue — dramatic feature wall",  color: "#2C3E5A" },
+  { id: "wall-terracotta",  label: "Terracotta",   sub: "Warm Australian earthy red-orange",       color: "#C87848" },
+];
+
 // ── Kitchen cost engine (mid-range QLD 2026) ─────────────────────────────────
 
 export interface RoomCostItem {
@@ -220,17 +229,29 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
       detail: floorOpt?.sub ?? "Select a floor finish to refine this estimate" },
     { label: `Mixer & Sink — ${mixerOpt?.label ?? "Not yet selected"}`,
       amount: 1_450, detail: mixerOpt ? `${mixerOpt.label} gooseneck, under-mount sink set` : "Select a mixer finish to refine this estimate" },
-    { label: sel.cooktop === "induction" ? "Induction Cooktop" : "Gas Cooktop + Lines",
-      amount: sel.cooktop === "induction" ? 1_800 : 2_400,
-      detail: sel.cooktop === "induction" ? "60cm zone induction + installation" : "900mm gas cooktop + gas line certification" },
-    { label: sel.dishwasher === "integrated" ? "Integrated Dishwasher" : "Freestanding Dishwasher",
-      amount: sel.dishwasher === "integrated" ? 2_200 : 1_100,
-      detail: sel.dishwasher === "integrated" ? "Panel-match integrated, supply + install" : "Freestanding, supply + connection" },
   ];
 
-  const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
-  if (ceilingOpt && ceilingOpt.cost > 0) {
-    items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
+  if (sel.cooktop) {
+    items.push({
+      label:  sel.cooktop === "induction" ? "Induction Cooktop" : "Gas Cooktop + Lines",
+      amount: sel.cooktop === "induction" ? 1_800 : 2_400,
+      detail: sel.cooktop === "induction" ? "60cm zone induction + installation" : "900mm gas cooktop + gas line certification",
+    });
+  }
+
+  if (sel.dishwasher) {
+    items.push({
+      label:  sel.dishwasher === "integrated" ? "Integrated Dishwasher" : "Freestanding Dishwasher",
+      amount: sel.dishwasher === "integrated" ? 2_200 : 1_100,
+      detail: sel.dishwasher === "integrated" ? "Panel-match integrated, supply + install" : "Freestanding, supply + connection",
+    });
+  }
+
+  if (sel.ceilingStyle) {
+    const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
+    if (ceilingOpt && ceilingOpt.cost > 0) {
+      items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
+    }
   }
 
   if (sel.hasIsland) {
@@ -288,7 +309,7 @@ export const BEDROOM_SIZE_OPTIONS: BedroomSizeOption[] = [
 ];
 
 export interface BedroomSelections {
-  roomSize:          BedroomRoomSize;
+  roomSize:          BedroomRoomSize | null;
   customLength:      number;   // metres — used when roomSize === "custom"
   customWidth:       number;
   flooring:          BedroomFlooring  | null;  // null = deselected
@@ -296,7 +317,7 @@ export interface BedroomSelections {
   lighting:          BedroomLighting  | null;
   storage:           StorageOption    | null;
   windowTreatment:   WindowTreatment  | null;
-  ceilingStyle:      CeilingStyle;
+  ceilingStyle:      CeilingStyle | null;
   hasElectricalWork: boolean;  // bedside pendants / re-wiring → advisory
   hasVJWall:         boolean;  // VJ feature wall (structural add)
   hasMediaJoinery:   boolean;  // built-in media/TV joinery
@@ -500,7 +521,7 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   const windowOpt   = sel.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment) : null;
 
   // Resolve floor area for cost and labels
-  const sizeOpt  = BEDROOM_SIZE_OPTIONS.find((o) => o.id === sel.roomSize);
+  const sizeOpt  = sel.roomSize ? BEDROOM_SIZE_OPTIONS.find((o) => o.id === sel.roomSize) : null;
   const sqm = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
     ? sel.customLength * sel.customWidth
     : (sizeOpt?.baseSqm ?? 16);
@@ -529,9 +550,11 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
       detail: windowOpt?.sub ?? "Select a window treatment to include in your estimate" },
   ];
 
-  const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
-  if (ceilingOpt && ceilingOpt.cost > 0) {
-    items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
+  if (sel.ceilingStyle) {
+    const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
+    if (ceilingOpt && ceilingOpt.cost > 0) {
+      items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
+    }
   }
 
   if (sel.hasVJWall) {
@@ -645,9 +668,9 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const floor    = sel.floorFinish ? (KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish)?.label ?? sel.floorFinish): null;
   const floorColorNote = sel.floorColor ? ` in the exact colour ${sel.floorColor}` : "";
   const wallColorNote  = sel.wallColor  ? `Kitchen walls: Paint all visible walls in the exact colour ${sel.wallColor}.` : null;
-  const cooktop  = sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop";
-  const dw       = sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher";
-  const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
+  const cooktop  = sel.cooktop ? (sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop") : "cooktop (type not specified)";
+  const dw       = sel.dishwasher ? (sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher") : "dishwasher (type not specified)";
+  const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
 
   // ── No-photo mode: generate from scratch ─────────────────────────────────
   if (!hasPhoto) {
@@ -723,7 +746,7 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
   const light    = sel.lighting        ? (BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)?.label        ?? sel.lighting)        : null;
   const storage  = sel.storage         ? (STORAGE_OPTIONS.find((o)           => o.id === sel.storage)?.label         ?? sel.storage)         : null;
   const window_  = sel.windowTreatment ? (WINDOW_TREATMENT_OPTIONS.find((o)  => o.id === sel.windowTreatment)?.label ?? sel.windowTreatment) : null;
-  const ceiling  = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling";
+  const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
 
   const lightDesc = !light
     ? "quality ambient lighting appropriate to the style"

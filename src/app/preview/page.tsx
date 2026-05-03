@@ -82,11 +82,11 @@ export default function PreviewPage() {
     baseItemisedCosts = result.items;
   } else {
     // Bathroom
-    const baseCost = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+    const baseCost = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
     estimatedCost  = Math.round(
-      calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
+      calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost) / 500
     ) * 500;
-    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost);
+    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost);
   }
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;

@@ -54,8 +54,8 @@ import {
 function getDesignTips(
   floorTile: TileOption | null,
   wallTile:  TileOption | null,
-  vanity:    VanityType,
-  tapware:   TapwareFinish,
+  vanity:    VanityType | null,
+  tapware:   TapwareFinish | null,
 ): string[] {
   const tips: string[] = [];
 
@@ -473,9 +473,9 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           bathroomSize, customLength, customWidth, projectBrief,
           lightingOption } = useBuilderStore();
 
-  const baseCost  = getBathroomBaseCost(bathroomSize, customLength, customWidth);
+  const baseCost  = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
   const estimated = Math.round(
-    calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, baseCost) / 500
+    calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost) / 500
   ) * 500;
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
@@ -628,12 +628,12 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
 // ══════════════════════════════════════════════════════════════════
 function CSSBathroomScene({ floorTile, wallTile, vanity, tapware }: {
   floorTile: TileOption | null; wallTile: TileOption | null;
-  vanity: VanityType; tapware: TapwareFinish;
+  vanity: VanityType | null; tapware: TapwareFinish | null;
 }) {
   const tapwareBg =
-    tapware === "chrome"      ? "linear-gradient(180deg,#e8e8e8,#c0c0c0,#a8a8a8)" :
     tapware === "matte-black" ? "linear-gradient(180deg,#3a3a3a,#1a1a1a)" :
-                                "linear-gradient(180deg,#e8c97e,#c9a84c,#b8962c)";
+    tapware === "brushed-gold" ? "linear-gradient(180deg,#e8c97e,#c9a84c,#b8962c)" :
+                                "linear-gradient(180deg,#e8e8e8,#c0c0c0,#a8a8a8)";
   return (
     <div className="absolute inset-0 flex flex-col">
       <div className={cn("flex-1 flex items-end justify-center", wallTile?.bgClass ?? "bg-marble-blanc")}>

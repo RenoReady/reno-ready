@@ -3,11 +3,11 @@
 /**
  * RoomRouter
  *
- * Two-step room selection: click a card to highlight, then press
- * "Start Designing →" to confirm. This prevents accidental room
- * switches when the user is still browsing options.
+ * Two-step room selection:
+ *  1. Click a card → highlights it (pending state).
+ *  2. A slide-up confirmation popup appears — click it to confirm.
  *
- * Also surfaces saved rooms so users can clearly add another area.
+ * This prevents accidental room switches and gives clear tactile feedback.
  */
 
 import { useState } from "react";
@@ -19,28 +19,44 @@ import type { SavedRoom } from "@/lib/roomTypes";
 const ROOM_CARDS: {
   type:        RoomType;
   emoji:       string;
-  accentColor: string;
+  label:       string;
+  accentBorder: string;
+  accentBg:    string;
+  accentText:  string;
+  confirmBg:   string;
   bgGrad:      string;
   features:    string[];
 }[] = [
   {
     type:        "bathroom",
     emoji:       "🛁",
-    accentColor: "border-terracotta bg-terracotta/5",
+    label:       "Bathroom",
+    accentBorder: "border-terracotta",
+    accentBg:    "bg-terracotta/5",
+    accentText:  "text-terracotta",
+    confirmBg:   "bg-terracotta hover:bg-terracotta/90",
     bgGrad:      "from-terracotta/10 to-transparent",
     features:    ["Floor & wall tiles", "Vanity & tapware", "Structural changes", "Cost estimate"],
   },
   {
     type:        "kitchen",
     emoji:       "🏗️",
-    accentColor: "border-amber-500 bg-amber-500/5",
+    label:       "Kitchen",
+    accentBorder: "border-amber-500",
+    accentBg:    "bg-amber-500/5",
+    accentText:  "text-amber-600",
+    confirmBg:   "bg-amber-500 hover:bg-amber-500/90",
     bgGrad:      "from-amber-500/10 to-transparent",
     features:    ["Cabinetry & benchtop", "Floor & wall colour", "Appliance layout", "Cost estimate"],
   },
   {
     type:        "bedroom",
     emoji:       "🛏️",
-    accentColor: "border-blue-500 bg-blue-500/5",
+    label:       "Bedroom / Living",
+    accentBorder: "border-blue-500",
+    accentBg:    "bg-blue-500/5",
+    accentText:  "text-blue-600",
+    confirmBg:   "bg-blue-500 hover:bg-blue-500/90",
     bgGrad:      "from-blue-500/10 to-transparent",
     features:    ["Flooring & wall treatment", "Lighting & atmosphere", "Storage / joinery", "Cost estimate"],
   },
@@ -52,11 +68,12 @@ interface RoomRouterProps {
   savedRooms?: SavedRoom[];
 }
 
-export default function RoomRouter({ selected, onSelect, savedRooms = [] }: RoomRouterProps) {
-  // Local "pending" — click highlights the card, Next confirms
-  const [pending, setPending] = useState<RoomType | null>(selected ?? null);
+export default function RoomRouter({ onSelect, savedRooms = [] }: RoomRouterProps) {
+  // Always start with no pending — user must make a deliberate click
+  const [pending, setPending] = useState<RoomType | null>(null);
 
   const isAddingRoom = savedRooms.length > 0;
+  const pendingCard  = ROOM_CARDS.find((c) => c.type === pending) ?? null;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto">
@@ -70,7 +87,7 @@ export default function RoomRouter({ selected, onSelect, savedRooms = [] }: Room
           {isAddingRoom ? "Which room would you like to add?" : "Which room are you renovating?"}
         </h2>
         <p className="text-sm text-charcoal/50 mt-1.5">
-          Select a room to highlight it, then press <strong>Start Designing</strong> to continue
+          Tap a room to select it, then confirm to continue
         </p>
       </div>
 
@@ -101,15 +118,15 @@ export default function RoomRouter({ selected, onSelect, savedRooms = [] }: Room
           return (
             <button
               key={card.type}
-              onClick={() => setPending(card.type)}
+              onClick={() => setPending(isHighlighted ? null : card.type)}
               className={cn(
                 "relative flex flex-col gap-4 p-6 rounded-3xl border-2 text-left transition-all duration-200 overflow-hidden group",
                 isHighlighted
-                  ? card.accentColor + " shadow-warm-lg scale-[1.02]"
+                  ? `${card.accentBorder} ${card.accentBg} shadow-warm-lg scale-[1.02]`
                   : "border-sand-200 bg-white/60 hover:border-sand-300 hover:bg-white/80 hover:scale-[1.01]",
               )}
             >
-              {/* Background gradient on highlight */}
+              {/* Background gradient when highlighted */}
               {isHighlighted && (
                 <div className={cn("absolute inset-0 bg-gradient-to-b", card.bgGrad, "pointer-events-none")} />
               )}
@@ -145,7 +162,7 @@ export default function RoomRouter({ selected, onSelect, savedRooms = [] }: Room
                 ))}
               </ul>
 
-              {/* Selected indicator */}
+              {/* Selected badge */}
               {isHighlighted && (
                 <div className="relative self-start flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-terracotta text-white text-[10px] font-bold">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -159,29 +176,46 @@ export default function RoomRouter({ selected, onSelect, savedRooms = [] }: Room
         })}
       </div>
 
-      {/* Confirm button */}
-      <button
-        onClick={() => { if (pending) onSelect(pending); }}
-        disabled={!pending}
+      {/* ── Slide-up confirmation popup ── */}
+      <div
         className={cn(
-          "w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-base transition-all duration-200",
-          pending
-            ? "bg-terracotta text-white shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100"
-            : "bg-sand-200 text-charcoal/35 cursor-not-allowed",
+          "overflow-hidden transition-all duration-300 ease-out",
+          pendingCard ? "max-h-32 opacity-100" : "max-h-0 opacity-0",
         )}
       >
-        {isAddingRoom ? <Plus size={18} /> : null}
-        {pending
-          ? `${isAddingRoom ? "Add" : "Start Designing"} — ${ROOM_LABELS[pending]}`
-          : "Select a room above to continue"}
-        {pending && <ArrowRight size={18} />}
-      </button>
+        {pendingCard && (
+          <div className="bg-white border-2 border-sand-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-warm-lg">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-2xl">{pendingCard.emoji}</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-wider">
+                  {isAddingRoom ? "Add to project" : "You selected"}
+                </p>
+                <p className="text-sm font-bold text-charcoal truncate">
+                  {pendingCard.label} Renovation
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => { if (pending) onSelect(pending); }}
+              className={cn(
+                "flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-white transition-all duration-150 active:scale-95 flex-shrink-0",
+                pendingCard.confirmBg,
+              )}
+            >
+              {isAddingRoom ? <Plus size={15} /> : null}
+              {isAddingRoom ? "Add Room" : "Continue"}
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Multi-room hint */}
-      <p className="text-center text-[10px] text-charcoal/30">
+      {/* Hint text */}
+      <p className="text-center text-[10px] text-charcoal/30 -mt-2">
         {isAddingRoom
           ? "Each room gets its own AI design and cost estimate — combined into one project total."
-          : "You can add more rooms to this project after completing each one."}
+          : "You can add more rooms to your project after completing each one."}
       </p>
     </div>
   );

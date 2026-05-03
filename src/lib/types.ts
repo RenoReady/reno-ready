@@ -424,65 +424,101 @@ export const SHOWER_FIXTURES_COST: Record<ShowerFixtures, number> = {
   dual:   1_200,
 };
 
+// ── Per-item flat cost constants ─────────────────────────────
+
+/** Supply & lay cost per tile selection — medium bathroom baseline (~7 m²) */
+export const FLOOR_TILE_COSTS: Record<string, number> = {
+  "travertine":      1_800,
+  "desert-stone":    1_600,
+  "charcoal-slate":  2_000,
+  "zellige-ivory":   2_800,
+  "terrazzo-blanc":  2_600,
+  "honed-limestone": 2_100,
+  "natural-oak":     2_200,
+  "marble-blanc":    3_500,
+};
+export const WALL_TILE_COSTS: Record<string, number> = {
+  "travertine":      1_600,
+  "desert-stone":    1_400,
+  "charcoal-slate":  1_800,
+  "zellige-ivory":   2_500,
+  "terrazzo-blanc":  2_300,
+  "honed-limestone": 1_900,
+  "natural-oak":     2_000,
+  "marble-blanc":    3_200,
+};
+export const BATHROOM_VANITY_COSTS: Record<string, number>  = { floating: 2_200, freestanding: 1_800 };
+export const BATHROOM_TAPWARE_COSTS: Record<string, number> = { chrome: 850, "matte-black": 1_300, "brushed-gold": 1_700 };
+export const BATHROOM_LIGHTING_COSTS: Record<string, number> = { none: 0, standard: 650, premium: 1_600 };
+/** Scale tile costs up/down based on bathroom size vs medium baseline */
+export const BATHROOM_SIZE_TILE_SCALE: Record<string, number> = {
+  small: 0.65, medium: 1.0, large: 1.5, custom: 1.0,
+};
+
 // ── Cost engine ───────────────────────────────────────────────────
 
-/** Fixed 2026 Australian bathroom renovation base price */
+/** Fixed 2026 Australian bathroom renovation base price (kept for display contexts) */
 export const BASE_RENOVATION_COST = 12_000;
 
 /**
- * Calculates the estimated renovation cost independently of the
- * budget slider.  The budget slider is the user's target; this
- * function returns what their selections actually cost so the UI
- * can flag over-budget scenarios.
+ * Calculates the estimated renovation cost from zero — costs only
+ * accumulate as the user makes selections.
  *
  * Logic:
- *  1. Start at $12,000 (entry-level Australian reno, 2026)
- *  2. Apply material & fixture multipliers
+ *  1. Determine tile scale from bathroom size or custom dimensions
+ *  2. Accumulate material costs for each non-null selection
  *  3. Add structural flat costs
- *  4. If Marble or Terrazzo tiles are selected → +20%
+ *  4. Labour = 40% of material total (only when materials > 0)
  *  5. Round to nearest $500
  */
 export function calcEstimatedCost(
   floorTile:         TileOption | null,
   wallTile:          TileOption | null,
-  vanity:            VanityType,
-  tapware:           TapwareFinish,
+  vanity:            VanityType | null,
+  tapware:           TapwareFinish | null,
   structuralChanges: StructuralChanges,
-  baseCost:          number = BASE_RENOVATION_COST,
+  _baseCost:         number = 0,
+  bathroomSize:      BathroomSize | null = null,
+  customLength:      number = 0,
+  customWidth:       number = 0,
+  lightingOption:    LightingOption | null = null,
 ): number {
-  // 1. Base
-  let cost = baseCost;
+  const round = (n: number) => Math.round(n);
 
-  // 2. Material multipliers
-  const floorMult   = TILE_MULTIPLIER[floorTile?.id ?? ""] ?? 1.0;
-  const wallMult    = TILE_MULTIPLIER[wallTile?.id  ?? ""] ?? 1.0;
-  const avgTileMult = (floorMult + wallMult) / 2;
+  // 1. Tile scale
+  let scale: number;
+  if (bathroomSize === "custom" && customLength > 0 && customWidth > 0) {
+    scale = Math.min(3.0, Math.max(0.5, (customLength * customWidth) / 7));
+  } else {
+    scale = BATHROOM_SIZE_TILE_SCALE[bathroomSize ?? "medium"] ?? 1.0;
+  }
 
-  cost *=
-    VANITY_MULTIPLIER[vanity] *
-    TAPWARE_MULTIPLIER[tapware] *
-    ((avgTileMult + 1) / 2);
+  // 2. Materials
+  let materials = 0;
+  if (floorTile)  materials += round((FLOOR_TILE_COSTS[floorTile.id] ?? 1_800) * scale);
+  if (wallTile)   materials += round((WALL_TILE_COSTS[wallTile.id]   ?? 1_600) * scale);
+  if (vanity)     materials += BATHROOM_VANITY_COSTS[vanity]  ?? 2_200;
+  if (tapware)    materials += BATHROOM_TAPWARE_COSTS[tapware] ?? 850;
+  if (lightingOption && lightingOption !== "none") materials += BATHROOM_LIGHTING_COSTS[lightingOption] ?? 650;
 
-  // 3. Boolean structural flat adders
+  // 3. Structural
+  let structural = 0;
   const { removeBathtub, addWalkinShower, replaceToilet, inWallCistern } = structuralChanges;
-  if (removeBathtub)   cost += STRUCTURAL_COST.removeBathtub;
-  if (addWalkinShower) cost += STRUCTURAL_COST.addWalkinShower;
-  if (replaceToilet)   cost += STRUCTURAL_COST.replaceToilet;
-  if (inWallCistern)   cost += STRUCTURAL_COST.inWallCistern;
+  if (removeBathtub)   structural += STRUCTURAL_COST.removeBathtub;
+  if (addWalkinShower) structural += STRUCTURAL_COST.addWalkinShower;
+  if (replaceToilet)   structural += STRUCTURAL_COST.replaceToilet;
+  if (inWallCistern)   structural += STRUCTURAL_COST.inWallCistern;
+  structural += NICHE_COST[structuralChanges.showerNiche];
+  structural += SHOWER_FIXTURES_COST[structuralChanges.showerFixtures];
 
-  // 4. Shower niche cost
-  cost += NICHE_COST[structuralChanges.showerNiche];
+  // 4. Early exit when nothing selected
+  if (materials === 0 && structural === 0) return 0;
 
-  // 5. Shower fixtures cost (dual head plumbing split)
-  cost += SHOWER_FIXTURES_COST[structuralChanges.showerFixtures];
+  // 5. Labour
+  const labour = materials > 0 ? round(materials * 0.40) : 0;
 
-  // 6. Premium surcharge
-  const premiumFloor = PREMIUM_TILE_IDS.has(floorTile?.id ?? "");
-  const premiumWall  = PREMIUM_TILE_IDS.has(wallTile?.id  ?? "");
-  if (premiumFloor || premiumWall) cost *= 1.20;
-
-  // 7. Round to $500
-  return Math.round(cost / 500) * 500;
+  // 6. Round to $500
+  return Math.round((materials + structural + labour) / 500) * 500;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -498,87 +534,80 @@ export interface CostLineItem {
 export function buildItemisedCosts(
   floorTile:         TileOption | null,
   wallTile:          TileOption | null,
-  vanity:            VanityType,
-  tapware:           TapwareFinish,
+  vanity:            VanityType | null,
+  tapware:           TapwareFinish | null,
   structuralChanges: StructuralChanges,
-  baseCost:          number = BASE_RENOVATION_COST,
+  _baseCost:         number = 0,
+  bathroomSize:      BathroomSize | null = null,
+  customLength:      number = 0,
+  customWidth:       number = 0,
+  lightingOption:    LightingOption | null = null,
 ): CostLineItem[] {
+  const round = (n: number) => Math.round(n);
+
+  // 1. Tile scale
+  let scale: number;
+  if (bathroomSize === "custom" && customLength > 0 && customWidth > 0) {
+    scale = Math.min(3.0, Math.max(0.5, (customLength * customWidth) / 7));
+  } else {
+    scale = BATHROOM_SIZE_TILE_SCALE[bathroomSize ?? "medium"] ?? 1.0;
+  }
+
+  // 2. Material line items
+  const materialItems: CostLineItem[] = [];
+  if (floorTile) {
+    const cost = round((FLOOR_TILE_COSTS[floorTile.id] ?? 1_800) * scale);
+    materialItems.push({ label: `Floor Tiles — ${floorTile.name}`, amount: cost, detail: floorTile.description });
+  }
+  if (wallTile) {
+    const cost = round((WALL_TILE_COSTS[wallTile.id] ?? 1_600) * scale);
+    materialItems.push({ label: `Wall Tiles — ${wallTile.name}`, amount: cost, detail: wallTile.description });
+  }
+  if (vanity) {
+    materialItems.push({
+      label:  vanity === "floating" ? "Floating Vanity" : "Freestanding Vanity",
+      amount: BATHROOM_VANITY_COSTS[vanity] ?? 2_200,
+    });
+  }
+  if (tapware) {
+    const tapwareLabel =
+      tapware === "matte-black"  ? "Matte Black Tapware" :
+      tapware === "brushed-gold" ? "Brushed Gold Tapware" :
+                                   "Chrome Tapware";
+    materialItems.push({ label: tapwareLabel, amount: BATHROOM_TAPWARE_COSTS[tapware] ?? 850 });
+  }
+  if (lightingOption && lightingOption !== "none") {
+    const lightLabel = lightingOption === "premium" ? "LED Accent + Heat Exhaust" : "Heat Exhaust (3-in-1)";
+    materialItems.push({ label: lightLabel, amount: BATHROOM_LIGHTING_COSTS[lightingOption] ?? 650 });
+  }
+
+  // 3. Labour (based on material total)
+  const materialTotal = materialItems.reduce((s, i) => s + i.amount, 0);
   const items: CostLineItem[] = [];
-
-  // 1. Base build
-  items.push({
-    label:  "Base bathroom renovation",
-    amount: baseCost,
-    detail: "Australian 2026 market rate estimate",
-  });
-
-  // 2. Tile premium adders
-  const floorMult   = TILE_MULTIPLIER[floorTile?.id ?? ""] ?? 1.0;
-  const wallMult    = TILE_MULTIPLIER[wallTile?.id  ?? ""] ?? 1.0;
-  const tileBlend   = ((floorMult + wallMult) / 2 + 1) / 2; // matches calcEstimatedCost
-  const tileAdder   = Math.round(BASE_RENOVATION_COST * (tileBlend - 1));
-  if (tileAdder !== 0) {
+  if (materialTotal > 0) {
     items.push({
-      label:  "Tile material premium",
-      amount: tileAdder,
-      detail: `${floorTile?.name ?? "—"} (floor) · ${wallTile?.name ?? "—"} (wall)`,
+      label:  "Labour & Installation",
+      amount: round(materialTotal * 0.40),
+      detail: "Tiling, plumbing fit-off, electrical, waste removal",
     });
   }
+  items.push(...materialItems);
 
-  // 3. Vanity multiplier delta
-  const vanityDelta = Math.round(BASE_RENOVATION_COST * (VANITY_MULTIPLIER[vanity] - 1));
-  if (vanityDelta !== 0) {
-    items.push({
-      label:  vanity === "floating" ? "Floating vanity" : "Freestanding vanity",
-      amount: vanityDelta,
-    });
-  }
-
-  // 4. Tapware multiplier delta
-  const tapwareDelta = Math.round(BASE_RENOVATION_COST * (TAPWARE_MULTIPLIER[tapware] - 1));
-  if (tapwareDelta !== 0) {
-    items.push({
-      label:  `${tapware === "matte-black" ? "Matte black" : tapware === "brushed-gold" ? "Brushed gold" : "Chrome"} tapware`,
-      amount: tapwareDelta,
-    });
-  }
-
-  // 5. Structural booleans
+  // 4. Structural line items
   if (structuralChanges.removeBathtub)
-    items.push({ label: "Bathtub removal",          amount: STRUCTURAL_COST.removeBathtub });
+    items.push({ label: "Bathtub removal",           amount: STRUCTURAL_COST.removeBathtub });
   if (structuralChanges.addWalkinShower)
-    items.push({ label: "Walk-in shower conversion", amount: STRUCTURAL_COST.addWalkinShower });
+    items.push({ label: "Walk-in shower conversion",  amount: STRUCTURAL_COST.addWalkinShower });
   if (structuralChanges.replaceToilet)
-    items.push({ label: "Toilet replacement",       amount: STRUCTURAL_COST.replaceToilet });
+    items.push({ label: "Toilet replacement",         amount: STRUCTURAL_COST.replaceToilet });
   if (structuralChanges.inWallCistern)
-    items.push({ label: "In-wall cistern",          amount: STRUCTURAL_COST.inWallCistern });
-
-  // 6. Shower niche
+    items.push({ label: "In-wall cistern",            amount: STRUCTURAL_COST.inWallCistern });
   if (structuralChanges.showerNiche === "single")
-    items.push({ label: "Single shower niche", amount: NICHE_COST.single });
+    items.push({ label: "Single shower niche",        amount: NICHE_COST.single });
   if (structuralChanges.showerNiche === "double")
-    items.push({ label: "Double shower niche", amount: NICHE_COST.double });
-
-  // 7. Shower fixtures
+    items.push({ label: "Double shower niche",        amount: NICHE_COST.double });
   if (structuralChanges.showerFixtures === "dual")
-    items.push({
-      label: "Dual shower heads",
-      amount: SHOWER_FIXTURES_COST.dual,
-      detail: "Rain + handheld with plumbing split",
-    });
-
-  // 8. Premium surcharge (marble/terrazzo)
-  const premiumFloor = PREMIUM_TILE_IDS.has(floorTile?.id ?? "");
-  const premiumWall  = PREMIUM_TILE_IDS.has(wallTile?.id  ?? "");
-  if (premiumFloor || premiumWall) {
-    const subtotal = items.reduce((sum, it) => sum + it.amount, 0);
-    const surcharge = Math.round(subtotal * 0.20);
-    items.push({
-      label:  "Premium tile surcharge (+20%)",
-      amount: surcharge,
-      detail: "Marble / terrazzo finishes",
-    });
-  }
+    items.push({ label: "Dual shower heads", amount: SHOWER_FIXTURES_COST.dual, detail: "Rain + handheld with plumbing split" });
 
   return items;
 }

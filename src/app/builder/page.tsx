@@ -20,7 +20,7 @@ import {
   BATHROOM_SIZE_OPTIONS,
   TileOption, VanityType, TapwareFinish, TileStyle, ShowerNiche, ShowerFixtures,
   BathroomSize, LightingOption,
-  calcEstimatedCost, getBathroomBaseCost,
+  calcEstimatedCost,
 } from "@/lib/types";
 import PaywallModal from "@/components/ui/PaywallModal";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
@@ -473,18 +473,14 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           bathroomSize, customLength, customWidth, projectBrief,
           lightingOption } = useBuilderStore();
 
-  const baseCost  = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
-  const estimated = Math.round(
-    calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost) / 500
-  ) * 500;
+  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
 
-  const lightingCost = LIGHTING_OPTIONS.find((o) => o.id === lightingOption)?.cost ?? 0;
   const briefItems   = projectBrief ? calcBriefCostItems(projectBrief) : [];
   const briefTotal   = projectBrief ? calcBriefTotal(projectBrief)     : 0;
-  const grandTotal   = estimated + briefTotal + lightingCost;
-  const isOverBudget = grandTotal > budget;
+  const grandTotal   = estimated + briefTotal;
+  const isOverBudget = grandTotal > budget && grandTotal > 0;
   const hasAsbestos  = needsAsbestosCheck(projectBrief);
 
   return (
@@ -496,27 +492,32 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           <EstimateAccuracyBadge />
         </div>
 
-        <div className="flex items-end gap-3">
-          <p className={cn(
-            "text-3xl font-bold transition-colors duration-300",
-            isOverBudget ? "text-terracotta" : "text-white",
-          )}>
-            {formatAUD(Math.round((low + briefTotal) / 500) * 500)}
-            <span className={cn("text-2xl mx-2 transition-colors duration-300", isOverBudget ? "text-terracotta/50" : "text-white/40")}>–</span>
-            {formatAUD(Math.round((high + briefTotal) / 500) * 500)}
-          </p>
-          {isOverBudget && (
-            <span className="text-xs font-bold px-2 py-1 rounded-full mb-1 bg-terracotta/20 text-terracotta">
-              Over budget
-            </span>
-          )}
-        </div>
-
-        <p className={cn("text-xs mt-1 transition-colors duration-300", isOverBudget ? "text-terracotta/60" : "text-white/30")}>
-          {isOverBudget
-            ? `${formatAUD(grandTotal - budget)} over your ${formatAUD(budget)} target`
-            : `Within your ${formatAUD(budget)} budget · Australian market rates`}
-        </p>
+        {estimated === 0 ? (
+          <p className="text-sm text-white/40 italic">Select options above to build your estimate</p>
+        ) : (
+          <>
+            <div className="flex items-end gap-3">
+              <p className={cn(
+                "text-3xl font-bold transition-colors duration-300",
+                isOverBudget ? "text-terracotta" : "text-white",
+              )}>
+                {formatAUD(Math.round((low + briefTotal) / 500) * 500)}
+                <span className={cn("text-2xl mx-2 transition-colors duration-300", isOverBudget ? "text-terracotta/50" : "text-white/40")}>–</span>
+                {formatAUD(Math.round((high + briefTotal) / 500) * 500)}
+              </p>
+              {isOverBudget && (
+                <span className="text-xs font-bold px-2 py-1 rounded-full mb-1 bg-terracotta/20 text-terracotta">
+                  Over budget
+                </span>
+              )}
+            </div>
+            <p className={cn("text-xs mt-1 transition-colors duration-300", isOverBudget ? "text-terracotta/60" : "text-white/30")}>
+              {isOverBudget
+                ? `${formatAUD(grandTotal - budget)} over your ${formatAUD(budget)} target`
+                : `Within your ${formatAUD(budget)} budget · Australian market rates`}
+            </p>
+          </>
+        )}
       </div>
 
       <div className="h-px bg-white/10" />
@@ -532,15 +533,6 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
             </div>
           );
         })}
-        {lightingCost > 0 && (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-white/60 flex items-center gap-1.5">
-              <Lightbulb size={10} className="text-amber-400" />
-              Lighting &amp; Electrical
-            </p>
-            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(lightingCost)}</p>
-          </div>
-        )}
       </div>
 
       {/* ── Brief-driven real cost items ── */}

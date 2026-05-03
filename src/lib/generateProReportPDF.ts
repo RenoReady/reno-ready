@@ -15,7 +15,7 @@ import type { BuilderSelections } from "./types";
 import type { ProjectBrief } from "./projectBrief";
 import type { RoomType, KitchenSelections, BedroomSelections } from "./roomTypes";
 import { calcBriefCostItems, needsAsbestosCheck, calcBriefTotal } from "./projectBrief";
-import { buildItemisedCosts, calcEstimatedCost, getBathroomBaseCost, VANITY_OPTIONS, TAPWARE_OPTIONS } from "./types";
+import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS } from "./types";
 import {
   calcKitchenCost, calcBedroomCost,
   CABINETRY_OPTIONS, BENCHTOP_OPTIONS, SPLASHBACK_OPTIONS, MIXER_OPTIONS,
@@ -216,8 +216,7 @@ function buildCostItems(
     return calcBedroomCost(bedroom).items;
   }
   // Bathroom
-  const baseCost = getBathroomBaseCost(sel.bathroomSize ?? "medium", sel.customLength, sel.customWidth);
-  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity ?? "floating", sel.tapware ?? "chrome", sel.structuralChanges, baseCost);
+  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity, sel.tapware, sel.structuralChanges, 0, sel.bathroomSize, sel.customLength, sel.customWidth, sel.lightingOption);
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

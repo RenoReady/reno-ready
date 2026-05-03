@@ -203,7 +203,7 @@ export interface RoomCostItem {
   warning?: boolean;
 }
 
-export const KITCHEN_BASE_COST = 22_000; // Demo, install labour, electrical, plumbing base
+export const KITCHEN_BASE_COST = 22_000; // kept for reference
 
 export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]; total: number } {
   const cabinetryOpt  = sel.cabinetry   ? CABINETRY_OPTIONS.find((o)     => o.id === sel.cabinetry)   : null;
@@ -212,48 +212,80 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
   const mixerOpt      = sel.mixer       ? MIXER_OPTIONS.find((o)         => o.id === sel.mixer)       : null;
   const floorOpt      = sel.floorFinish ? KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish) : null;
 
-  const items: RoomCostItem[] = [
-    { label: "Demo & Installation Labour",
-      amount: 8_500, detail: "Full kitchen stripout, wall prep, install, waterproofing" },
-    { label: `Cabinetry — ${cabinetryOpt?.label ?? "Not yet selected"}`,
-      amount: 8_000 + (cabinetryOpt?.costAdj ?? 0),
-      detail: cabinetryOpt ? cabinetryOpt.label + " doors + carcasses, floor-to-ceiling" : "Select a cabinetry style to refine this estimate" },
-    { label: `Benchtop — ${benchtopOpt?.label ?? "Not yet selected"}`,
-      amount: 3_200 + (benchtopOpt?.costAdj ?? 0),
-      detail: benchtopOpt?.label ?? "Select a benchtop material to refine this estimate" },
-    { label: `Splashback — ${splashbackOpt?.label ?? "Not yet selected"}`,
-      amount: 1_200 + (splashbackOpt?.costAdj ?? 0),
-      detail: splashbackOpt?.label ?? "Select a splashback to refine this estimate" },
-    { label: `Kitchen Floor — ${floorOpt?.label ?? "Not yet selected"}`,
-      amount: 2_800 + (floorOpt?.costAdj ?? 0),
-      detail: floorOpt?.sub ?? "Select a floor finish to refine this estimate" },
-    { label: `Mixer & Sink — ${mixerOpt?.label ?? "Not yet selected"}`,
-      amount: 1_450, detail: mixerOpt ? `${mixerOpt.label} gooseneck, under-mount sink set` : "Select a mixer finish to refine this estimate" },
-  ];
+  const materialItems: RoomCostItem[] = [];
 
+  if (sel.cabinetry && cabinetryOpt) {
+    materialItems.push({
+      label:  `Cabinetry — ${cabinetryOpt.label}`,
+      amount: 8_000 + cabinetryOpt.costAdj,
+      detail: cabinetryOpt.label + " doors + carcasses, floor-to-ceiling",
+    });
+  }
+  if (sel.benchtop && benchtopOpt) {
+    materialItems.push({
+      label:  `Benchtop — ${benchtopOpt.label}`,
+      amount: 3_200 + benchtopOpt.costAdj,
+      detail: benchtopOpt.label,
+    });
+  }
+  if (sel.splashback && splashbackOpt) {
+    materialItems.push({
+      label:  `Splashback — ${splashbackOpt.label}`,
+      amount: 1_200 + splashbackOpt.costAdj,
+      detail: splashbackOpt.label,
+    });
+  }
+  if ((sel.floorFinish || sel.floorColor) && floorOpt) {
+    materialItems.push({
+      label:  `Kitchen Floor — ${floorOpt.label}`,
+      amount: 2_800 + floorOpt.costAdj,
+      detail: floorOpt.sub,
+    });
+  } else if (sel.floorColor && !floorOpt) {
+    // custom colour without a tile finish option
+    materialItems.push({ label: "Kitchen Floor — Custom Colour", amount: 2_800 });
+  }
+  if (sel.mixer && mixerOpt) {
+    materialItems.push({
+      label:  `Mixer & Sink — ${mixerOpt.label}`,
+      amount: 1_450,
+      detail: `${mixerOpt.label} gooseneck, under-mount sink set`,
+    });
+  }
   if (sel.cooktop) {
-    items.push({
+    materialItems.push({
       label:  sel.cooktop === "induction" ? "Induction Cooktop" : "Gas Cooktop + Lines",
       amount: sel.cooktop === "induction" ? 1_800 : 2_400,
       detail: sel.cooktop === "induction" ? "60cm zone induction + installation" : "900mm gas cooktop + gas line certification",
     });
   }
-
   if (sel.dishwasher) {
-    items.push({
+    materialItems.push({
       label:  sel.dishwasher === "integrated" ? "Integrated Dishwasher" : "Freestanding Dishwasher",
       amount: sel.dishwasher === "integrated" ? 2_200 : 1_100,
       detail: sel.dishwasher === "integrated" ? "Panel-match integrated, supply + install" : "Freestanding, supply + connection",
     });
   }
-
   if (sel.ceilingStyle) {
     const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
     if (ceilingOpt && ceilingOpt.cost > 0) {
-      items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
+      materialItems.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
     }
   }
 
+  const materialTotal = materialItems.reduce((s, i) => s + i.amount, 0);
+  const items: RoomCostItem[] = [];
+
+  if (materialTotal > 0) {
+    items.push({
+      label:  "Installation & Labour",
+      amount: Math.round(materialTotal * 0.35),
+      detail: "Demo, waste removal, trade connections & tiling labour",
+    });
+  }
+  items.push(...materialItems);
+
+  // Structural adds
   if (sel.hasIsland) {
     items.push({ label: "Island Bench — Plumbing/Gas Relocation", amount: 2_500, detail: "Repositioning drain or gas point to island location", warning: true });
   }
@@ -267,7 +299,7 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
     items.push({ label: "Wall Removal / Addition", amount: 6_500, detail: "Structural engineer, demolition, lintel, patch & paint", warning: true });
   }
   if (sel.hasButlersPantry) {
-    items.push({ label: "Butler's Pantry Integration", amount: 8_000, detail: "Separate prep space with cabinetry, sink, additional storage", warning: false });
+    items.push({ label: "Butler's Pantry Integration", amount: 8_000, detail: "Separate prep space with cabinetry, sink, additional storage" });
   }
 
   const total = items.reduce((s, i) => s + i.amount, 0);
@@ -511,7 +543,7 @@ export const WINDOW_TREATMENT_OPTIONS: { id: WindowTreatment; label: string; sub
 
 // ── Bedroom cost engine ────────────────────────────────────────────────────────
 
-export const BEDROOM_BASE_COST = 3_500; // Prep, painting, access, skip bin
+export const BEDROOM_BASE_COST = 3_500; // kept for reference
 
 export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]; total: number } {
   const flooringOpt = sel.flooring       ? BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === sel.flooring)       : null;
@@ -521,7 +553,7 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   const windowOpt   = sel.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o) => o.id === sel.windowTreatment) : null;
 
   // Resolve floor area for cost and labels
-  const sizeOpt  = sel.roomSize ? BEDROOM_SIZE_OPTIONS.find((o) => o.id === sel.roomSize) : null;
+  const sizeOpt = sel.roomSize ? BEDROOM_SIZE_OPTIONS.find((o) => o.id === sel.roomSize) : null;
   const sqm = sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0
     ? sel.customLength * sel.customWidth
     : (sizeOpt?.baseSqm ?? 16);
@@ -530,25 +562,35 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   // Scale flooring cost by area (base cost is per 16m²)
   const flooringCost = flooringOpt ? Math.round((flooringOpt.cost * sqm) / 16 / 100) * 100 : 0;
 
-  const items: RoomCostItem[] = [
-    { label: "Preparation & Plastering",
-      amount: BEDROOM_BASE_COST, detail: "Wall prep, skirting removal, painting base coats" },
-    { label: `Flooring — ${flooringOpt?.label ?? "Not yet selected"}`,
-      amount: flooringCost,
-      detail: flooringOpt ? `Supply + lay, ${sqmLabel}` : "Select a flooring option to include in your estimate" },
-    { label: `Wall — ${wallOpt?.label ?? "Not yet selected"}`,
-      amount: wallOpt?.cost ?? 0,
-      detail: wallOpt?.sub ?? "Select a wall treatment to include in your estimate" },
-    { label: `Lighting — ${lightOpt?.label ?? "Not yet selected"}`,
-      amount: lightOpt?.cost ?? 0,
-      detail: lightOpt?.sub ?? "Select a lighting option to include in your estimate" },
-    { label: `Storage — ${storageOpt?.label ?? "Not yet selected"}`,
-      amount: storageOpt?.cost ?? 0,
-      detail: storageOpt?.sub ?? "Select a storage option to include in your estimate" },
-    { label: `Window — ${windowOpt?.label ?? "Not yet selected"}`,
-      amount: windowOpt?.cost ?? 0,
-      detail: windowOpt?.sub ?? "Select a window treatment to include in your estimate" },
-  ];
+  const materialItems: RoomCostItem[] = [];
+
+  if (flooringOpt) {
+    materialItems.push({ label: `Flooring — ${flooringOpt.label}`, amount: flooringCost, detail: `Supply + lay, ${sqmLabel}` });
+  }
+  if (wallOpt) {
+    materialItems.push({ label: `Wall — ${wallOpt.label}`, amount: wallOpt.cost, detail: wallOpt.sub });
+  }
+  if (lightOpt) {
+    materialItems.push({ label: `Lighting — ${lightOpt.label}`, amount: lightOpt.cost, detail: lightOpt.sub });
+  }
+  if (storageOpt) {
+    materialItems.push({ label: `Storage — ${storageOpt.label}`, amount: storageOpt.cost, detail: storageOpt.sub });
+  }
+  if (windowOpt) {
+    materialItems.push({ label: `Window — ${windowOpt.label}`, amount: windowOpt.cost, detail: windowOpt.sub });
+  }
+
+  const materialTotal = materialItems.reduce((s, i) => s + i.amount, 0);
+  const items: RoomCostItem[] = [];
+
+  if (materialTotal > 0) {
+    items.push({
+      label:  "Labour & Preparation",
+      amount: Math.round(materialTotal * 0.30),
+      detail: "Wall prep, skirting, painting, waste removal",
+    });
+  }
+  items.push(...materialItems);
 
   if (sel.ceilingStyle) {
     const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
@@ -556,12 +598,11 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
       items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
     }
   }
-
   if (sel.hasVJWall) {
-    items.push({ label: "VJ Feature Wall Installation", amount: 2_800, detail: "Floor-to-ceiling tongue-and-groove boards, painted", warning: false });
+    items.push({ label: "VJ Feature Wall Installation", amount: 2_800, detail: "Floor-to-ceiling tongue-and-groove boards, painted" });
   }
   if (sel.hasMediaJoinery) {
-    items.push({ label: "Built-in Media Joinery",        amount: 4_500, detail: "Custom TV unit + integrated shelving/storage", warning: false });
+    items.push({ label: "Built-in Media Joinery", amount: 4_500, detail: "Custom TV unit + integrated shelving/storage" });
   }
   if (sel.hasPendantRoughin || sel.hasElectricalWork) {
     items.push({ label: "Electrical Re-wiring & Fit-off", amount: 2_200, detail: "New circuits for pendant/sconce/cove lighting, safety switch upgrades", warning: true });

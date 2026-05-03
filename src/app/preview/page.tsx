@@ -24,7 +24,6 @@ import {
   TAPWARE_OPTIONS,
   calcEstimatedCost,
   buildItemisedCosts,
-  getBathroomBaseCost,
 } from "@/lib/types";
 import {
   calcBriefCostItems,
@@ -82,11 +81,8 @@ export default function PreviewPage() {
     baseItemisedCosts = result.items;
   } else {
     // Bathroom
-    const baseCost = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
-    estimatedCost  = Math.round(
-      calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost) / 500
-    ) * 500;
-    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost);
+    estimatedCost     = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
+    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
   }
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;

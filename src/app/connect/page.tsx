@@ -30,7 +30,6 @@ import {
   TILE_STYLE_OPTIONS,
   calcEstimatedCost,
   buildItemisedCosts,
-  getBathroomBaseCost,
 } from "@/lib/types";
 import {
   calcKitchenCost,
@@ -125,12 +124,11 @@ export default function ConnectPage() {
       return { estimatedCost: Math.round(r.total / 500) * 500, itemisedCosts: r.items };
     }
     // Bathroom
-    const baseCost = getBathroomBaseCost(bathroomSize ?? "medium", customLength, customWidth);
     return {
-      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost),
-      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity ?? "floating", tapware ?? "chrome", structuralChanges, baseCost),
+      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption),
+      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption),
     };
-  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth, lightingOption]);
 
   // Build the raw AI prompt that would be (or was) sent to Gemini
   const aiPrompt = useMemo(() => buildGeminiPrompt({

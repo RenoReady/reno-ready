@@ -173,8 +173,8 @@ export default function PreviewPage() {
   };
 
   return (
-    <div className="min-h-screen bg-sand pb-24">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+    <div className="min-h-screen bg-sand pb-12 sm:pb-24">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-5 sm:py-8">
 
         {/* Back nav */}
         <button
@@ -185,7 +185,7 @@ export default function PreviewPage() {
         </button>
 
         {/* Page header */}
-        <div className="mb-10">
+        <div className="mb-6 sm:mb-10">
           <div
             className={cn(
               "inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-4 border",
@@ -206,17 +206,17 @@ export default function PreviewPage() {
               </>
             )}
           </div>
-          <h1 className="text-4xl lg:text-5xl font-bold text-charcoal">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-charcoal">
             {hasImage ? `Your ${roomLabel} Preview` : `Sample ${roomLabel} Preview`}
           </h1>
-          <p className="text-charcoal/50 mt-2 text-lg">
+          <p className="text-charcoal/50 mt-2 text-sm sm:text-lg">
             {hasImage
               ? "Here's how your selected style could look — and what it's likely to cost."
               : "This is a sample renovation. Generate your own AI preview from the configurator to see your design here."}
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-[1fr_400px] gap-8 items-start">
+        <div className="grid lg:grid-cols-[1fr_400px] gap-5 sm:gap-8 items-start">
 
           {/* ── LEFT: AI Preview / Sample slider ────────────────── */}
           <div className="flex flex-col gap-6">

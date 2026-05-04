@@ -14,7 +14,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-sand-50/90 backdrop-blur-md border-b border-sand-200">
-      <div className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-24 flex items-center justify-between gap-2 sm:gap-6">
 
         {/* Logo — square canvas, multiply removes the white background on sand header */}
         <Link href="/" className="flex items-center group flex-shrink-0">
@@ -23,13 +23,9 @@ export default function Header() {
             alt="Reno Ready"
             height={150}
             width={150}
-            style={{
-              height: 150,
-              width:  150,
-              mixBlendMode: "multiply",   // white canvas → transparent on light bg
-            }}
+            style={{ mixBlendMode: "multiply" }}
             priority
-            className="transition-opacity duration-200 group-hover:opacity-75"
+            className="h-10 w-auto sm:h-[100px] sm:w-auto transition-opacity duration-200 group-hover:opacity-75"
           />
         </Link>
 

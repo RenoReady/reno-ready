@@ -29,19 +29,17 @@ export default function ProgressNav() {
               href={step.href}
               aria-current={isActive ? "step" : undefined}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold tracking-tight",
+                "flex items-center gap-1 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-tight",
                 "transition-all duration-200",
                 isActive && "bg-terracotta text-white shadow-warm-sm",
                 isDone   && "text-charcoal/70 hover:text-charcoal",
-                // Future steps are clickable but visually subdued so users can
-                // jump ahead even before generating an AI preview
                 isFuture && "text-charcoal/35 hover:text-charcoal/70 hover:bg-charcoal/5",
               )}
             >
-              {/* Step number / check */}
+              {/* Step number / check — hidden on mobile to save space */}
               <span
                 className={cn(
-                  "flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold",
+                  "hidden sm:flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold",
                   "transition-all duration-200",
                   isActive && "bg-white/20",
                   isDone   && "bg-terracotta/15 text-terracotta",
@@ -51,6 +49,11 @@ export default function ProgressNav() {
                 {isDone ? <Check size={12} strokeWidth={3} /> : i + 1}
               </span>
 
+              {/* On mobile show a tiny dot for done steps instead */}
+              {isDone && (
+                <span className="sm:hidden w-1.5 h-1.5 rounded-full bg-terracotta/60 flex-shrink-0" />
+              )}
+
               {step.label}
             </Link>
 
@@ -58,7 +61,7 @@ export default function ProgressNav() {
             {i < STEPS.length - 1 && (
               <div
                 className={cn(
-                  "w-8 h-px mx-1 rounded-full transition-all duration-300",
+                  "w-3 sm:w-8 h-px mx-0.5 sm:mx-1 rounded-full transition-all duration-300",
                   i < currentIndex ? "bg-terracotta/40" : "bg-charcoal/15",
                 )}
               />

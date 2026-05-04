@@ -1626,7 +1626,7 @@ export default function BuilderPage() {
 
   return (
     <div className="min-h-screen bg-sand">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-5 sm:py-8">
 
         {/* ── Room Router — full-page on mobile, centred modal on sm+ ── */}
         {showRoomRouter && (
@@ -1654,9 +1654,9 @@ export default function BuilderPage() {
           </div>
         )}
 
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold text-charcoal">
+        <div className="mb-5 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+            <h1 className="text-xl sm:text-3xl font-bold text-charcoal">
               {roomType === "kitchen" ? "Kitchen Configurator" : roomType === "bedroom" ? "Bedroom Configurator" : "Bathroom Configurator"}
             </h1>
             <button
@@ -1666,7 +1666,7 @@ export default function BuilderPage() {
               Change Room ↗
             </button>
           </div>
-          <p className="text-charcoal/50">Choose your finishes, then generate your AI preview.</p>
+          <p className="text-sm sm:text-base text-charcoal/50">Choose your finishes, then generate your AI preview.</p>
           {savedRooms.length > 0 && (
             <p className="text-xs text-terracotta font-semibold mt-1">
               ✓ {savedRooms.length} room{savedRooms.length > 1 ? "s" : ""} saved to project
@@ -1674,7 +1674,7 @@ export default function BuilderPage() {
           )}
         </div>
 
-        <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start xl:items-start">
+        <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-4 sm:gap-6 items-start">
 
           {/* ══ LEFT PANEL — Project Brief + Structural Needs ══ */}
           <aside className="flex flex-col gap-4 col-span-full xl:col-span-1 order-first xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">

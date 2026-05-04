@@ -345,11 +345,14 @@ export interface BedroomSelections {
   customLength:      number;   // metres — used when roomSize === "custom"
   customWidth:       number;
   flooring:          BedroomFlooring  | null;  // null = deselected
+  flooringColor:     string | null;            // custom hex override for flooring
   wallTreatment:     WallTreatment    | null;
+  wallColor:         string | null;            // custom hex override for wall
   lighting:          BedroomLighting  | null;
   storage:           StorageOption    | null;
   windowTreatment:   WindowTreatment  | null;
   ceilingStyle:      CeilingStyle | null;
+  ceilingColor:      string | null;            // custom hex override for ceiling
   hasElectricalWork: boolean;  // bedside pendants / re-wiring → advisory
   hasVJWall:         boolean;  // VJ feature wall (structural add)
   hasMediaJoinery:   boolean;  // built-in media/TV joinery

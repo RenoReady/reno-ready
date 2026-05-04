@@ -3,13 +3,25 @@
 /**
  * BedroomSidebar
  *
- * The 5-category design selection panel for Living / Master Bedroom renovations.
+ * Design selection panel for Living / Master Bedroom renovations.
+ *
+ * Section order:
+ *   0 — Room Size
+ *   1 — Flooring          (+ custom colour picker)
+ *   2 — Wall Treatment     (+ custom colour picker)
+ *   3 — Ceiling Treatment  (+ custom colour picker) ← grouped with surfaces
+ *   4 — Lighting & Atmosphere
+ *   5 — Storage & Joinery
+ *   6 — Window Treatments
+ *   Additional Request
  */
 
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   type BedroomSelections,
   type BedroomRoomSize,
+  type CeilingStyle,
   BEDROOM_SIZE_OPTIONS,
   BEDROOM_FLOORING_OPTIONS,
   WALL_TREATMENT_OPTIONS,
@@ -18,13 +30,82 @@ import {
   WINDOW_TREATMENT_OPTIONS,
   CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { TriangleAlert, Ruler } from "lucide-react";
+import { Ruler, Palette } from "lucide-react";
+
+// ── Section label ─────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-2">{children}</p>
   );
 }
+
+// ── Colour swatch / picker ────────────────────────────────────────────────────
+
+function ColourSwatch({
+  label,
+  value,
+  onChange,
+  placeholder = "Choose a custom colour",
+}: {
+  label:        string;
+  value:        string | null;
+  onChange:     (hex: string | null) => void;
+  placeholder?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 transition-all duration-200",
+        value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50",
+      )}
+    >
+      {/* Colour circle — click to open native colour picker */}
+      <button
+        onClick={() => inputRef.current?.click()}
+        className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden hover:scale-105 transition-transform"
+        style={{ background: value ?? "#e8e0d5" }}
+        title="Pick a custom colour"
+      />
+
+      {/* Label + hex value */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <Palette size={10} className="text-charcoal/35 flex-shrink-0" />
+          <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wide">{label}</p>
+        </div>
+        {value ? (
+          <p className="text-[11px] font-semibold text-terracotta mt-0.5">{value.toUpperCase()}</p>
+        ) : (
+          <p className="text-[10px] text-charcoal/35 mt-0.5">{placeholder}</p>
+        )}
+      </div>
+
+      {/* Clear button */}
+      {value && (
+        <button
+          onClick={() => onChange(null)}
+          className="text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
+        >
+          Clear
+        </button>
+      )}
+
+      {/* Hidden native colour input */}
+      <input
+        ref={inputRef}
+        type="color"
+        value={value ?? "#d4b896"}
+        onChange={(e) => onChange(e.target.value)}
+        className="sr-only"
+      />
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 interface BedroomSidebarProps {
   selections: BedroomSelections;
@@ -131,10 +212,18 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
               </button>
             );
           })}
+
+          {/* Custom flooring colour */}
+          <ColourSwatch
+            label="Custom Flooring Colour"
+            value={selections.flooringColor ?? null}
+            onChange={(hex) => onChange({ flooringColor: hex })}
+            placeholder="Pick a custom stain or finish colour"
+          />
         </div>
       </div>
 
-      {/* 2 — Wall Treatments */}
+      {/* 2 — Wall Treatment */}
       <div>
         <SectionLabel>2 — Wall Treatment</SectionLabel>
         <div className="flex flex-col gap-2">
@@ -162,12 +251,61 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
               </button>
             );
           })}
+
+          {/* Custom wall colour */}
+          <ColourSwatch
+            label="Custom Wall Colour"
+            value={selections.wallColor ?? null}
+            onChange={(hex) => onChange({ wallColor: hex })}
+            placeholder="Pick a paint or treatment colour"
+          />
         </div>
       </div>
 
-      {/* 3 — Lighting & Atmosphere */}
+      {/* 3 — Ceiling Treatment (moved up to group with surfaces) */}
       <div>
-        <SectionLabel>3 — Lighting &amp; Atmosphere</SectionLabel>
+        <SectionLabel>3 — Ceiling Treatment</SectionLabel>
+        <div className="flex flex-col gap-2">
+          {CEILING_OPTIONS.map((opt) => {
+            const active = selections.ceilingStyle === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id as CeilingStyle })}
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
+                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
+                )}
+              >
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
+                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {opt.cost > 0 && (
+                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
+                      +${(opt.cost / 1000).toFixed(1)}k
+                    </span>
+                  )}
+                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
+                </div>
+              </button>
+            );
+          })}
+
+          {/* Custom ceiling colour */}
+          <ColourSwatch
+            label="Custom Ceiling Colour"
+            value={selections.ceilingColor ?? null}
+            onChange={(hex) => onChange({ ceilingColor: hex })}
+            placeholder="Pick a ceiling paint colour"
+          />
+        </div>
+      </div>
+
+      {/* 4 — Lighting & Atmosphere */}
+      <div>
+        <SectionLabel>4 — Lighting &amp; Atmosphere</SectionLabel>
         <div className="flex flex-col gap-2">
           {BEDROOM_LIGHTING_OPTIONS.map((opt) => {
             const active = selections.lighting === opt.id;
@@ -209,9 +347,9 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
         </div>
       </div>
 
-      {/* 4 — Storage & Joinery */}
+      {/* 5 — Storage & Joinery */}
       <div>
-        <SectionLabel>4 — Storage &amp; Joinery</SectionLabel>
+        <SectionLabel>5 — Storage &amp; Joinery</SectionLabel>
         <div className="flex flex-col gap-2">
           {STORAGE_OPTIONS.map((opt) => {
             const active = selections.storage === opt.id;
@@ -240,9 +378,9 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
         </div>
       </div>
 
-      {/* 5 — Window Treatments */}
+      {/* 6 — Window Treatments */}
       <div>
-        <SectionLabel>5 — Window Treatments</SectionLabel>
+        <SectionLabel>6 — Window Treatments</SectionLabel>
         <div className="flex flex-col gap-2">
           {WINDOW_TREATMENT_OPTIONS.map((opt) => {
             const active = selections.windowTreatment === opt.id;
@@ -271,40 +409,7 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
         </div>
       </div>
 
-      {/* 6 — Ceiling Treatment */}
-      <div>
-        <SectionLabel>6 — Ceiling Treatment</SectionLabel>
-        <div className="flex flex-col gap-2">
-          {CEILING_OPTIONS.map((opt) => {
-            const active = selections.ceilingStyle === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {opt.cost > 0 && (
-                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                      +${(opt.cost / 1000).toFixed(1)}k
-                    </span>
-                  )}
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Custom note */}
+      {/* Additional Request */}
       <div>
         <SectionLabel>Additional Request</SectionLabel>
         <textarea

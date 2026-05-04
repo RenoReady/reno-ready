@@ -1154,16 +1154,17 @@ function InlineBriefPanel({
   const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
   const isOld = valid && y < 1990;
 
-  // Year + scope are required; plumbing defaults to "keep-layout" if not set
-  const canSave = valid && scope !== null;
+  // Scope alone is enough to save — year defaults to current year if not entered
+  const canSave = scope !== null;
 
   // Asbestos triggers when pre-1990 AND walls will be disturbed
   const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  // Auto-save whenever year and scope are set (plumbing optional, defaults to keep-layout)
+  // Auto-save whenever scope is set (year optional, plumbing optional)
   useEffect(() => {
     if (!canSave || !scope) return;
-    onSave({ yearBuilt: y, plumbingLayout: plumbingLayout ?? "keep-layout", scope, bathroomCount: 1 });
+    const effectiveYear = valid ? y : new Date().getFullYear();
+    onSave({ yearBuilt: effectiveYear, plumbingLayout: plumbingLayout ?? "keep-layout", scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, plumbingLayout, scope]);
 
@@ -1243,15 +1244,18 @@ function InlineBriefPanel({
         <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Scope</p>
         <div className="flex flex-col gap-1.5">
           {([
-            { key: "full-stripout",    label: "Full Strip-out",   sub: "Complete gut renovation"  },
-            { key: "cosmetic-refresh", label: "Cosmetic Refresh", sub: "Surfaces & finishes only" },
-          ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string }[]).map(({ key, label, sub }) => (
+            { key: "full-stripout",    label: "Full Strip-out",   sub: "Complete gut renovation",  cost: "+$2,300" },
+            { key: "cosmetic-refresh", label: "Cosmetic Refresh", sub: "Surfaces & finishes only", cost: "+$350"   },
+          ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string; cost: string }[]).map(({ key, label, sub, cost }) => (
             <button key={key}
               onClick={() => setScope(scope === key ? null : key)}
-              className={cn("flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
+              className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
                 scope === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
-              <p className={cn("text-xs font-semibold", scope === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
-              <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
+              <div className="min-w-0">
+                <p className={cn("text-xs font-semibold", scope === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
+                <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
+              </div>
+              <p className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", scope === key ? "text-terracotta/70" : "text-charcoal/30")}>{cost}</p>
             </button>
           ))}
         </div>
@@ -1272,7 +1276,8 @@ function InlineBriefPanel({
 export default function BuilderPage() {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const photoUploadRef = useRef<HTMLDivElement>(null);
+  const photoUploadRef    = useRef<HTMLDivElement>(null);
+  const photoDropzoneRef  = useRef<HTMLDivElement>(null);
 
   // Set to true when returning from OAuth with a pending generate request
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
@@ -1356,6 +1361,7 @@ export default function BuilderPage() {
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
   const [showNoPhotoWarning, setShowNoPhotoWarning] = useState(false);
+  const [pulseUpload,        setPulseUpload]        = useState(false);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -2119,13 +2125,16 @@ export default function BuilderPage() {
                     </div>
                   ) : (
                     <div
+                      ref={photoDropzoneRef}
                       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                       onDragLeave={() => setIsDragging(false)}
                       onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                       onClick={() => fileRef.current?.click()}
                       className={cn(
-                        "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-200",
-                        isDragging ? "border-terracotta bg-terracotta/5" : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
+                        "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-500",
+                        pulseUpload  ? "border-terracotta bg-terracotta/8 shadow-[0_0_0_4px_rgba(210,125,94,0.25)] scale-[1.01]"
+                        : isDragging ? "border-terracotta bg-terracotta/5"
+                        : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
                       )}
                     >
                       <div className="w-10 h-10 rounded-xl bg-sand-100 flex items-center justify-center">
@@ -2262,13 +2271,16 @@ export default function BuilderPage() {
                   </div>
                 ) : (
                   <div
+                    ref={photoDropzoneRef}
                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                     onClick={() => fileRef.current?.click()}
                     className={cn(
-                      "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-200",
-                      isDragging ? "border-terracotta bg-terracotta/5" : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
+                      "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-500",
+                      pulseUpload  ? "border-terracotta bg-terracotta/8 shadow-[0_0_0_4px_rgba(210,125,94,0.25)] scale-[1.01]"
+                      : isDragging ? "border-terracotta bg-terracotta/5"
+                      : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
                     )}
                   >
                     <div className="w-10 h-10 rounded-xl bg-sand-100 flex items-center justify-center">
@@ -2648,9 +2660,12 @@ export default function BuilderPage() {
               <button
                 onClick={() => {
                   setShowNoPhotoWarning(false);
-                  // Scroll to the photo upload area
-                  photoUploadRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  setTimeout(() => fileRef.current?.click(), 500);
+                  // Scroll exactly to the dropzone and pulse it
+                  setTimeout(() => {
+                    photoDropzoneRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    setPulseUpload(true);
+                    setTimeout(() => setPulseUpload(false), 3000);
+                  }, 100);
                 }}
                 className="w-full py-3 rounded-2xl bg-terracotta text-white text-sm font-bold hover:bg-terracotta/90 transition-all"
               >

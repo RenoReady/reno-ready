@@ -55,29 +55,29 @@ function ColourSwatch({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 transition-all duration-200",
-        value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50",
+        "relative flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 transition-all duration-200 cursor-pointer",
+        value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
       )}
     >
-      {/* Colour circle — the <input type="color"> is positioned over it so
-          a tap anywhere on the circle directly opens the native colour picker
-          on both desktop and mobile. */}
-      <div className="relative w-9 h-9 flex-shrink-0">
-        <div
-          className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm overflow-hidden"
-          style={{ background: value ?? "#e8e0d5" }}
-        />
-        <input
-          type="color"
-          value={value ?? "#d4b896"}
-          onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer rounded-xl"
-          title="Pick a custom colour"
-        />
-      </div>
+      {/* Full-row transparent colour input — sits over the entire row so a tap
+          anywhere (except the Clear button above it) opens the native picker. */}
+      <input
+        type="color"
+        value={value ?? "#d4b896"}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer rounded-2xl"
+        style={{ zIndex: 1 }}
+        title="Pick a custom colour"
+      />
+
+      {/* Colour swatch circle */}
+      <div
+        className="relative w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden"
+        style={{ background: value ?? "#e8e0d5", zIndex: 2 }}
+      />
 
       {/* Label + hex value */}
-      <div className="flex-1 min-w-0">
+      <div className="relative flex-1 min-w-0" style={{ zIndex: 2 }}>
         <div className="flex items-center gap-1.5">
           <Palette size={10} className="text-charcoal/35 flex-shrink-0" />
           <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wide">{label}</p>
@@ -89,11 +89,12 @@ function ColourSwatch({
         )}
       </div>
 
-      {/* Clear button */}
+      {/* Clear button — above the colour input so it stays clickable */}
       {value && (
         <button
-          onClick={() => onChange(null)}
-          className="text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
+          onClick={(e) => { e.stopPropagation(); onChange(null); }}
+          className="relative text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
+          style={{ zIndex: 3 }}
         >
           Clear
         </button>

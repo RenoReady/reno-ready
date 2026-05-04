@@ -29,7 +29,8 @@ import {
   WINDOW_TREATMENT_OPTIONS,
   CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { Ruler, Palette } from "lucide-react";
+import { Ruler } from "lucide-react";
+import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 
 // ── Section label ─────────────────────────────────────────────────────────────
 
@@ -39,70 +40,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Colour swatch / picker ────────────────────────────────────────────────────
-
-function ColourSwatch({
-  label,
-  value,
-  onChange,
-  placeholder = "Choose a custom colour",
-}: {
-  label:        string;
-  value:        string | null;
-  onChange:     (hex: string | null) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "relative flex items-center gap-3 px-3 py-2.5 rounded-2xl border-2 transition-all duration-200 cursor-pointer",
-        value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-      )}
-    >
-      {/* Full-row transparent colour input — must be the TOPMOST layer (z-20)
-          so every tap anywhere on the row opens the native picker.
-          Previously z-1 was below the swatch (z-2) causing inconsistent hits. */}
-      <input
-        type="color"
-        value={value ?? "#d4b896"}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer rounded-2xl"
-        style={{ zIndex: 20 }}
-        title="Pick a custom colour"
-      />
-
-      {/* Colour swatch circle — visual only, input sits transparently above */}
-      <div
-        className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden"
-        style={{ background: value ?? "#e8e0d5" }}
-      />
-
-      {/* Label + hex value — visual only */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <Palette size={10} className="text-charcoal/35 flex-shrink-0" />
-          <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wide">{label}</p>
-        </div>
-        {value ? (
-          <p className="text-[11px] font-semibold text-terracotta mt-0.5">{value.toUpperCase()}</p>
-        ) : (
-          <p className="text-[10px] text-charcoal/35 mt-0.5">{placeholder}</p>
-        )}
-      </div>
-
-      {/* Clear button — sits above the colour input (z-30) */}
-      {value && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onChange(null); }}
-          className="text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
-          style={{ position: "relative", zIndex: 30 }}
-        >
-          Clear
-        </button>
-      )}
-    </div>
-  );
-}
+// ColourPickerSwatch imported above — replaces the old inline ColourSwatch
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -213,11 +151,11 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
           })}
 
           {/* Custom flooring colour */}
-          <ColourSwatch
+          <ColourPickerSwatch
             label="Custom Flooring Colour"
             value={selections.flooringColor ?? null}
             onChange={(hex) => onChange({ flooringColor: hex })}
-            placeholder="Pick a custom stain or finish colour"
+            variant="row"
           />
         </div>
       </div>
@@ -252,11 +190,11 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
           })}
 
           {/* Custom wall colour */}
-          <ColourSwatch
+          <ColourPickerSwatch
             label="Custom Wall Colour"
             value={selections.wallColor ?? null}
             onChange={(hex) => onChange({ wallColor: hex })}
-            placeholder="Pick a paint or treatment colour"
+            variant="row"
           />
         </div>
       </div>
@@ -293,11 +231,11 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
           })}
 
           {/* Custom ceiling colour */}
-          <ColourSwatch
+          <ColourPickerSwatch
             label="Custom Ceiling Colour"
             value={selections.ceilingColor ?? null}
             onChange={(hex) => onChange({ ceilingColor: hex })}
-            placeholder="Pick a ceiling paint colour"
+            variant="row"
           />
         </div>
       </div>

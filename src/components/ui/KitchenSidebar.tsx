@@ -21,8 +21,8 @@ import {
   SPLASHBACK_OPTIONS,
   CEILING_OPTIONS,
 } from "@/lib/roomTypes";
-import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, Palette } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler } from "lucide-react";
+import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -30,87 +30,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Inline colour picker swatch (self-contained) ──────────────────────────────
-function KitchenColourSwatch({ label, value, onChange }: {
-  label:    string;
-  value:    string | null;
-  onChange: (c: string | null) => void;
-}) {
-  const [open, setOpen]   = useState(false);
-  const [hex,  setHex]    = useState(value ?? "#D2B48C");
-  const btnRef            = useRef<HTMLButtonElement>(null);
-  const popRef            = useRef<HTMLDivElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (btnRef.current?.contains(e.target as Node)) return;
-      if (popRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        onClick={() => setOpen((o) => !o)}
-        title={label}
-        className={cn(
-          "w-10 h-10 rounded-lg overflow-hidden ring-1 ring-black/10 transition-all",
-          value ? "ring-2 ring-terracotta ring-offset-1" : "hover:ring-terracotta/40",
-        )}
-      >
-        {value ? (
-          <div className="w-full h-full" style={{ background: value }} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"
-            style={{ background: "conic-gradient(from 0deg, #ff3b30, #ff9500, #ffcc00, #34c759, #007aff, #af52de, #ff3b30)" }}>
-            <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
-              <Palette size={10} className="text-charcoal/60" />
-            </div>
-          </div>
-        )}
-      </button>
-      {open && (
-        <div ref={popRef} className="absolute left-0 top-12 z-[200] w-52 p-3 rounded-2xl bg-white border border-sand-200 shadow-warm-xl">
-          <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wider mb-2">{label}</p>
-          <div className="flex items-center gap-2 mb-3">
-            <input
-              type="color" value={hex}
-              onChange={(e) => { setHex(e.target.value); onChange(e.target.value); }}
-              className="w-9 h-9 rounded-lg cursor-pointer border-2 border-sand-200 bg-transparent p-0.5 flex-shrink-0"
-            />
-            <input
-              type="text" value={hex} maxLength={7} placeholder="#D2B48C"
-              onChange={(e) => {
-                setHex(e.target.value);
-                const n = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`;
-                if (/^#[0-9A-Fa-f]{6}$/.test(n)) { onChange(n); setHex(n); }
-              }}
-              className="flex-1 text-xs font-mono px-2 py-1.5 rounded-lg border-2 border-sand-200 focus:border-terracotta/60 focus:outline-none text-charcoal/80"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { onChange(hex); setOpen(false); }}
-              className="flex-1 text-xs font-bold py-1.5 rounded-xl bg-terracotta text-white hover:bg-terracotta/90"
-            >Apply</button>
-            {value && (
-              <button
-                onClick={() => { onChange(null); setHex("#D2B48C"); setOpen(false); }}
-                className="px-2 text-xs text-charcoal/40 hover:text-charcoal"
-              >Clear</button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// KitchenColourSwatch replaced by shared ColourPickerSwatch (square variant)
+// — identical look to the bathroom tile grid swatch, with fixed-position popup
 
 interface KitchenSidebarProps {
   selections:  KitchenSelections;
@@ -354,10 +275,11 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
           })}
 
           {/* Custom colour swatch */}
-          <KitchenColourSwatch
+          <ColourPickerSwatch
             label="Custom Floor Colour"
             value={selections.floorColor ?? null}
             onChange={(c) => onChange({ floorColor: c, floorFinish: c ? null : selections.floorFinish })}
+            variant="square"
           />
         </div>
 
@@ -388,10 +310,11 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
           })}
 
           {/* Custom colour wheel */}
-          <KitchenColourSwatch
+          <ColourPickerSwatch
             label="Custom Wall Colour"
             value={selections.wallColor ?? null}
             onChange={(c) => onChange({ wallColor: c })}
+            variant="square"
           />
         </div>
       </div>

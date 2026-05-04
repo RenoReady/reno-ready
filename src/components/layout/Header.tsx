@@ -36,10 +36,13 @@ export default function Header() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
-    supabase.auth.getSession().then((result) => {
-      const session = result.data.session;
-      setUser(session?.user ? buildUserInfo(session.user) : null);
-    });
+    // async/await lets TypeScript infer the return type correctly;
+    // .then() callbacks lose inference when the client lacks a Database generic
+    async function loadSession() {
+      const { data } = await supabase.auth.getSession();
+      setUser(data.session?.user ? buildUserInfo(data.session.user) : null);
+    }
+    loadSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ? buildUserInfo(session.user) : null);

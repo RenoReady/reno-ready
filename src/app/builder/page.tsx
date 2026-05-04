@@ -1628,11 +1628,11 @@ export default function BuilderPage() {
     <div className="min-h-screen bg-sand">
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
 
-        {/* ── Room Router overlay — shown until user confirms a room type ── */}
+        {/* ── Room Router — full-page on mobile, centred modal on sm+ ── */}
         {showRoomRouter && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
-            <div className="bg-sand rounded-3xl p-8 w-full max-w-3xl shadow-warm-xl relative">
-              {/* Show × whenever user already has a confirmed room (mid-session change) */}
+          <div className="fixed inset-0 z-[300] overflow-y-auto bg-sand sm:bg-black/50 sm:backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:overflow-hidden sm:p-6">
+            <div className="relative bg-sand w-full min-h-full px-5 py-10 sm:min-h-0 sm:rounded-3xl sm:p-8 sm:max-w-3xl sm:shadow-warm-xl">
+              {/* Close × — only visible when user has already confirmed a room */}
               {roomConfirmed && (
                 <button
                   onClick={() => setShowRoomRouter(false)}

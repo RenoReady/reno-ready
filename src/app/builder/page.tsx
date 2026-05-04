@@ -1272,6 +1272,7 @@ function InlineBriefPanel({
 export default function BuilderPage() {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const photoUploadRef = useRef<HTMLDivElement>(null);
 
   // Set to true when returning from OAuth with a pending generate request
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
@@ -1354,6 +1355,7 @@ export default function BuilderPage() {
   const [refinementNote,     setRefinementNote]     = useState("");
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
+  const [showNoPhotoWarning, setShowNoPhotoWarning] = useState(false);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -1414,7 +1416,7 @@ export default function BuilderPage() {
     setSelectedRegion(zone.charAt(0).toUpperCase() + zone.slice(1));
   }, []);
 
-  const handleGenerate = useCallback(async () => {
+  const executeGenerate = useCallback(async () => {
     if (!isAuthed()) {
       saveBuilderStateForAuth(true); // snapshot before OAuth redirect
       setShowAuthModal(true);
@@ -1445,8 +1447,11 @@ export default function BuilderPage() {
     setGenerateDescription(null);
 
     try {
+      const roomLabel = store.roomType === "kitchen" ? "kitchen"
+        : store.roomType === "bedroom" ? "bedroom"
+        : "bathroom";
       const prompt =
-        `Transform bathroom: floor=${store.floorTile?.name ?? "stone"}` +
+        `Transform ${roomLabel}: floor=${store.floorTile?.name ?? "stone"}` +
         (store.customFloorColor ? ` in ${store.customFloorColor}` : "") + `, ` +
         `wall=${store.wallTile?.name ?? "white tile"}` +
         (store.customWallColor ? ` in ${store.customWallColor}` : "") + `, ` +
@@ -1517,15 +1522,24 @@ export default function BuilderPage() {
     }
   }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump]);
 
+  const handleGenerate = useCallback(async () => {
+    const store = useBuilderStore.getState();
+    if (!store.roomPhotoUrl) {
+      setShowNoPhotoWarning(true);
+      return;
+    }
+    await executeGenerate();
+  }, [executeGenerate]);
+
   // Auto-trigger generation when returning from Google OAuth redirect.
   // Waits until userStatus has finished loading so the paywall check
-  // inside handleGenerate uses real data (not the loading placeholder).
+  // inside executeGenerate uses real data (not the loading placeholder).
   useEffect(() => {
     if (!shouldAutoGenerate) return;
     if (userStatus.loading) return;   // hold until status is known
     setShouldAutoGenerate(false);
-    handleGenerate();
-  }, [shouldAutoGenerate, userStatus.loading, handleGenerate]);
+    executeGenerate();
+  }, [shouldAutoGenerate, userStatus.loading, executeGenerate]);
 
   // ── Refinement: surgical edit using the generated image as the seed.
   //
@@ -2082,7 +2096,7 @@ export default function BuilderPage() {
           </div>
 
           {/* ══ RIGHT SIDEBAR — Design Selectors ══════════════════ */}
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-0.5">
+          <aside ref={photoUploadRef} className="flex flex-col gap-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-0.5">
 
             {/* Hidden file input — always in DOM so fileRef works for all room types */}
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
@@ -2578,7 +2592,7 @@ export default function BuilderPage() {
 
       {showAuthModal && (
         <AuthModal
-          onSuccess={() => { setShowAuthModal(false); handleGenerate(); }}
+          onSuccess={() => { setShowAuthModal(false); executeGenerate(); }}
           onClose={() => setShowAuthModal(false)}
         />
       )}
@@ -2613,6 +2627,48 @@ export default function BuilderPage() {
 
       {/* Tile detail modal */}
       {modalTile && <TileModal tile={modalTile} onClose={() => setModalTile(null)} />}
+
+      {/* ── No-photo warning modal ── */}
+      {showNoPhotoWarning && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-warm-xl max-w-md w-full p-8 flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
+                <ImagePlus size={22} className="text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold text-charcoal">No room photo uploaded</h2>
+              <p className="text-sm text-charcoal/60 leading-relaxed">
+                It looks like you&apos;re generating without uploading a photo of your room. For the best quality result, we strongly recommend uploading a photo first — the AI will apply your selections directly to your actual space.
+              </p>
+              <p className="text-sm text-charcoal/60">
+                Would you like to proceed anyway, or upload a photo first?
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowNoPhotoWarning(false);
+                  // Scroll to the photo upload area
+                  photoUploadRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  setTimeout(() => fileRef.current?.click(), 500);
+                }}
+                className="w-full py-3 rounded-2xl bg-terracotta text-white text-sm font-bold hover:bg-terracotta/90 transition-all"
+              >
+                📷 Upload a Photo First (Recommended)
+              </button>
+              <button
+                onClick={() => {
+                  setShowNoPhotoWarning(false);
+                  executeGenerate();
+                }}
+                className="w-full py-3 rounded-2xl border-2 border-sand-200 bg-sand-50 text-charcoal/70 text-sm font-semibold hover:border-charcoal/20 hover:text-charcoal transition-all"
+              >
+                Proceed Without Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -725,7 +725,8 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
       : "a standard residential kitchen";
 
     const lines = [
-      "You are a professional interior design visualizer. Generate a photorealistic kitchen render from scratch.",
+      "ROOM TYPE: KITCHEN. This is strictly a KITCHEN renovation visualisation. Do NOT generate a bathroom, bedroom, or any other room type.",
+      "You are a professional interior design visualizer. Generate a photorealistic KITCHEN render from scratch.",
       `Compose ${sizeDesc} from a slightly elevated angle showing cabinetry, benchtop, splashback and appliances.`,
       "Remove all clutter. Produce a high-end architectural photography result at 2K resolution.",
       "",
@@ -809,7 +810,8 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
       : "a master bedroom";
 
     const lines = [
-      "You are a professional interior design visualizer. Generate a photorealistic bedroom render from scratch.",
+      "ROOM TYPE: BEDROOM. This is strictly a BEDROOM renovation visualisation. Do NOT generate a bathroom, kitchen, or any other room type.",
+      "You are a professional interior design visualizer. Generate a photorealistic BEDROOM render from scratch.",
       `Compose ${sizeDesc} showing the bedhead feature wall, flooring, storage and window treatments at 2K resolution.`,
       "Remove all clutter and personal items. Produce a high-end editorial photography result.",
       "",

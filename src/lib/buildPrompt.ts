@@ -118,7 +118,8 @@ export function buildGeminiPrompt(req: PromptInput): string {
     "Output: high-fidelity 2K image.",
   ].join("\n") : [
     // ── No-photo: generate from scratch ─────────────────────────────────────
-    "You are a professional interior design visualizer. Generate a photorealistic bathroom from scratch.",
+    "ROOM TYPE: BATHROOM. This is strictly a BATHROOM renovation visualisation. Do NOT generate a kitchen, bedroom, or any other room type.",
+    "You are a professional interior design visualizer. Generate a photorealistic BATHROOM from scratch.",
     "Compose the scene as an interior architect would: slightly elevated angle centred on the vanity,",
     "showing both the floor and at least two walls. Render at 2K resolution.",
     "",

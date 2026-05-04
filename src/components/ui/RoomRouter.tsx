@@ -116,11 +116,14 @@ export default function RoomRouter({ onSelect, savedRooms = [] }: RoomRouterProp
         {ROOM_CARDS.map((card) => {
           const isHighlighted = pending === card.type;
           return (
-            <button
+            <div
               key={card.type}
+              role="button"
+              tabIndex={0}
               onClick={() => setPending(isHighlighted ? null : card.type)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setPending(isHighlighted ? null : card.type); }}
               className={cn(
-                "relative flex flex-col gap-4 p-6 rounded-3xl border-2 text-left transition-all duration-200 overflow-hidden group",
+                "relative flex flex-col gap-4 p-6 rounded-3xl border-2 text-left transition-all duration-200 overflow-hidden group cursor-pointer",
                 isHighlighted
                   ? `${card.accentBorder} ${card.accentBg} shadow-warm-lg scale-[1.02]`
                   : "border-sand-200 bg-white/60 hover:border-sand-300 hover:bg-white/80 hover:scale-[1.01]",
@@ -171,7 +174,17 @@ export default function RoomRouter({ onSelect, savedRooms = [] }: RoomRouterProp
                   Selected
                 </div>
               )}
-            </button>
+
+              {/* Continue button — shown inside the card when selected */}
+              {isHighlighted && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (pending) onSelect(pending); }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all active:scale-95 mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Continue <ArrowRight size={15} />
+                </button>
+              )}
+            </div>
           );
         })}
       </div>

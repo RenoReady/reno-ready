@@ -45,8 +45,10 @@ export const metadata: Metadata = {
     locale:      "en_AU",
   },
   icons: {
-    icon:    [{ url: "/logo.png", type: "image/png" }],
-    apple:   [{ url: "/logo.png", type: "image/png" }],
+    icon: [
+      { url: "/logo.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple:   [{ url: "/logo.png", type: "image/png", sizes: "512x512" }],
     shortcut: "/logo.png",
   },
 };

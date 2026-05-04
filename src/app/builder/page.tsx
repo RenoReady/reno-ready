@@ -888,12 +888,14 @@ function ArchitectViewport({
       {/* ── Toolbar ─────────────────────────────────────────── */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/8 bg-[#151920] flex-shrink-0">
         {/* Minimal brand header */}
-        <div className="flex items-center gap-2.5 mr-auto">
+        <div className="hidden sm:flex items-center gap-2.5 mr-auto">
           <div className="w-1.5 h-1.5 rounded-full bg-terracotta/70" />
           <span className="text-xs font-bold text-white/35 tracking-widest uppercase">
             Reno Ready — Design Preview
           </span>
         </div>
+        {/* Mobile spacer so toolbar buttons stay right-aligned */}
+        <div className="sm:hidden mr-auto" />
 
         {hasGenerated && roomPhotoUrl && (
           <button
@@ -1942,7 +1944,7 @@ export default function BuilderPage() {
           </aside>
 
           {/* ══ CENTER: Viewport + Refinement + Cost ══════════════ */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6 min-w-0">
             <ArchitectViewport
               onGenerate={handleGenerate}
               onViewFullPreview={() => router.push("/preview")}

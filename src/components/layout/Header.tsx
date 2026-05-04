@@ -14,7 +14,10 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-sand-50/90 backdrop-blur-md border-b border-sand-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-24 flex items-center justify-between gap-2 sm:gap-6">
+      <div className={cn(
+        "max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-6",
+        isAppRoute ? "h-16 sm:h-28" : "h-14 sm:h-24",
+      )}>
 
         {/* Logo — square canvas, multiply removes the white background on sand header */}
         <Link href="/" className="flex items-center group flex-shrink-0">
@@ -25,7 +28,10 @@ export default function Header() {
             width={150}
             style={{ mixBlendMode: "multiply" }}
             priority
-            className="h-10 w-auto sm:h-[100px] sm:w-auto transition-opacity duration-200 group-hover:opacity-75"
+            className={cn(
+              "w-auto transition-opacity duration-200 group-hover:opacity-75",
+              isAppRoute ? "h-12 sm:h-[120px]" : "h-10 sm:h-[100px]",
+            )}
           />
         </Link>
 

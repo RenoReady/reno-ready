@@ -410,7 +410,7 @@ export const STRUCTURAL_COST: {
   removeBathtub:   2_500,
   addWalkinShower: 4_500,
   replaceToilet:   1_200,
-  inWallCistern:   2_200,
+  inWallCistern:   1_500,
 };
 
 export const NICHE_COST: Record<ShowerNiche, number> = {

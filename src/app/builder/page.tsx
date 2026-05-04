@@ -1154,16 +1154,16 @@ function InlineBriefPanel({
   const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
   const isOld = valid && y < 1990;
 
-  // All three fields must be filled before the brief activates
-  const canSave = valid && plumbingLayout !== null && scope !== null;
+  // Year + scope are required; plumbing defaults to "keep-layout" if not set
+  const canSave = valid && scope !== null;
 
   // Asbestos triggers when pre-1990 AND walls will be disturbed
   const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  // Auto-save whenever all fields are set and year is valid
+  // Auto-save whenever year and scope are set (plumbing optional, defaults to keep-layout)
   useEffect(() => {
-    if (!canSave || !plumbingLayout || !scope) return;
-    onSave({ yearBuilt: y, plumbingLayout, scope, bathroomCount: 1 });
+    if (!canSave || !scope) return;
+    onSave({ yearBuilt: y, plumbingLayout: plumbingLayout ?? "keep-layout", scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, plumbingLayout, scope]);
 
@@ -1377,7 +1377,18 @@ export default function BuilderPage() {
   }, [setRoomPhotoUrl]);
 
   // Apply a style library preset to all tile/vanity/tapware selections
+  // Clicking the already-active preset deselects everything
   const handleStylePreset = useCallback((preset: StylePreset) => {
+    if (activeStylePreset === preset.id) {
+      // Deselect — clear all preset-driven selections
+      setFloorTile(null);
+      setWallTile(null);
+      setVanity(null);
+      setTapware(null);
+      setTileStyle(null);
+      setActiveStylePreset(null);
+      return;
+    }
     const floor = FLOOR_TILES.find((t) => t.id === preset.floorTileId) ?? null;
     const wall  = WALL_TILES.find((t)  => t.id === preset.wallTileId)  ?? null;
     if (floor) setFloorTile(floor);
@@ -1389,7 +1400,7 @@ export default function BuilderPage() {
     setCustomWallColor(null);
     setActiveStylePreset(preset.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeStylePreset]);
 
   // Zone click → pre-fill refinement text with zone-specific instruction
   const handleZoneClick = useCallback((zone: ZoneId) => {
@@ -1610,7 +1621,7 @@ export default function BuilderPage() {
     { key: "removeBathtub",   label: "Bathtub Removal",            sub: "+$2,500 est." },
     { key: "addWalkinShower", label: "Walk-in Shower Conversion",  sub: "+$4,500 est." },
     { key: "replaceToilet",   label: "Toilet Replacement",         sub: "+$1,200 est." },
-    { key: "inWallCistern",   label: "In-Wall Cistern",            sub: "+$2,200 est." },
+    { key: "inWallCistern",   label: "In-Wall Cistern",            sub: "+$1,500 est." },
   ];
 
   return (
@@ -1665,8 +1676,8 @@ export default function BuilderPage() {
 
         <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start">
 
-          {/* ══ LEFT PANEL — Project Brief + Structural Needs (xl only) ══ */}
-          <aside className="hidden xl:flex flex-col gap-4 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
+          {/* ══ LEFT PANEL — Project Brief + Structural Needs ══ */}
+          <aside className="flex flex-col gap-4 order-last xl:order-first xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
             {/* Inline Project Brief */}
             <InlineBriefPanel
               projectBrief={projectBrief}
@@ -2158,8 +2169,9 @@ export default function BuilderPage() {
                       <button
                         key={opt.id}
                         onClick={() => {
-                          setBathroomSize(opt.id as BathroomSize);
-                          setUseCustomDimensions(opt.id === "custom");
+                          const next = bathroomSize === opt.id ? null : opt.id as BathroomSize;
+                          setBathroomSize(next);
+                          setUseCustomDimensions(next === "custom");
                         }}
                         className={cn(
                           "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200 outline-none",

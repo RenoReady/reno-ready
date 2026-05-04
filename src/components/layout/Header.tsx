@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import ProgressNav from "@/components/ui/ProgressNav";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
 import { LogOut, RefreshCcw } from "lucide-react";
 
 const APP_ROUTES = ["/builder", "/preview", "/connect"];
@@ -44,9 +45,11 @@ export default function Header() {
     }
     loadSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ? buildUserInfo(session.user) : null);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+        setUser(session?.user ? buildUserInfo(session.user) : null);
+      },
+    );
 
     return () => subscription.unsubscribe();
   }, []);

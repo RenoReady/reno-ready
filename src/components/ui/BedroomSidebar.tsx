@@ -59,25 +59,26 @@ function ColourSwatch({
         value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
       )}
     >
-      {/* Full-row transparent colour input — sits over the entire row so a tap
-          anywhere (except the Clear button above it) opens the native picker. */}
+      {/* Full-row transparent colour input — must be the TOPMOST layer (z-20)
+          so every tap anywhere on the row opens the native picker.
+          Previously z-1 was below the swatch (z-2) causing inconsistent hits. */}
       <input
         type="color"
         value={value ?? "#d4b896"}
         onChange={(e) => onChange(e.target.value)}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer rounded-2xl"
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 20 }}
         title="Pick a custom colour"
       />
 
-      {/* Colour swatch circle */}
+      {/* Colour swatch circle — visual only, input sits transparently above */}
       <div
-        className="relative w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden"
-        style={{ background: value ?? "#e8e0d5", zIndex: 2 }}
+        className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden"
+        style={{ background: value ?? "#e8e0d5" }}
       />
 
-      {/* Label + hex value */}
-      <div className="relative flex-1 min-w-0" style={{ zIndex: 2 }}>
+      {/* Label + hex value — visual only */}
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <Palette size={10} className="text-charcoal/35 flex-shrink-0" />
           <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wide">{label}</p>
@@ -89,12 +90,12 @@ function ColourSwatch({
         )}
       </div>
 
-      {/* Clear button — above the colour input so it stays clickable */}
+      {/* Clear button — sits above the colour input (z-30) */}
       {value && (
         <button
           onClick={(e) => { e.stopPropagation(); onChange(null); }}
-          className="relative text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
-          style={{ zIndex: 3 }}
+          className="text-[10px] font-bold text-charcoal/30 hover:text-charcoal/60 flex-shrink-0 transition-colors"
+          style={{ position: "relative", zIndex: 30 }}
         >
           Clear
         </button>

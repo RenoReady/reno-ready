@@ -1143,11 +1143,15 @@ function InlineBriefPanel({
   projectBrief,
   onSave,
   onClear,
+  roomType,
 }: {
   projectBrief: ProjectBrief | null;
-  onSave:  (b: ProjectBrief) => void;
-  onClear: () => void;
+  onSave:   (b: ProjectBrief) => void;
+  onClear:  () => void;
+  roomType: import("@/lib/roomTypes").RoomType;
 }) {
+  const isBedroom = roomType === "bedroom";
+
   const [year,           setYear]           = useState(projectBrief?.yearBuilt ? String(projectBrief.yearBuilt) : "");
   const [plumbingLayout, setPlumbingLayout] = useState<PlumbingLayout | null>(projectBrief?.plumbingLayout ?? null);
   const [scope,          setScope]          = useState<import("@/lib/projectBrief").RenovationScope | null>(projectBrief?.scope ?? null);
@@ -1156,21 +1160,35 @@ function InlineBriefPanel({
   const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
   const isOld = valid && y < 1990;
 
-  // Scope alone is enough to save — year defaults to current year if not entered
   const canSave = scope !== null;
 
-  // Asbestos triggers when pre-1990 AND walls will be disturbed
-  const asbestosTriggered = isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
+  // For bedroom: asbestos triggered by full reno only (no plumbing move option)
+  const asbestosTriggered = isBedroom
+    ? isOld && scope === "full-stripout"
+    : isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  // Auto-save whenever scope is set (year optional, plumbing optional)
+  // Auto-save whenever scope changes (year optional, plumbing optional)
   useEffect(() => {
     if (!canSave || !scope) return;
     const effectiveYear = valid ? y : new Date().getFullYear();
-    onSave({ yearBuilt: effectiveYear, plumbingLayout: plumbingLayout ?? "keep-layout", scope, bathroomCount: 1 });
+    // Bedroom always uses keep-layout (no plumbing)
+    const effectivePlumbing = isBedroom ? "keep-layout" : (plumbingLayout ?? "keep-layout");
+    onSave({ yearBuilt: effectiveYear, plumbingLayout: effectivePlumbing, scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, plumbingLayout, scope]);
 
   const isFilled = projectBrief !== null;
+
+  // Room-specific scope options
+  const scopeOptions: { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string; cost: string }[] = isBedroom
+    ? [
+        { key: "full-stripout",    label: "Full Bedroom Renovation", sub: "New flooring, built-ins, lighting & feature wall", cost: "+$2,300" },
+        { key: "cosmetic-refresh", label: "Cosmetic Refresh",        sub: "Paint, surfaces & minor updates",                  cost: "+$350"   },
+      ]
+    : [
+        { key: "full-stripout",    label: "Full Strip-out",          sub: "Complete gut renovation",                          cost: "+$2,300" },
+        { key: "cosmetic-refresh", label: "Cosmetic Refresh",        sub: "Surfaces & finishes only",                         cost: "+$350"   },
+      ];
 
   return (
     <div className="bg-white/70 rounded-3xl border border-sand-200 shadow-warm-sm p-5 flex flex-col gap-5">
@@ -1206,49 +1224,52 @@ function InlineBriefPanel({
         {isOld && (
           <div className="flex items-start gap-1.5 mt-1.5">
             <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-            <p className="text-[10px] text-amber-700 leading-snug">Pre-1990 — asbestos risk if strip-out or plumbing move</p>
+            <p className="text-[10px] text-amber-700 leading-snug">
+              {isBedroom
+                ? "Pre-1990 — walls may contain asbestos sheeting or lead paint"
+                : "Pre-1990 — asbestos risk if strip-out or plumbing move"}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Plumbing & Layout */}
-      <div>
-        <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Plumbing &amp; Layout</p>
-        <div className="flex flex-col gap-1.5">
-          {([
-            { key: "keep-layout",   label: "Keep Existing Layout",  sub: "No plumbing moves",           cost: null      },
-            { key: "move-plumbing", label: "Moving Plumbing/Walls", sub: "Relocating fixtures/drains",  cost: "+$2,500" },
-          ] as { key: PlumbingLayout; label: string; sub: string; cost: string | null }[]).map(({ key, label, sub, cost }) => (
-            <button key={key}
-              onClick={() => setPlumbingLayout(plumbingLayout === key ? null : key)}
-              className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
-                plumbingLayout === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
-              <div className="min-w-0">
-                <p className={cn("text-xs font-semibold", plumbingLayout === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
-                <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
-              </div>
-              {cost && (
-                <p className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", plumbingLayout === key ? "text-terracotta/70" : "text-charcoal/30")}>{cost}</p>
-              )}
-            </button>
-          ))}
-        </div>
-        {asbestosTriggered && (
-          <div className="flex items-start gap-1.5 mt-1.5">
-            <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-            <p className="text-[10px] text-amber-700 leading-snug">Asbestos removal added to estimate (~$2,272)</p>
+      {/* Plumbing & Layout — bathroom/kitchen only */}
+      {!isBedroom && (
+        <div>
+          <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Plumbing &amp; Layout</p>
+          <div className="flex flex-col gap-1.5">
+            {([
+              { key: "keep-layout",   label: "Keep Existing Layout",  sub: "No plumbing moves",          cost: null      },
+              { key: "move-plumbing", label: "Moving Plumbing/Walls", sub: "Relocating fixtures/drains", cost: "+$2,500" },
+            ] as { key: PlumbingLayout; label: string; sub: string; cost: string | null }[]).map(({ key, label, sub, cost }) => (
+              <button key={key}
+                onClick={() => setPlumbingLayout(plumbingLayout === key ? null : key)}
+                className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
+                  plumbingLayout === key ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/30")}>
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-semibold", plumbingLayout === key ? "text-terracotta" : "text-charcoal/70")}>{label}</p>
+                  <p className="text-[10px] text-charcoal/40 mt-0.5">{sub}</p>
+                </div>
+                {cost && (
+                  <p className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", plumbingLayout === key ? "text-terracotta/70" : "text-charcoal/30")}>{cost}</p>
+                )}
+              </button>
+            ))}
           </div>
-        )}
-      </div>
+          {asbestosTriggered && (
+            <div className="flex items-start gap-1.5 mt-1.5">
+              <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+              <p className="text-[10px] text-amber-700 leading-snug">Asbestos removal added to estimate (~$2,272)</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Scope */}
       <div>
         <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-widest mb-1.5">Scope</p>
         <div className="flex flex-col gap-1.5">
-          {([
-            { key: "full-stripout",    label: "Full Strip-out",   sub: "Complete gut renovation",  cost: "+$2,300" },
-            { key: "cosmetic-refresh", label: "Cosmetic Refresh", sub: "Surfaces & finishes only", cost: "+$350"   },
-          ] as { key: import("@/lib/projectBrief").RenovationScope; label: string; sub: string; cost: string }[]).map(({ key, label, sub, cost }) => (
+          {scopeOptions.map(({ key, label, sub, cost }) => (
             <button key={key}
               onClick={() => setScope(scope === key ? null : key)}
               className={cn("flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200",
@@ -1261,12 +1282,17 @@ function InlineBriefPanel({
             </button>
           ))}
         </div>
+        {/* Bedroom asbestos warning lives here (no separate plumbing section) */}
+        {isBedroom && asbestosTriggered && (
+          <div className="flex items-start gap-1.5 mt-1.5">
+            <TriangleAlert size={11} className="text-amber-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
+            <p className="text-[10px] text-amber-700 leading-snug">Asbestos/lead-paint removal may be required (~$2,272)</p>
+          </div>
+        )}
       </div>
 
       {!canSave && (
-        <p className="text-[10px] text-charcoal/35 text-center">
-          {!valid ? "Enter year built to activate brief" : "Select plumbing layout and scope to complete brief"}
-        </p>
+        <p className="text-[10px] text-charcoal/35 text-center">Select renovation scope to activate the cost estimate</p>
       )}
     </div>
   );
@@ -1705,6 +1731,7 @@ export default function BuilderPage() {
               projectBrief={projectBrief}
               onSave={setProjectBrief}
               onClear={() => setProjectBrief(null)}
+              roomType={roomType}
             />
 
             {/* Structural Needs — room-aware */}

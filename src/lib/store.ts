@@ -144,6 +144,15 @@ const defaultBedroomSelections: BedroomSelections = {
 };
 
 interface BuilderStore extends BuilderSelections {
+  // ── Session state ──────────────────────────────────────────────────────────
+  /** True once the user has confirmed a room in the RoomRouter this session.
+   *  Prevents the picker re-appearing when navigating back from preview. */
+  roomConfirmed:        boolean;
+  setRoomConfirmed:     (v: boolean) => void;
+  /** Tracks which rooms have been visited so switching BACK restores state
+   *  rather than wiping it, while a first visit always starts deselected. */
+  roomsInitialised:     Record<RoomType, boolean>;
+
   // ── Room type ──────────────────────────────────────────────────────────────
   roomType:              RoomType;
   setRoomType:           (r: RoomType) => void;
@@ -218,12 +227,66 @@ const defaults: BuilderSelections = {
   generateDescription: null,
 };
 
+const BLANK_ROOMS: Record<RoomType, boolean> = { bathroom: false, kitchen: false, bedroom: false };
+
 export const useBuilderStore = create<BuilderStore>((set, get) => ({
   ...defaults,
 
+  // ── Session state ──────────────────────────────────────────────────────────
+  roomConfirmed:    false,
+  setRoomConfirmed: (v) => set({ roomConfirmed: v }),
+  roomsInitialised: { ...BLANK_ROOMS },
+
   // ── Room type ──────────────────────────────────────────────────────────────
-  roomType:              "bathroom",
-  setRoomType:           (r) => set({ roomType: r, generatedImageUrl: null, generateDescription: null }),
+  roomType: "bathroom",
+
+  /**
+   * Switch room type with smart state management:
+   * - First visit to a room → reset its selections to blank (fully deselected)
+   * - Returning to a previously-visited room → restore its saved selections
+   * - The room you're leaving is always preserved in the store
+   */
+  setRoomType: (r) => set((st) => {
+    const alreadyVisited = st.roomsInitialised[r];
+
+    const base: Partial<BuilderStore> = {
+      roomType:          r,
+      generatedImageUrl: null,
+      generateDescription: null,
+      roomPhotoUrl:      null,                 // clear photo when switching rooms
+      roomsInitialised:  { ...st.roomsInitialised, [r]: true },
+    };
+
+    if (alreadyVisited) return base;           // returning — keep saved selections
+
+    // First visit — reset that room to blank/deselected
+    if (r === "kitchen") {
+      return { ...base, kitchenSelections: { ...defaultKitchenSelections } };
+    }
+    if (r === "bedroom") {
+      return { ...base, bedroomSelections: { ...defaultBedroomSelections } };
+    }
+    // bathroom
+    return {
+      ...base,
+      floorTile:         null,
+      wallTile:          null,
+      vanity:            null,
+      tapware:           null,
+      lightingOption:    null,
+      bathroomSize:      null,
+      projectBrief:      null,
+      customNote:        "",
+      structuralChanges: {
+        removeBathtub:   false,
+        addWalkinShower: false,
+        replaceToilet:   false,
+        inWallCistern:   false,
+        showerNiche:     "none",
+        showerFixtures:  "single",
+      },
+    };
+  }),
 
   // ── Kitchen ───────────────────────────────────────────────────────────────
   kitchenSelections:     defaultKitchenSelections,
@@ -280,5 +343,13 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
   setCustomWidth:         (n)     => set({ customWidth: n }),
   setGeneratedImageUrl:   (url)   => set({ generatedImageUrl: url }),
   setGenerateDescription: (desc)  => set({ generateDescription: desc }),
-  reset:                  ()      => set({ ...defaults, roomType: "bathroom", kitchenSelections: defaultKitchenSelections, bedroomSelections: defaultBedroomSelections, savedRooms: [] }),
+  reset: () => set({
+    ...defaults,
+    roomType:          "bathroom",
+    roomConfirmed:     false,
+    roomsInitialised:  { ...BLANK_ROOMS },
+    kitchenSelections: { ...defaultKitchenSelections },
+    bedroomSelections: { ...defaultBedroomSelections },
+    savedRooms:        [],
+  }),
 }));

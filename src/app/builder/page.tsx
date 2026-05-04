@@ -1332,6 +1332,7 @@ export default function BuilderPage() {
     kitchenSelections,  setKitchenSelections,
     bedroomSelections,  setBedroomSelections,
     savedRooms,         saveCurrentRoom,
+    roomConfirmed,      setRoomConfirmed,
   } = useBuilderStore();
 
   const userStatus = useUserStatus(statusRefreshKey);
@@ -1340,7 +1341,9 @@ export default function BuilderPage() {
   const [viewportState,      setViewportState]     = useState<ViewportState>("idle");
   const [isGenerating,       setIsGenerating]      = useState(false);
   const [generateError,      setGenerateError]     = useState<string | null>(null);
-  const [showRoomRouter,     setShowRoomRouter]     = useState(true);
+  // Only show picker if the user hasn't confirmed a room yet this session.
+  // Back-navigation from /preview must NOT re-show the picker.
+  const [showRoomRouter,     setShowRoomRouter]     = useState(!roomConfirmed);
   const [showAuthModal,      setShowAuthModal]      = useState(false);
   const [showPaywallModal,   setShowPaywallModal]   = useState(false);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
@@ -1618,7 +1621,8 @@ export default function BuilderPage() {
         {showRoomRouter && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
             <div className="bg-sand rounded-3xl p-8 w-full max-w-3xl shadow-warm-xl relative">
-              {savedRooms.length > 0 && (
+              {/* Show × whenever user already has a confirmed room (mid-session change) */}
+              {roomConfirmed && (
                 <button
                   onClick={() => setShowRoomRouter(false)}
                   className="absolute top-4 right-4 w-8 h-8 rounded-full bg-charcoal/10 flex items-center justify-center text-charcoal/50 hover:bg-charcoal/20 hover:text-charcoal transition-all"
@@ -1631,6 +1635,7 @@ export default function BuilderPage() {
                 savedRooms={savedRooms}
                 onSelect={(r) => {
                   setRoomType(r);
+                  setRoomConfirmed(true);   // don't re-show on back-navigation
                   setShowRoomRouter(false);
                 }}
               />

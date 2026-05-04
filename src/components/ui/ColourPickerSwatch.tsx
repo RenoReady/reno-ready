@@ -38,18 +38,18 @@ export default function ColourPickerSwatch({
 }: Props) {
   const [open,   setOpen]   = useState(false);
   const [hex,    setHex]    = useState(value ?? defaultHex);
-  const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
+  const [popPos, setPopPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const buttonRef  = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Reposition popover to right of button, flip left if near viewport edge
+  // Smart positioning: prefer right → flip left → drop below (mobile)
   useEffect(() => {
     if (!open) return;
 
-    const POPOVER_W = 224;   // matches w-56
-    const POPOVER_H = 180;
-    const GAP       = 10;
+    const IDEAL_W = 224;   // preferred popover width
+    const POPOVER_H = 186;
+    const GAP       = 8;
 
     const update = () => {
       if (!buttonRef.current) return;
@@ -57,14 +57,38 @@ export default function ColourPickerSwatch({
       const vw   = window.innerWidth;
       const vh   = window.innerHeight;
 
-      let left = rect.right + GAP;
-      let top  = rect.top;
+      const spaceRight = vw - rect.right - GAP;
+      const spaceLeft  = rect.left - GAP;
 
-      if (left + POPOVER_W > vw - 8) left = rect.left - POPOVER_W - GAP;
-      if (top  + POPOVER_H > vh - 8) top  = Math.max(8, vh - POPOVER_H - 8);
+      let top: number;
+      let left: number;
+      let width: number;
+
+      if (spaceRight >= IDEAL_W) {
+        // Plenty of room to the right — default desktop position
+        left  = rect.right + GAP;
+        top   = rect.top;
+        width = IDEAL_W;
+      } else if (spaceLeft >= IDEAL_W) {
+        // Flip to the left
+        left  = rect.left - IDEAL_W - GAP;
+        top   = rect.top;
+        width = IDEAL_W;
+      } else {
+        // Not enough room on either side (mobile full-width sidebar)
+        // Drop down below the button, matching its width
+        width = Math.min(IDEAL_W, vw - 16);
+        left  = Math.max(8, Math.min(rect.left, vw - width - 8));
+        top   = rect.bottom + GAP;
+        // If dropping below clips the bottom, flip above instead
+        if (top + POPOVER_H > vh - 8) top = rect.top - POPOVER_H - GAP;
+      }
+
+      // Vertical clamp for side-positioned modes
+      if (top + POPOVER_H > vh - 8) top = Math.max(8, vh - POPOVER_H - 8);
       if (top < 8) top = 8;
 
-      setPopPos({ top, left });
+      setPopPos({ top, left, width });
     };
 
     update();
@@ -88,12 +112,12 @@ export default function ColourPickerSwatch({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Popover (shared by both variants)
+  // Popover (shared by both variants) — width comes from positioning logic
   const popover = open && popPos && (
     <div
       ref={popoverRef}
-      className="fixed z-[300] w-56 p-3.5 rounded-2xl bg-white border border-sand-200 shadow-warm-xl"
-      style={{ top: popPos.top, left: popPos.left }}
+      className="fixed z-[300] p-3.5 rounded-2xl bg-white border border-sand-200 shadow-warm-xl"
+      style={{ top: popPos.top, left: popPos.left, width: popPos.width }}
     >
       <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wider mb-2.5">{label}</p>
       <div className="flex items-center gap-2.5 mb-3">

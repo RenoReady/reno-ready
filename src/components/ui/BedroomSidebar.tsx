@@ -16,7 +16,6 @@
  *   Additional Request
  */
 
-import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   type BedroomSelections,
@@ -53,8 +52,6 @@ function ColourSwatch({
   onChange:     (hex: string | null) => void;
   placeholder?: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
   return (
     <div
       className={cn(
@@ -62,13 +59,22 @@ function ColourSwatch({
         value ? "border-terracotta/40 bg-terracotta/5" : "border-sand-200 bg-white/50",
       )}
     >
-      {/* Colour circle — click to open native colour picker */}
-      <button
-        onClick={() => inputRef.current?.click()}
-        className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm flex-shrink-0 overflow-hidden hover:scale-105 transition-transform"
-        style={{ background: value ?? "#e8e0d5" }}
-        title="Pick a custom colour"
-      />
+      {/* Colour circle — the <input type="color"> is positioned over it so
+          a tap anywhere on the circle directly opens the native colour picker
+          on both desktop and mobile. */}
+      <div className="relative w-9 h-9 flex-shrink-0">
+        <div
+          className="w-9 h-9 rounded-xl border-2 border-white/60 shadow-sm overflow-hidden"
+          style={{ background: value ?? "#e8e0d5" }}
+        />
+        <input
+          type="color"
+          value={value ?? "#d4b896"}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer rounded-xl"
+          title="Pick a custom colour"
+        />
+      </div>
 
       {/* Label + hex value */}
       <div className="flex-1 min-w-0">
@@ -92,15 +98,6 @@ function ColourSwatch({
           Clear
         </button>
       )}
-
-      {/* Hidden native colour input */}
-      <input
-        ref={inputRef}
-        type="color"
-        value={value ?? "#d4b896"}
-        onChange={(e) => onChange(e.target.value)}
-        className="sr-only"
-      />
     </div>
   );
 }

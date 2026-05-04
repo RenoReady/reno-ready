@@ -569,7 +569,7 @@ export default function LandingPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-charcoal/40 uppercase tracking-widest w-14">Floor</span>
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-4 gap-2">
                 {["bg-travertine","bg-desert-stone","bg-charcoal-slate","bg-zellige-ivory","bg-terrazzo-blanc","bg-honed-limestone","bg-natural-oak","bg-matte-slate-lg"].map((c) => (
                   <TileSwatch key={c} bgClass={c} />
                 ))}
@@ -577,7 +577,7 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-charcoal/40 uppercase tracking-widest w-14">Wall</span>
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-4 gap-2">
                 {["bg-marble-blanc","bg-sage-subway","bg-terracotta-feature","bg-zellige-white","bg-zellige-sage","bg-fluted-white","bg-coastal-terrazzo","bg-smoked-concrete"].map((c) => (
                   <TileSwatch key={c} bgClass={c} />
                 ))}

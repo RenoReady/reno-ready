@@ -1674,10 +1674,10 @@ export default function BuilderPage() {
           )}
         </div>
 
-        <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start">
+        <div className="grid xl:grid-cols-[260px_1fr_380px] lg:grid-cols-[1fr_380px] gap-6 items-start xl:items-start">
 
           {/* ══ LEFT PANEL — Project Brief + Structural Needs ══ */}
-          <aside className="flex flex-col gap-4 order-last xl:order-first xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
+          <aside className="flex flex-col gap-4 col-span-full xl:col-span-1 order-first xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
             {/* Inline Project Brief */}
             <InlineBriefPanel
               projectBrief={projectBrief}
@@ -2082,7 +2082,7 @@ export default function BuilderPage() {
           </div>
 
           {/* ══ RIGHT SIDEBAR — Design Selectors ══════════════════ */}
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-24 max-h-[calc(100vh-7rem)] overflow-y-auto pr-0.5">
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-0.5">
 
             {/* Hidden file input — always in DOM so fileRef works for all room types */}
             <input ref={fileRef} type="file" accept="image/*" className="hidden"

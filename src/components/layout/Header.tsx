@@ -36,8 +36,8 @@ export default function Header() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ? buildUserInfo(session.user) : null);
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ? buildUserInfo(data.session.user) : null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {

@@ -794,11 +794,10 @@ function getRegionLabel(xPct: number, yPct: number): string {
 }
 
 function ArchitectViewport({
-  onGenerate, onViewFullPreview, onRegionClick, onZoneClick, isGenerating,
-  viewportState, generateDescription, generateError, activeZone,
+  onGenerate, onRegionClick, onZoneClick, isGenerating,
+  viewportState, generateDescription, generateError, activeZone, refinementMode,
 }: {
   onGenerate:        () => void;
-  onViewFullPreview: () => void;
   onRegionClick:     (region: string) => void;
   onZoneClick?:      (zone: ZoneId) => void;
   isGenerating:      boolean;
@@ -806,6 +805,7 @@ function ArchitectViewport({
   generateDescription: string | null;
   generateError:       string | null;
   activeZone?:       ZoneId | null;
+  refinementMode:    boolean;
 }) {
   const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware } = useBuilderStore();
 
@@ -815,11 +815,23 @@ function ArchitectViewport({
   const [sliderPos,       setSliderPos]       = useState(50);
   const [focusMarker,     setFocusMarker]     = useState<{ xPct: number; yPct: number } | null>(null);
 
+  // ── Sync refinementMode → beforeAfterMode ─────────────────────────
+  // When "Not quite right?" is clicked (refinementMode=true), show the AI image
+  // with the click-to-focus overlay. When refinementMode is reset (false) and a
+  // photo exists, revert to before/after comparison.
+  useEffect(() => {
+    if (refinementMode) {
+      setBeforeAfterMode(false);
+    } else if (viewportState === "ready" && roomPhotoUrl) {
+      setBeforeAfterMode(true);
+    }
+  }, [refinementMode, viewportState, roomPhotoUrl]);
+
   // ── Auto before/after reveal when generation completes with a photo ──
   // Starts fully showing the AI result, then sweeps left to 50% so the
   // user gets an immediate wow-factor comparison against their original room.
   useEffect(() => {
-    if (viewportState === "ready" && roomPhotoUrl) {
+    if (viewportState === "ready" && roomPhotoUrl && !refinementMode) {
       setBeforeAfterMode(true);
       setSliderPos(100);
 
@@ -961,24 +973,7 @@ function ArchitectViewport({
       {/* ── Canvas ──────────────────────────────────────────── */}
       <div className="relative w-full flex-1" style={{ minHeight: isFullscreen ? "calc(100vh - 145px)" : "460px" }}>
 
-        {/* Floating "Next → View Full Preview" FAB — appears once generation completes */}
-        {hasGenerated && !isGenerating && (
-          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 animate-fade-in">
-            <button
-              onClick={onViewFullPreview}
-              className={cn(
-                "flex items-center gap-2.5 px-6 py-3 rounded-2xl",
-                "bg-blue-600 text-white text-sm font-bold",
-                "shadow-[0_8px_32px_rgba(37,99,235,0.5)]",
-                "hover:bg-blue-700 hover:scale-105 active:scale-100",
-                "transition-all duration-200",
-              )}
-            >
-              Next → View Full Preview
-              <ArrowRight size={15} />
-            </button>
-          </div>
-        )}
+        {/* Floating button removed — actions now live below the viewport */}
 
         {/* Click-to-focus overlay — shown on the AI image when not in before/after mode */}
         {hasGenerated && generatedImageUrl && !beforeAfterMode && !isGenerating && (
@@ -1389,6 +1384,9 @@ export default function BuilderPage() {
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
   const [showNoPhotoWarning, setShowNoPhotoWarning] = useState(false);
+  // Controls whether the "Not quite right?" refinement UI is shown.
+  // Starts false (before/after comparison shown); toggled by the orange button.
+  const [refinementMode,     setRefinementMode]     = useState(false);
   const [pulseUpload,        setPulseUpload]        = useState(false);
 
   const handleFile = useCallback((file: File) => {
@@ -1479,6 +1477,7 @@ export default function BuilderPage() {
     setViewportState("generating");
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
+    setRefinementMode(false);   // reset to comparison view for each new generation
 
     try {
       const roomLabel = store.roomType === "kitchen" ? "kitchen"
@@ -1974,7 +1973,6 @@ export default function BuilderPage() {
           <div className="flex flex-col gap-4 sm:gap-6 min-w-0">
             <ArchitectViewport
               onGenerate={handleGenerate}
-              onViewFullPreview={() => router.push("/preview")}
               onRegionClick={(region) => setSelectedRegion(region)}
               onZoneClick={handleZoneClick}
               activeZone={activeZone}
@@ -1982,6 +1980,7 @@ export default function BuilderPage() {
               viewportState={viewportState}
               generateDescription={generateDescription}
               generateError={generateError}
+              refinementMode={refinementMode}
             />
 
             {/* ── Secondary Generate CTA — prominent button below viewport when idle ── */}
@@ -2001,40 +2000,110 @@ export default function BuilderPage() {
               </button>
             )}
 
-          {/* ── Refinement panel ── */}
-            {viewportState === "ready" && (
-              <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest">Not quite right?</p>
-                  <p className="text-[10px] text-charcoal/30">Click the image to focus on a specific area</p>
-                </div>
-                {selectedRegion && (
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-xs font-semibold text-terracotta">
-                      📍 {selectedRegion}
-                    </span>
-                    <button onClick={() => setSelectedRegion(null)} className="text-[10px] text-charcoal/30 hover:text-charcoal/60 transition-colors">clear</button>
+          {/* ── Post-generation action area ── */}
+            {viewportState === "ready" && !isGenerating && (
+              <>
+                {!refinementMode ? (
+                  /* ── Default: two-button bar (comparison view) ── */
+                  <div className="flex gap-3">
+                    {/* Orange — enter refinement mode */}
+                    <button
+                      onClick={() => setRefinementMode(true)}
+                      className={cn(
+                        "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
+                        "bg-terracotta text-white text-sm font-bold",
+                        "shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100",
+                        "transition-all duration-200",
+                      )}
+                    >
+                      <Sparkles size={16} />
+                      Not quite right?
+                    </button>
+
+                    {/* Blue — proceed to full preview */}
+                    <button
+                      onClick={() => router.push("/preview")}
+                      className={cn(
+                        "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
+                        "bg-blue-600 text-white text-sm font-bold",
+                        "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
+                        "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
+                        "transition-all duration-200",
+                      )}
+                    >
+                      Next → View Full Preview
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  /* ── Refinement mode: textarea + controls ── */
+                  <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Refine your design</p>
+                      <div className="flex items-center gap-3">
+                        <p className="text-[10px] text-charcoal/30">Click the image to focus on an area</p>
+                        <button
+                          onClick={() => { setRefinementMode(false); setSelectedRegion(null); }}
+                          className="text-[10px] font-bold text-charcoal/40 hover:text-charcoal/70 transition-colors"
+                        >
+                          ← Back
+                        </button>
+                      </div>
+                    </div>
+
+                    {selectedRegion && (
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-terracotta/10 border border-terracotta/20 text-xs font-semibold text-terracotta">
+                          📍 {selectedRegion}
+                        </span>
+                        <button onClick={() => setSelectedRegion(null)} className="text-[10px] text-charcoal/30 hover:text-charcoal/60 transition-colors">clear</button>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <textarea
+                        value={refinementNote}
+                        onChange={(e) => setRefinementNote(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
+                        placeholder="e.g. make the tiles darker, change tapware to matte black, add a window…"
+                        rows={2}
+                        autoFocus
+                        className="flex-1 resize-none rounded-xl px-3 py-2.5 text-sm border-2 border-sand-200 bg-white/50 focus:outline-none focus:border-terracotta/60 text-charcoal/80 placeholder:text-charcoal/30"
+                      />
+                      <button
+                        onClick={handleRefine}
+                        disabled={isRefining || !refinementNote.trim()}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold",
+                          "bg-terracotta text-white transition-all duration-200",
+                          "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed",
+                        )}
+                      >
+                        {isRefining ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                        {isRefining ? "Refining…" : "Apply"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-charcoal/30">Uses the current render as a starting point — surgical changes only</p>
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <textarea
-                    value={refinementNote}
-                    onChange={(e) => setRefinementNote(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
-                    placeholder="e.g. make the tiles darker, change tapware to matte black, add a window…"
-                    rows={2}
-                    className="flex-1 resize-none rounded-xl px-3 py-2.5 text-sm border-2 border-sand-200 bg-white/50 focus:outline-none focus:border-terracotta/60 text-charcoal/80 placeholder:text-charcoal/30"
-                  />
-                  <button onClick={handleRefine} disabled={isRefining || !refinementNote.trim()}
-                    className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold",
-                      "bg-terracotta text-white transition-all duration-200",
-                      "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed")}>
-                    {isRefining ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                    {isRefining ? "Refining…" : "Apply"}
+
+                {/* Blue "Next" always visible below refinement panel too */}
+                {refinementMode && (
+                  <button
+                    onClick={() => router.push("/preview")}
+                    className={cn(
+                      "flex items-center justify-center gap-3 w-full py-4 rounded-2xl",
+                      "bg-blue-600 text-white text-base font-bold",
+                      "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
+                      "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
+                      "transition-all duration-200",
+                    )}
+                  >
+                    Next → View Full Preview
+                    <ArrowRight size={18} />
                   </button>
-                </div>
-                <p className="text-[10px] text-charcoal/30">Uses the current render as a starting point — surgical changes only</p>
-              </div>
+                )}
+              </>
             )}
 
             {/* ── Hidden Cost Advisor — room-specific trade cost alerts ── */}
@@ -2043,23 +2112,6 @@ export default function BuilderPage() {
               hasIsland={kitchenSelections.hasIsland}
               hasElectrical={bedroomSelections.hasElectricalWork}
             />
-
-            {/* ── Blue "Next" CTA — appears after generation to drive users to the preview ── */}
-            {viewportState === "ready" && !isGenerating && (
-              <button
-                onClick={() => router.push("/preview")}
-                className={cn(
-                  "flex items-center justify-center gap-3 w-full py-4 rounded-2xl",
-                  "bg-blue-600 text-white text-base font-bold",
-                  "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
-                  "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
-                  "transition-all duration-200",
-                )}
-              >
-                Next → View Full Preview
-                <ArrowRight size={18} />
-              </button>
-            )}
 
             {/* ── Add Another Room — appears after generation completes ── */}
             {viewportState === "ready" && !isGenerating && (

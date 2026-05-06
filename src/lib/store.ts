@@ -38,6 +38,12 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
   if (typeof window === "undefined") return;
   const s = useBuilderStore.getState();
   const snapshot = {
+    // ── Room context (must be restored first so the correct room is shown) ──
+    roomType:          s.roomType,
+    roomConfirmed:     true,          // mark confirmed so RoomRouter doesn't pop up
+    kitchenSelections: s.kitchenSelections,
+    bedroomSelections: s.bedroomSelections,
+    // ── Bathroom fields ─────────────────────────────────────────────────────
     projectBrief:      s.projectBrief,
     lightingOption:    s.lightingOption,
     floorTile:         s.floorTile,
@@ -80,6 +86,16 @@ export function restoreBuilderStateFromAuth(): boolean {
     sessionStorage.removeItem(PERSIST_KEY);
     const saved = JSON.parse(raw) as Record<string, unknown>;
     const store = useBuilderStore.getState();
+
+    // ── Room context — restore first so everything renders in the right room ──
+    if (saved.roomType      !== undefined) store.setRoomType(saved.roomType as RoomType);
+    if (saved.roomConfirmed !== undefined) store.setRoomConfirmed(saved.roomConfirmed as boolean);
+    if (saved.kitchenSelections !== undefined)
+      store.setKitchenSelections(saved.kitchenSelections as KitchenSelections);
+    if (saved.bedroomSelections !== undefined)
+      store.setBedroomSelections(saved.bedroomSelections as BedroomSelections);
+
+    // ── Bathroom fields ────────────────────────────────────────────────────────
     if (saved.projectBrief   !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
     if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption | null);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);

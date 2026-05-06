@@ -48,7 +48,7 @@ export default function PreviewPage() {
     wallTile,
     vanity,
     tapware,
-    budget,
+    budget: bathroomBudget,
     structuralChanges,
     bathroomSize,
     customLength,
@@ -87,6 +87,12 @@ export default function PreviewPage() {
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;
   const high = Math.round(estimatedCost * 1.12 / 500) * 500;
+
+  // Use the room-specific budget for the over-budget indicator
+  const budget =
+    roomType === "kitchen" ? kitchenSelections.budget :
+    roomType === "bedroom" ? bedroomSelections.budget :
+    bathroomBudget;
 
   // Brief-driven verified items (bathroom only — brief not used for kitchen/bedroom)
   const briefItems  = projectBrief ? calcBriefCostItems(projectBrief) : [];

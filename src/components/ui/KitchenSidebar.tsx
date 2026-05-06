@@ -20,8 +20,11 @@ import {
   MIXER_OPTIONS,
   SPLASHBACK_OPTIONS,
   CEILING_OPTIONS,
+  KITCHEN_BUDGET_MIN,
+  KITCHEN_BUDGET_MAX,
+  KITCHEN_BUDGET_STEP,
 } from "@/lib/roomTypes";
-import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler } from "lucide-react";
+import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } from "lucide-react";
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -437,6 +440,39 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Budget */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <SlidersHorizontal size={12} className="text-charcoal/40" />
+          <SectionLabel>Your Budget</SectionLabel>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end justify-between">
+            <p className="text-3xl font-bold text-charcoal">
+              {selections.budget.toLocaleString("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-charcoal/40 pb-1">AUD target</p>
+          </div>
+          <input
+            type="range"
+            min={KITCHEN_BUDGET_MIN}
+            max={KITCHEN_BUDGET_MAX}
+            step={KITCHEN_BUDGET_STEP}
+            value={selections.budget}
+            onChange={(e) => onChange({ budget: Number(e.target.value) })}
+            className="range-terracotta w-full"
+            style={{ "--range-pct": `${((selections.budget - KITCHEN_BUDGET_MIN) / (KITCHEN_BUDGET_MAX - KITCHEN_BUDGET_MIN)) * 100}%` } as React.CSSProperties}
+          />
+          <div className="flex justify-between text-xs text-charcoal/40 font-medium">
+            <span>$15k</span>
+            <span>$80k</span>
+          </div>
+          <p className="text-[10px] text-charcoal/35 leading-snug">
+            AU kitchens: ~$15k basic refresh · $35k–$55k mid-range · $80k+ premium
+          </p>
         </div>
       </div>
 

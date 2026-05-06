@@ -68,6 +68,13 @@ export const KITCHEN_SIZE_OPTIONS: KitchenSizeOption[] = [
   { id: "custom",   label: "Custom Size",        sub: "Enter your exact dimensions",     approxSqm: "",        baseCost: 0      },
 ];
 
+// ── Kitchen budget constants (AU market 2026) ─────────────────────────────────
+// Basic refresh: ~$15k  |  Mid-range: $35k–$55k  |  Premium: $80k+
+export const KITCHEN_BUDGET_MIN     = 15_000;
+export const KITCHEN_BUDGET_MAX     = 80_000;
+export const KITCHEN_BUDGET_STEP    =  1_000;
+export const KITCHEN_BUDGET_DEFAULT = 40_000;
+
 export interface KitchenSelections {
   roomSize:             KitchenRoomSize | null;
   customLength:         number;   // metres — used when roomSize === "custom"
@@ -87,6 +94,7 @@ export interface KitchenSelections {
   hasSinkRoughin:       boolean;  // moving the plumbing stack
   hasWallChange:        boolean;  // open-plan wall removal/addition
   hasButlersPantry:     boolean;  // butler's pantry integration
+  budget:               number;   // user's target budget (AUD)
   customNote:           string;
 }
 
@@ -340,6 +348,13 @@ export const BEDROOM_SIZE_OPTIONS: BedroomSizeOption[] = [
   { id: "custom",   label: "Custom Size",       sub: "Enter your exact dimensions",          approxSqm: "",        baseSqm: 0  },
 ];
 
+// ── Bedroom budget constants (AU market 2026) ─────────────────────────────────
+// Cosmetic refresh: ~$5k  |  Mid-range: $15k–$25k  |  Premium: $40k+
+export const BEDROOM_BUDGET_MIN     =  5_000;
+export const BEDROOM_BUDGET_MAX     = 40_000;
+export const BEDROOM_BUDGET_STEP    =    500;
+export const BEDROOM_BUDGET_DEFAULT = 15_000;
+
 export interface BedroomSelections {
   roomSize:          BedroomRoomSize | null;
   customLength:      number;   // metres — used when roomSize === "custom"
@@ -357,6 +372,7 @@ export interface BedroomSelections {
   hasVJWall:         boolean;  // VJ feature wall (structural add)
   hasMediaJoinery:   boolean;  // built-in media/TV joinery
   hasPendantRoughin: boolean;  // bedside sconce/pendant rough-ins
+  budget:            number;   // user's target budget (AUD)
   customNote:        string;
 }
 

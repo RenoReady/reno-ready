@@ -28,8 +28,11 @@ import {
   STORAGE_OPTIONS,
   WINDOW_TREATMENT_OPTIONS,
   CEILING_OPTIONS,
+  BEDROOM_BUDGET_MIN,
+  BEDROOM_BUDGET_MAX,
+  BEDROOM_BUDGET_STEP,
 } from "@/lib/roomTypes";
-import { Ruler } from "lucide-react";
+import { Ruler, SlidersHorizontal } from "lucide-react";
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 
 // ── Section label ─────────────────────────────────────────────────────────────
@@ -343,6 +346,39 @@ export default function BedroomSidebar({ selections, onChange }: BedroomSidebarP
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Budget */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <SlidersHorizontal size={12} className="text-charcoal/40" />
+          <SectionLabel>Your Budget</SectionLabel>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end justify-between">
+            <p className="text-3xl font-bold text-charcoal">
+              {selections.budget.toLocaleString("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 })}
+            </p>
+            <p className="text-xs text-charcoal/40 pb-1">AUD target</p>
+          </div>
+          <input
+            type="range"
+            min={BEDROOM_BUDGET_MIN}
+            max={BEDROOM_BUDGET_MAX}
+            step={BEDROOM_BUDGET_STEP}
+            value={selections.budget}
+            onChange={(e) => onChange({ budget: Number(e.target.value) })}
+            className="range-terracotta w-full"
+            style={{ "--range-pct": `${((selections.budget - BEDROOM_BUDGET_MIN) / (BEDROOM_BUDGET_MAX - BEDROOM_BUDGET_MIN)) * 100}%` } as React.CSSProperties}
+          />
+          <div className="flex justify-between text-xs text-charcoal/40 font-medium">
+            <span>$5k</span>
+            <span>$40k</span>
+          </div>
+          <p className="text-[10px] text-charcoal/35 leading-snug">
+            AU bedrooms: ~$5k cosmetic refresh · $15k–$25k mid-range · $40k+ luxury fit-out
+          </p>
         </div>
       </div>
 

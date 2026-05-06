@@ -17,6 +17,8 @@ import {
   type KitchenSelections,
   type BedroomSelections,
   type SavedRoom,
+  KITCHEN_BUDGET_DEFAULT,
+  BEDROOM_BUDGET_DEFAULT,
 } from "./roomTypes";
 
 // ── OAuth state persistence ────────────────────────────────────────
@@ -122,6 +124,7 @@ const defaultKitchenSelections: KitchenSelections = {
   hasSinkRoughin:      false,
   hasWallChange:       false,
   hasButlersPantry:    false,
+  budget:              KITCHEN_BUDGET_DEFAULT,
   customNote:          "",
 };
 
@@ -143,6 +146,7 @@ const defaultBedroomSelections: BedroomSelections = {
   hasVJWall:         false,
   hasMediaJoinery:   false,
   hasPendantRoughin: false,
+  budget:            BEDROOM_BUDGET_DEFAULT,
   customNote:        "",
 };
 

@@ -2086,18 +2086,36 @@ export default function BuilderPage() {
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Kitchen Cost Estimate</p>
                 {(() => {
                   const { items, total } = calcKitchenCost(kitchenSelections);
+                  const rounded = Math.round(total / 500) * 500;
+                  const isOver  = rounded > kitchenSelections.budget && rounded > 0;
                   return (
                     <>
-                      <p className="text-3xl font-bold text-white">{formatAUD(Math.round(total / 500) * 500)}</p>
-                      <div className="h-px bg-white/10" />
-                      <div className="flex flex-col gap-3">
-                        {items.map((item) => (
-                          <div key={item.label} className="flex items-center justify-between gap-3">
-                            <p className="text-xs text-white/60">{item.label}</p>
-                            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
-                          </div>
-                        ))}
+                      <div className="flex items-end gap-3">
+                        <p className={cn("text-3xl font-bold transition-colors duration-300", isOver ? "text-terracotta" : "text-white")}>
+                          {formatAUD(rounded)}
+                        </p>
+                        {isOver && (
+                          <span className="text-xs font-bold px-2 py-1 rounded-full mb-1 bg-terracotta/20 text-terracotta">Over budget</span>
+                        )}
                       </div>
+                      <p className={cn("text-xs -mt-2 transition-colors duration-300", isOver ? "text-terracotta/60" : "text-white/30")}>
+                        {isOver
+                          ? `${formatAUD(rounded - kitchenSelections.budget)} over your ${formatAUD(kitchenSelections.budget)} target`
+                          : total > 0 ? `Within your ${formatAUD(kitchenSelections.budget)} budget · Australian market rates` : "Select options above to build your estimate"}
+                      </p>
+                      {total > 0 && (
+                        <>
+                          <div className="h-px bg-white/10" />
+                          <div className="flex flex-col gap-3">
+                            {items.map((item) => (
+                              <div key={item.label} className="flex items-center justify-between gap-3">
+                                <p className="text-xs text-white/60">{item.label}</p>
+                                <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                       <p className="text-[10px] text-white/25 leading-snug">Estimates are indicative only. QLD 2026 market rates.</p>
                     </>
                   );
@@ -2108,18 +2126,36 @@ export default function BuilderPage() {
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Bedroom Cost Estimate</p>
                 {(() => {
                   const { items, total } = calcBedroomCost(bedroomSelections);
+                  const rounded = Math.round(total / 500) * 500;
+                  const isOver  = rounded > bedroomSelections.budget && rounded > 0;
                   return (
                     <>
-                      <p className="text-3xl font-bold text-white">{formatAUD(Math.round(total / 500) * 500)}</p>
-                      <div className="h-px bg-white/10" />
-                      <div className="flex flex-col gap-3">
-                        {items.map((item) => (
-                          <div key={item.label} className="flex items-center justify-between gap-3">
-                            <p className="text-xs text-white/60">{item.label}</p>
-                            <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
-                          </div>
-                        ))}
+                      <div className="flex items-end gap-3">
+                        <p className={cn("text-3xl font-bold transition-colors duration-300", isOver ? "text-terracotta" : "text-white")}>
+                          {formatAUD(rounded)}
+                        </p>
+                        {isOver && (
+                          <span className="text-xs font-bold px-2 py-1 rounded-full mb-1 bg-terracotta/20 text-terracotta">Over budget</span>
+                        )}
                       </div>
+                      <p className={cn("text-xs -mt-2 transition-colors duration-300", isOver ? "text-terracotta/60" : "text-white/30")}>
+                        {isOver
+                          ? `${formatAUD(rounded - bedroomSelections.budget)} over your ${formatAUD(bedroomSelections.budget)} target`
+                          : total > 0 ? `Within your ${formatAUD(bedroomSelections.budget)} budget · Australian market rates` : "Select options above to build your estimate"}
+                      </p>
+                      {total > 0 && (
+                        <>
+                          <div className="h-px bg-white/10" />
+                          <div className="flex flex-col gap-3">
+                            {items.map((item) => (
+                              <div key={item.label} className="flex items-center justify-between gap-3">
+                                <p className="text-xs text-white/60">{item.label}</p>
+                                <p className="text-xs font-semibold text-white/80 tabular-nums">{formatAUD(item.amount)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
                       <p className="text-[10px] text-white/25 leading-snug">Estimates are indicative only. QLD 2026 market rates.</p>
                     </>
                   );

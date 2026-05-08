@@ -2764,10 +2764,13 @@ export default function BuilderPage() {
       {showGetTheLook && (
         <GetTheLookModal
           onClose={() => setShowGetTheLook(false)}
+          roomType={roomType}
           floorTile={floorTile}
           wallTile={wallTile}
           vanity={vanity}
           tapware={tapware}
+          kitchenSelections={kitchenSelections}
+          bedroomSelections={bedroomSelections}
         />
       )}
 

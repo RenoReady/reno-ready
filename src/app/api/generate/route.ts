@@ -81,7 +81,7 @@ interface GenerateResponse {
 }
 
 /** Free tier limit */
-const FREE_GENERATION_LIMIT = 3;
+const FREE_GENERATION_LIMIT = 5;
 
 // ── Helpers ────────────────────────────────────────────────────────
 const PLACEHOLDER_API_KEY = "your_google_api_key_here";

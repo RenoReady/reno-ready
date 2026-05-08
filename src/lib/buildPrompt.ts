@@ -88,6 +88,10 @@ export function buildGeminiPrompt(req: PromptInput): string {
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
 
+  const vanityStyle = selections.vanity === "floating"
+    ? "a floating wall-mounted vanity with concealed plumbing"
+    : "a freestanding floor-mounted vanity";
+
   const systemInstruction = isPhotoMode ? [
     // ── Hard spatial lock — placed FIRST ────────────────────────────────────
     "SURFACE RETEXTURING TASK — NOT a redesign or reimagining.",
@@ -105,17 +109,31 @@ export function buildGeminiPrompt(req: PromptInput): string {
     "   identical to the reference photo unless a structural change is explicitly listed below.",
     "5. ONLY SURFACES CHANGE. Textures, colours, and material finishes may change. Geometry may not.",
     "",
+    // ── Spatial accuracy rules ────────────────────────────────────────────────
+    "SPATIAL ACCURACY RULES (applied to every fixture):",
+    "- The vanity and shower enclosure must be in clearly separate zones with visible floor space",
+    "  between them — minimum 90-degree separation maintained. Do not let them overlap or merge.",
+    "- If a shower enclosure is present, the shower head must be positioned centrally within the",
+    "  glass boundaries, never outside or above the glass panel.",
+    "- Any walk-in shower must have a continuous floor-to-ceiling glass panel to contain water.",
+    "- All fixtures (vanity, toilet, shower) must be fully grounded — no floating objects.",
+    "",
     // ── Materials ────────────────────────────────────────────────────────────
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    `Floor tiles: Re-texture the existing floor with ${floorDesc}.`,
-    `Wall tiles: Re-texture the existing wall surfaces with ${wallDesc}.`,
-    `Tapware: Replace visible tapware with ${tapwareFmt} finish fittings.`,
-    `Vanity: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity." : "Replace with a freestanding / floor-mounted vanity."}`,
+    `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
+    `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
+    `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
+    `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
     "",
     "Remove all personal clutter, towels, and toiletries. The result should look like a",
-    "professional real-estate staging photo.",
-    "Style: High-end architectural photography, natural Australian lighting, realistic textures.",
-    "Output: high-fidelity 2K image.",
+    "professional architectural photography shot — clean, staged, Australian styling.",
+    "Output: high-fidelity 2K image. Do NOT render any text, labels, or annotations on the image.",
+    "",
+    // ── Negative prompt ───────────────────────────────────────────────────────
+    "AVOID (hard negative constraints): floating fixtures not touching floor or wall; shower heads",
+    "positioned outside or above glass enclosure boundaries; vanity unit overlapping shower space;",
+    "fixtures that appear to merge or share the same wall position; distorted perspective or",
+    "impossible geometry; any visible text, watermarks, or labels on surfaces.",
   ].join("\n") : [
     // ── No-photo: generate from scratch ─────────────────────────────────────
     "ROOM TYPE: BATHROOM. This is strictly a BATHROOM renovation visualisation. Do NOT generate a kitchen, bedroom, or any other room type.",
@@ -123,9 +141,25 @@ export function buildGeminiPrompt(req: PromptInput): string {
     "Compose the scene as an interior architect would: slightly elevated angle centred on the vanity,",
     "showing both the floor and at least two walls. Render at 2K resolution.",
     "",
-    `Floor: ${floorDesc}. Wall: ${wallDesc}. Tapware: ${tapwareFmt}.`,
-    `Vanity: ${selections.vanity === "floating" ? "floating / wall-mounted" : "freestanding / floor-mounted"}.`,
-    "Style: High-end architectural photography, natural Australian lighting, realistic textures.",
+    // ── Spatial layout rules ─────────────────────────────────────────────────
+    "SPATIAL LAYOUT RULES (mandatory):",
+    "- Position the vanity and shower in clearly separate zones with at least 90 degrees of",
+    "  separation — they must not share the same wall or appear to overlap.",
+    "- Render the shower head centrally within the glass enclosure, never outside the glass.",
+    "- The walk-in shower must have a continuous floor-to-ceiling glass panel on all open sides.",
+    "- Every fixture (vanity, toilet, shower tray, fittings) must be fully grounded on a surface.",
+    "",
+    // ── Materials ─────────────────────────────────────────────────────────────
+    `Floor surface: ${floorDesc}.`,
+    `Wall surface: ${wallDesc}.`,
+    `Tapware: ${tapwareFmt} finish throughout.`,
+    `Vanity: ${vanityStyle}.`,
+    "Style: High-end architectural photography, natural Australian daylight, clean staging.",
+    "Output: 2K image, no text labels, no watermarks, no annotations on any surface.",
+    "",
+    // ── Negative prompt ────────────────────────────────────────────────────────
+    "AVOID: floating fixtures; shower head outside glass boundaries; vanity overlapping shower;",
+    "impossible geometry; perspective distortion; any rendered text or labels in the scene.",
   ].join("\n");
 
   // ── Tile style / layout ──────────────────────────────────────────────────

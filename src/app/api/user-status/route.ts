@@ -18,7 +18,7 @@ import { ADMIN_EMAIL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-export const FREE_GENERATION_LIMIT = 3;
+export const FREE_GENERATION_LIMIT = 5;
 
 interface UserStatusResponse {
   userId:          string | null;

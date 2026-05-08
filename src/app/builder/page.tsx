@@ -7,7 +7,7 @@ import {
   CheckCircle2, X, Info, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
-  ClipboardList, TriangleAlert, Lightbulb,
+  ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -31,6 +31,7 @@ import RoomRouter from "@/components/ui/RoomRouter";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
 import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
+import GetTheLookModal from "@/components/ui/GetTheLookModal";
 import { useUserStatus, bustUserStatusCache } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
 import {
@@ -1103,19 +1104,7 @@ function ArchitectViewport({
       {isGenerating && <DesignConcierge tips={designTips} />}
 
       <div className="flex items-center gap-4 px-4 py-2.5 bg-[#151920] border-t border-white/5 text-[10px] text-white/30 font-mono flex-shrink-0">
-        {floorTile && (
-          <span className="flex items-center gap-1.5">
-            <span className={cn("inline-block w-2 h-2 rounded-sm flex-shrink-0", floorTile.bgClass)} />
-            Floor: {floorTile.name}
-          </span>
-        )}
-        {wallTile && (
-          <span className="flex items-center gap-1.5">
-            <span className={cn("inline-block w-2 h-2 rounded-sm flex-shrink-0", wallTile.bgClass)} />
-            Wall: {wallTile.name}
-          </span>
-        )}
-        <span className="ml-auto flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5">
           <span className={cn("w-1.5 h-1.5 rounded-full",
             isGenerating ? "bg-terracotta animate-pulse" : hasGenerated ? "bg-green-500" : "bg-white/20")} />
           {isGenerating ? "Generating…" : hasGenerated ? "Preview ready" : "Ready to render"}
@@ -1387,6 +1376,7 @@ export default function BuilderPage() {
   // Controls whether the "Not quite right?" refinement UI is shown.
   // Starts false (before/after comparison shown); toggled by the orange button.
   const [refinementMode,     setRefinementMode]     = useState(false);
+  const [showGetTheLook,     setShowGetTheLook]     = useState(false);
   const [pulseUpload,        setPulseUpload]        = useState(false);
 
   const handleFile = useCallback((file: File) => {
@@ -2004,35 +1994,51 @@ export default function BuilderPage() {
             {viewportState === "ready" && !isGenerating && (
               <>
                 {!refinementMode ? (
-                  /* ── Default: two-button bar (comparison view) ── */
-                  <div className="flex gap-3">
-                    {/* Orange — enter refinement mode */}
-                    <button
-                      onClick={() => setRefinementMode(true)}
-                      className={cn(
-                        "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
-                        "bg-terracotta text-white text-sm font-bold",
-                        "shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100",
-                        "transition-all duration-200",
-                      )}
-                    >
-                      <Sparkles size={16} />
-                      Not quite right?
-                    </button>
+                  /* ── Default: two-button bar + Get the Look (comparison view) ── */
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-3">
+                      {/* Orange — enter refinement mode */}
+                      <button
+                        onClick={() => setRefinementMode(true)}
+                        className={cn(
+                          "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
+                          "bg-terracotta text-white text-sm font-bold",
+                          "shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100",
+                          "transition-all duration-200",
+                        )}
+                      >
+                        <Sparkles size={16} />
+                        Not quite right?
+                      </button>
 
-                    {/* Blue — proceed to full preview */}
+                      {/* Blue — proceed to full preview */}
+                      <button
+                        onClick={() => router.push("/preview")}
+                        className={cn(
+                          "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
+                          "bg-blue-600 text-white text-sm font-bold",
+                          "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
+                          "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
+                          "transition-all duration-200",
+                        )}
+                      >
+                        Next → View Full Preview
+                        <ArrowRight size={16} />
+                      </button>
+                    </div>
+
+                    {/* Get the Look — AU product sourcing */}
                     <button
-                      onClick={() => router.push("/preview")}
+                      onClick={() => setShowGetTheLook(true)}
                       className={cn(
-                        "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
-                        "bg-blue-600 text-white text-sm font-bold",
-                        "shadow-[0_8px_24px_rgba(37,99,235,0.35)]",
-                        "hover:bg-blue-700 hover:scale-[1.01] active:scale-100",
+                        "flex items-center justify-center gap-2 w-full py-3 rounded-2xl",
+                        "border-2 border-sand-200 bg-white/60 text-charcoal/70 text-sm font-semibold",
+                        "hover:border-terracotta/40 hover:bg-terracotta/5 hover:text-terracotta",
                         "transition-all duration-200",
                       )}
                     >
-                      Next → View Full Preview
-                      <ArrowRight size={16} />
+                      <ShoppingBag size={15} />
+                      Get the Look — Shop AU Products
                     </button>
                   </div>
                 ) : (
@@ -2752,6 +2758,17 @@ export default function BuilderPage() {
       {/* Hygiene Advisory modal (single bathroom) */}
       {showHygieneModal && (
         <HygieneAdvisoryModal onDismiss={() => setShowHygieneModal(false)} />
+      )}
+
+      {/* Get the Look — AU product sourcing modal */}
+      {showGetTheLook && (
+        <GetTheLookModal
+          onClose={() => setShowGetTheLook(false)}
+          floorTile={floorTile}
+          wallTile={wallTile}
+          vanity={vanity}
+          tapware={tapware}
+        />
       )}
 
       {/* Tile detail modal */}

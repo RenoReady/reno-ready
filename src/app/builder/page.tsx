@@ -8,6 +8,7 @@ import {
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -1377,7 +1378,37 @@ export default function BuilderPage() {
   // Starts false (before/after comparison shown); toggled by the orange button.
   const [refinementMode,     setRefinementMode]     = useState(false);
   const [showGetTheLook,     setShowGetTheLook]     = useState(false);
+
+  // ── Generation history — lets the user step back/forward through renders ──
+  // Stored as plain base-64 data-URL strings, capped at 10 entries.
+  // Refs mirror state so callbacks never capture stale values.
+  const [genHistory,    setGenHistory]    = useState<string[]>([]);
+  const [historyIdx,    setHistoryIdx]    = useState(-1);
+  const genHistoryRef = useRef<string[]>([]);
+  const historyIdxRef = useRef(-1);
   const [pulseUpload,        setPulseUpload]        = useState(false);
+
+  // ── History helpers ────────────────────────────────────────────────────────
+  const pushToHistory = useCallback((imageUrl: string) => {
+    // Truncate any "future" entries if the user had navigated back, then generates again
+    const base    = genHistoryRef.current.slice(0, historyIdxRef.current + 1);
+    const updated = [...base, imageUrl].slice(-10);   // cap at 10
+    genHistoryRef.current  = updated;
+    historyIdxRef.current  = updated.length - 1;
+    setGenHistory(updated);
+    setHistoryIdx(updated.length - 1);
+  }, []);
+
+  const navigateHistory = useCallback((direction: "back" | "forward") => {
+    const newIdx = direction === "back"
+      ? Math.max(0, historyIdxRef.current - 1)
+      : Math.min(genHistoryRef.current.length - 1, historyIdxRef.current + 1);
+    if (newIdx === historyIdxRef.current) return;
+    historyIdxRef.current = newIdx;
+    setHistoryIdx(newIdx);
+    setGeneratedImageUrl(genHistoryRef.current[newIdx] ?? null);
+    setViewportState("ready");
+  }, [setGeneratedImageUrl]);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -1529,6 +1560,7 @@ export default function BuilderPage() {
       setGenerateDescription(data.description ?? null);
       setGenerateError(null);
       setViewportState("ready");
+      if (data.imageUrl) pushToHistory(data.imageUrl);
       // Instantly decrement the displayed free counter without waiting for a re-fetch
       if (!userStatus.isAdmin && !userStatus.isPremium) {
         setLocalGenerationBump((b) => b + 1);
@@ -1543,7 +1575,7 @@ export default function BuilderPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump]);
+  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, pushToHistory]);
 
   const handleGenerate = useCallback(async () => {
     const store = useBuilderStore.getState();
@@ -1631,6 +1663,7 @@ export default function BuilderPage() {
       setGenerateDescription(data.description ?? null);
       setGenerateError(null);
       setViewportState("ready");
+      if (data.imageUrl) pushToHistory(data.imageUrl);
       bustUserStatusCache();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1641,7 +1674,7 @@ export default function BuilderPage() {
       setIsRefining(false);
       setIsGenerating(false);
     }
-  }, [refinementNote, selectedRegion, setGeneratedImageUrl, setGenerateDescription]);
+  }, [refinementNote, selectedRegion, setGeneratedImageUrl, setGenerateDescription, pushToHistory]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -2108,6 +2141,41 @@ export default function BuilderPage() {
                     Next → View Full Preview
                     <ArrowRight size={18} />
                   </button>
+                )}
+
+                {/* ── Generation history navigator ── */}
+                {genHistory.length > 1 && (
+                  <div className="flex items-center justify-between gap-2 px-1 pt-1">
+                    <button
+                      onClick={() => navigateHistory("back")}
+                      disabled={historyIdx === 0}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-semibold py-1.5 px-2.5 rounded-xl transition-all",
+                        historyIdx === 0
+                          ? "text-charcoal/20 cursor-not-allowed"
+                          : "text-charcoal/50 hover:text-charcoal/80 hover:bg-sand-200",
+                      )}
+                    >
+                      <ChevronLeft size={13} />
+                      Previous
+                    </button>
+                    <span className="text-[10px] text-charcoal/35 font-mono tabular-nums select-none">
+                      version {historyIdx + 1} of {genHistory.length}
+                    </span>
+                    <button
+                      onClick={() => navigateHistory("forward")}
+                      disabled={historyIdx === genHistory.length - 1}
+                      className={cn(
+                        "flex items-center gap-1 text-xs font-semibold py-1.5 px-2.5 rounded-xl transition-all",
+                        historyIdx === genHistory.length - 1
+                          ? "text-charcoal/20 cursor-not-allowed"
+                          : "text-charcoal/50 hover:text-charcoal/80 hover:bg-sand-200",
+                      )}
+                    >
+                      Next
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
                 )}
               </>
             )}

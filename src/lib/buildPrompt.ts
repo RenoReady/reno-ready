@@ -95,19 +95,31 @@ export function buildGeminiPrompt(req: PromptInput): string {
   const systemInstruction = isPhotoMode ? [
     // ── Hard spatial lock — placed FIRST ────────────────────────────────────
     "SURFACE RETEXTURING TASK — NOT a redesign or reimagining.",
-    "You are given a reference photo of a real bathroom. Your ONLY job is to re-texture and",
-    "re-colour the existing visible surfaces (tiles, vanity, tapware, floor) in-place.",
+    "You are given a reference photo of a real room. Your ONLY job is to re-texture and",
+    "re-colour the existing visible surfaces (tiles, cabinetry, tapware, floor, walls) in-place.",
     "",
-    "HARD CONSTRAINTS — these are immutable and override everything else:",
-    "1. ROOM SIZE IS FIXED. The bathroom footprint, wall positions, and ceiling height shown",
-    "   in the reference photo must not change by even one centimetre. Do not make it look larger.",
+    "HARD CONSTRAINTS — these are immutable and override everything else, including any aesthetic goal:",
+    "1. ROOM SIZE IS FIXED. The room footprint, wall positions, ceiling height, and all structural",
+    "   boundaries shown in the reference photo must not change by even one centimetre.",
     "2. CAMERA IS LOCKED. Reproduce the exact camera angle, distance, field of view, and",
     "   perspective from the reference photo. Do not zoom out, pan, or change the viewpoint.",
     "3. NO NEW SPACE. Every surface you modify must already exist in the reference photo.",
-    "   Do not add walls, fixtures, or fittings outside the existing frame.",
-    "4. STRUCTURAL LAYOUT IS FROZEN. Sink, toilet, shower/bath, and window positions stay",
-    "   identical to the reference photo unless a structural change is explicitly listed below.",
-    "5. ONLY SURFACES CHANGE. Textures, colours, and material finishes may change. Geometry may not.",
+    "   Do not add walls, fixtures, windows, or fittings that are not already visible in the frame.",
+    "4. STRUCTURAL LAYOUT IS ABSOLUTELY FROZEN. Every doorway, archway, window opening, wall",
+    "   corner, and structural boundary visible in the reference photo must appear in EXACTLY",
+    "   the same position, at EXACTLY the same width and height in your output. This takes",
+    "   precedence over any aesthetic improvement. Do NOT close, move, widen, narrow, add, or",
+    "   remove any doorway or opening under any circumstances.",
+    "5. ONLY SURFACES CHANGE. Textures, colours, and material finishes may change. Geometry,",
+    "   structure, and spatial layout may not change in any way.",
+    "",
+    // ── STRUCTURE SNAPSHOT guardrail ──────────────────────────────────────────
+    "STRUCTURE SNAPSHOT — READ BEFORE GENERATING:",
+    "Mentally trace every structural edge in the reference photo: all wall–wall corners,",
+    "wall–ceiling junctions, door/window openings, floor–wall junctions, and any built-in",
+    "joinery boundaries. Every one of these edge lines must appear at the identical pixel",
+    "position in your output. If improving the aesthetics would require moving, deleting,",
+    "or obscuring any structural edge, do NOT make that aesthetic change.",
     "",
     // ── Spatial accuracy rules ────────────────────────────────────────────────
     "SPATIAL ACCURACY RULES (applied to every fixture):",
@@ -116,7 +128,7 @@ export function buildGeminiPrompt(req: PromptInput): string {
     "- If a shower enclosure is present, the shower head must be positioned centrally within the",
     "  glass boundaries, never outside or above the glass panel.",
     "- Any walk-in shower must have a continuous floor-to-ceiling glass panel to contain water.",
-    "- All fixtures (vanity, toilet, shower) must be fully grounded — no floating objects.",
+    "- All fixtures (vanity, toilet, shower, appliances) must be fully grounded — no floating objects.",
     "",
     // ── Materials ────────────────────────────────────────────────────────────
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
@@ -130,10 +142,11 @@ export function buildGeminiPrompt(req: PromptInput): string {
     "Output: high-fidelity 2K image. Do NOT render any text, labels, or annotations on the image.",
     "",
     // ── Negative prompt ───────────────────────────────────────────────────────
-    "AVOID (hard negative constraints): floating fixtures not touching floor or wall; shower heads",
-    "positioned outside or above glass enclosure boundaries; vanity unit overlapping shower space;",
-    "fixtures that appear to merge or share the same wall position; distorted perspective or",
-    "impossible geometry; any visible text, watermarks, or labels on surfaces.",
+    "AVOID (hard negative constraints): any doorway, window, or opening that did not exist in",
+    "the reference photo; any structural edge moved from its reference position; floating fixtures",
+    "not touching floor or wall; shower heads positioned outside or above glass enclosure boundaries;",
+    "vanity unit overlapping shower space; fixtures that appear to merge or share the same wall",
+    "position; distorted perspective or impossible geometry; any visible text, watermarks, or labels.",
   ].join("\n") : [
     // ── No-photo: generate from scratch ─────────────────────────────────────
     "ROOM TYPE: BATHROOM. This is strictly a BATHROOM renovation visualisation. Do NOT generate a kitchen, bedroom, or any other room type.",
@@ -219,9 +232,14 @@ export function buildGeminiPrompt(req: PromptInput): string {
   const spatialReminder = isPhotoMode
     ? [
         "",
-        "FINAL SPATIAL CHECK (read before generating): The output must show the same room size,",
-        "camera angle, and structural layout as the reference photo. Only materials and textures",
-        "should have changed. The bathroom must not look bigger or different in shape than the reference.",
+        "FINAL STRUCTURE CHECK (read before generating):",
+        "Compare your output against the reference photo one last time.",
+        "✓ Every doorway from the reference is present at the same position and width.",
+        "✓ Every wall corner and structural edge is in the same place.",
+        "✓ The room is the same size — not larger, not wider, not taller.",
+        "✓ The camera angle and field of view are identical to the reference.",
+        "✓ Only material finishes and textures have changed — nothing structural.",
+        "If any of the above checks fail, correct the output before returning it.",
       ].join("\n")
     : "";
 

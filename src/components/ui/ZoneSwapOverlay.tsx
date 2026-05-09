@@ -78,22 +78,18 @@ export default function ZoneSwapOverlay({ onZoneClick, activeZone }: ZoneSwapOve
               )}
             />
 
-            {/* Zone label chip */}
-            <div
-              className={cn(
-                "absolute top-2 left-2 flex flex-col gap-0.5 px-2 py-1.5 rounded-lg backdrop-blur-sm transition-all duration-200",
-                isActive
-                  ? "bg-blue-600/90"
-                  : isHovered
-                  ? "bg-terracotta/90"
-                  : "bg-charcoal/60",
-              )}
-            >
-              <p className="text-[10px] font-bold text-white leading-none">{zone.label}</p>
-              {isHovered && (
+            {/* Zone label chip — only visible on hover or when active */}
+            {(isHovered || isActive) && (
+              <div
+                className={cn(
+                  "absolute top-2 left-2 flex flex-col gap-0.5 px-2 py-1.5 rounded-lg backdrop-blur-sm transition-all duration-200",
+                  isActive ? "bg-blue-600/90" : "bg-terracotta/90",
+                )}
+              >
+                <p className="text-[10px] font-bold text-white leading-none">{zone.label}</p>
                 <p className="text-[9px] text-white/80 leading-none">{zone.hint}</p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Edit icon — appears on hover */}
             {isHovered && (
@@ -107,15 +103,17 @@ export default function ZoneSwapOverlay({ onZoneClick, activeZone }: ZoneSwapOve
         );
       })}
 
-      {/* Legend strip at bottom of overlay */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 pb-2 pointer-events-none">
-        <div className="flex items-center gap-1.5 bg-charcoal/70 backdrop-blur-sm rounded-xl px-3 py-1.5 shadow-warm-sm">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M7 1.5L8.5 3L3.5 8H2V6.5L7 1.5Z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[9px] font-semibold text-white/80">Click a zone to swap materials</span>
+      {/* Legend strip — only shown when no zone is hovered yet (first-use hint) */}
+      {!hoveredZone && (
+        <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center pointer-events-none">
+          <div className="flex items-center gap-1.5 bg-charcoal/50 backdrop-blur-sm rounded-xl px-3 py-1.5">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M7 1.5L8.5 3L3.5 8H2V6.5L7 1.5Z" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-[9px] font-semibold text-white/70">Tap a zone to refine that area</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -798,6 +798,7 @@ function getRegionLabel(xPct: number, yPct: number): string {
 function ArchitectViewport({
   onGenerate, onRegionClick, onZoneClick, isGenerating,
   viewportState, generateDescription, generateError, activeZone, refinementMode,
+  historyLength, historyIdx, onNavigateHistory,
 }: {
   onGenerate:        () => void;
   onRegionClick:     (region: string) => void;
@@ -808,6 +809,9 @@ function ArchitectViewport({
   generateError:       string | null;
   activeZone?:       ZoneId | null;
   refinementMode:    boolean;
+  historyLength:     number;
+  historyIdx:        number;
+  onNavigateHistory: (dir: "back" | "forward") => void;
 }) {
   const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware } = useBuilderStore();
 
@@ -1059,9 +1063,43 @@ function ArchitectViewport({
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={generatedImageUrl} alt="AI Preview" className="w-full h-full object-cover" />
-                {/* Zone swap overlay — click a zone to target refinement */}
-                {!isGenerating && onZoneClick && (
+                {/* Zone swap overlay — only in refinement mode to keep image clean by default */}
+                {refinementMode && !isGenerating && onZoneClick && (
                   <ZoneSwapOverlay onZoneClick={onZoneClick} activeZone={activeZone} />
+                )}
+                {/* ── In-canvas history navigation ── */}
+                {historyLength > 1 && !isGenerating && (
+                  <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 pointer-events-auto">
+                    <button
+                      onClick={() => onNavigateHistory("back")}
+                      disabled={historyIdx === 0}
+                      className={cn(
+                        "flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg backdrop-blur-md transition-all duration-150",
+                        historyIdx === 0
+                          ? "bg-black/20 text-white/25 cursor-not-allowed"
+                          : "bg-black/40 text-white/80 hover:bg-black/60 hover:text-white",
+                      )}
+                    >
+                      <ChevronLeft size={11} />
+                      Prev
+                    </button>
+                    <span className="text-[9px] font-mono text-white/50 bg-black/35 backdrop-blur-md px-2 py-1.5 rounded-lg select-none tabular-nums">
+                      {historyIdx + 1}/{historyLength}
+                    </span>
+                    <button
+                      onClick={() => onNavigateHistory("forward")}
+                      disabled={historyIdx === historyLength - 1}
+                      className={cn(
+                        "flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg backdrop-blur-md transition-all duration-150",
+                        historyIdx === historyLength - 1
+                          ? "bg-black/20 text-white/25 cursor-not-allowed"
+                          : "bg-black/40 text-white/80 hover:bg-black/60 hover:text-white",
+                      )}
+                    >
+                      Next
+                      <ChevronRight size={11} />
+                    </button>
+                  </div>
                 )}
               </>
             ) : viewportState === "idle" && !isGenerating ? (
@@ -2004,6 +2042,9 @@ export default function BuilderPage() {
               generateDescription={generateDescription}
               generateError={generateError}
               refinementMode={refinementMode}
+              historyLength={genHistory.length}
+              historyIdx={historyIdx}
+              onNavigateHistory={navigateHistory}
             />
 
             {/* ── Secondary Generate CTA — prominent button below viewport when idle ── */}
@@ -2143,40 +2184,6 @@ export default function BuilderPage() {
                   </button>
                 )}
 
-                {/* ── Generation history navigator ── */}
-                {genHistory.length > 1 && (
-                  <div className="flex items-center justify-between gap-2 px-1 pt-1">
-                    <button
-                      onClick={() => navigateHistory("back")}
-                      disabled={historyIdx === 0}
-                      className={cn(
-                        "flex items-center gap-1 text-xs font-semibold py-1.5 px-2.5 rounded-xl transition-all",
-                        historyIdx === 0
-                          ? "text-charcoal/20 cursor-not-allowed"
-                          : "text-charcoal/50 hover:text-charcoal/80 hover:bg-sand-200",
-                      )}
-                    >
-                      <ChevronLeft size={13} />
-                      Previous
-                    </button>
-                    <span className="text-[10px] text-charcoal/35 font-mono tabular-nums select-none">
-                      version {historyIdx + 1} of {genHistory.length}
-                    </span>
-                    <button
-                      onClick={() => navigateHistory("forward")}
-                      disabled={historyIdx === genHistory.length - 1}
-                      className={cn(
-                        "flex items-center gap-1 text-xs font-semibold py-1.5 px-2.5 rounded-xl transition-all",
-                        historyIdx === genHistory.length - 1
-                          ? "text-charcoal/20 cursor-not-allowed"
-                          : "text-charcoal/50 hover:text-charcoal/80 hover:bg-sand-200",
-                      )}
-                    >
-                      Next
-                      <ChevronRight size={13} />
-                    </button>
-                  </div>
-                )}
               </>
             )}
 

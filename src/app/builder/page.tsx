@@ -32,7 +32,7 @@ import RoomRouter from "@/components/ui/RoomRouter";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
 import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
-import GetTheLookModal from "@/components/ui/GetTheLookModal";
+import SourcingModal from "@/components/ui/SourcingModal";
 import { useUserStatus, bustUserStatusCache } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
 import {
@@ -2830,7 +2830,7 @@ export default function BuilderPage() {
 
       {/* Get the Look — AU product sourcing modal */}
       {showGetTheLook && (
-        <GetTheLookModal
+        <SourcingModal
           onClose={() => setShowGetTheLook(false)}
           roomType={roomType}
           floorTile={floorTile}

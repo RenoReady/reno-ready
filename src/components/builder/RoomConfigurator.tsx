@@ -30,6 +30,8 @@ import StyleLibrary, { STYLE_PRESETS, type StylePreset } from "@/components/ui/S
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, LayoutTemplatePicker } from "@/components/builder/Steps";
+import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
+import { isKept } from "@/lib/keepExisting";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
@@ -1394,16 +1396,21 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     generateDescription,
     projectBrief,       setProjectBrief,
     lightingOption,     setLightingOption,
-    roomType,           setRoomType,
+    roomType: storeRoomType, setRoomType,
     kitchenSelections,  setKitchenSelections,
     bedroomSelections,  setBedroomSelections,
     savedRooms,         saveCurrentRoom,
     roomConfirmed,      setRoomConfirmed,
     layoutTemplate,     setLayoutTemplate,
+    keepExisting,       setBathroomKeep,
   } = useBuilderStore();
 
   // The preview + cost column — scrolled into view when generation starts on small screens
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Room pages render their own room from the first paint (including the
+  // server-rendered HTML) instead of waiting for the store to catch up.
+  const roomType = room ?? storeRoomType;
 
   const userStatus = useUserStatus(statusRefreshKey);
 
@@ -1601,6 +1608,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             tileStyle:         store.tileStyle,
             lightingOption:    store.lightingOption,
             structuralChanges: store.structuralChanges,
+            keepExisting:      store.keepExisting,
           },
         }),
       });
@@ -1765,9 +1773,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Step completion drives the tracker and the step badges
   const k = kitchenSelections, bd = bedroomSelections;
   const step1Done =
-    roomType === "kitchen" ? !!(k.cabinetry || k.benchtop || k.mixer || k.splashback || k.floorFinish || k.floorColor || k.wallColor || k.cooktop || k.dishwasher || k.ceilingStyle)
+    (roomType === "kitchen" ? k.keepExisting : roomType === "bedroom" ? bd.keepExisting : keepExisting)?.length > 0 ||
+    (roomType === "kitchen" ? !!(k.cabinetry || k.benchtop || k.mixer || k.splashback || k.floorFinish || k.floorColor || k.wallColor || k.cooktop || k.dishwasher || k.ceilingStyle)
     : roomType === "bedroom" ? !!(bd.flooring || bd.flooringColor || bd.wallTreatment || bd.wallColor || bd.lighting || bd.storage || bd.windowTreatment || bd.ceilingStyle)
-    : !!(floorTile || wallTile || customFloorColor || customWallColor || tileStyle || vanity || tapware || activeStylePreset);
+    : !!(floorTile || wallTile || customFloorColor || customWallColor || tileStyle || vanity || tapware || activeStylePreset));
   const sizeDone = (size: string | null, l: number, w: number) => !!size && (size !== "custom" || (l > 0 && w > 0));
   const step2Done =
     roomType === "kitchen" ? sizeDone(k.roomSize, k.customLength, k.customWidth)
@@ -1839,6 +1848,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 <StyleLibrary activePresetId={activeStylePreset} onSelect={handleStylePreset} />
                 {/* 2. Floor Tiles */}
                 <SidebarSection icon={Layers} title="Floor Tiles (Colour)">
+                <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
                   <div className="grid grid-cols-4 gap-2">
                     {FLOOR_TILES.map((tile) => (
                       <TileCard key={tile.id} tile={tile}
@@ -1869,6 +1879,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                 {/* 3. Wall Tiles */}
                 <SidebarSection icon={Layers} title="Wall Tiles (Colour)">
+                <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
                   <div className="grid grid-cols-4 gap-2">
                     {WALL_TILES.map((tile) => (
                       <TileCard key={tile.id} tile={tile}
@@ -1946,6 +1957,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                 {/* 5. Vanity */}
                 <SidebarSection icon={Layers} title="Vanity Style">
+                <KeepExistingToggle room="bathroom" thing="vanity" active={isKept(keepExisting, "vanity")} onToggle={(on) => setBathroomKeep("vanity", on)} />
                   <div className="grid grid-cols-2 gap-3">
                     {VANITY_OPTIONS.map((opt) => (
                       <button key={opt.id} onClick={() => setVanity(opt.id as VanityType)}
@@ -1963,6 +1975,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                 {/* 6. Tapware */}
                 <SidebarSection icon={Droplets} title="Tapware Finish">
+                <KeepExistingToggle room="bathroom" thing="tapware" active={isKept(keepExisting, "tapware")} onToggle={(on) => setBathroomKeep("tapware", on)} />
                   <div className="grid grid-cols-3 gap-3">
                     {TAPWARE_OPTIONS.map((opt) => (
                       <button key={opt.id} onClick={() => setTapware(opt.id as TapwareFinish)}

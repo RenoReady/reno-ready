@@ -12,8 +12,8 @@
  *                    "AI Preview Simulated" badge.
  *
  *  REAL            — GOOGLE_API_KEY is set in .env.local.
- *                    Tries gemini-2.5-flash-image first;
- *                    falls back to gemini-3.1-flash-image if the
+ *                    Tries gemini-3.1-flash-image (Nano Banana 2) first;
+ *                    falls back to gemini-3.1-flash-lite-image if the
  *                    primary model is unavailable in your region.
  *                    If a room photo is provided it is passed as
  *                    an inlineData part so the model can apply
@@ -126,14 +126,60 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
   };
 }
 
-// ── Models — fastest first ─────────────────────────────────────────
-// gemini-2.5-flash-image   — fastest, primary
-// gemini-3.1-flash-image   — stable GA (replaces -preview per Google's
-//                            Aug 2026 deprecation notice for Imagen 4 endpoints)
-const MODELS = [
-  "gemini-2.5-flash-image",
-  "gemini-3.1-flash-image",
+// ── Models — tried in order ────────────────────────────────────────
+// gemini-3.1-flash-image       Nano Banana 2 — primary, 1K ($0.067/image)
+// gemini-3.1-flash-lite-image  Nano Banana 2 Lite — backup when the primary
+//                              is busy or failing; 1K only ($0.034/image)
+// gemini-2.5-flash-image was shut down by Google on 2 October 2026.
+const MODELS: { name: string; imageSize?: "1K" }[] = [
+  { name: "gemini-3.1-flash-image", imageSize: "1K" },
+  { name: "gemini-3.1-flash-lite-image" },
 ];
+
+// ── Output shape ───────────────────────────────────────────────────
+// Ask for the aspect ratio closest to the uploaded photo so the render
+// lines up with the original in the before/after slider.
+const ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
+
+/** Width/height from a JPEG, PNG or WebP header — no decoding needed */
+function imageSize(buf: Buffer): { w: number; h: number } | null {
+  // PNG: IHDR chunk
+  if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  }
+  // JPEG: walk the markers to the first start-of-frame
+  if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < buf.length) {
+      if (buf[i] !== 0xff) { i++; continue; }
+      const marker = buf[i + 1];
+      const isSOF = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+      if (isSOF) return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+      i += 2 + buf.readUInt16BE(i + 2);
+    }
+    return null;
+  }
+  // WebP: lossy, lossless and extended variants
+  if (buf.length > 30 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") {
+    const kind = buf.toString("ascii", 12, 16);
+    if (kind === "VP8 ") return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+    if (kind === "VP8L") {
+      const b = buf.readUInt32LE(21);
+      return { w: (b & 0x3fff) + 1, h: ((b >> 14) & 0x3fff) + 1 };
+    }
+    if (kind === "VP8X") return { w: buf.readUIntLE(24, 3) + 1, h: buf.readUIntLE(27, 3) + 1 };
+  }
+  return null;
+}
+
+function closestAspectRatio(w: number, h: number): string {
+  const target = Math.log(w / h);
+  return ASPECT_RATIOS.reduce((best, r) => {
+    const [a, b] = r.split(":").map(Number);
+    const [ba, bb] = best.split(":").map(Number);
+    return Math.abs(Math.log(a / b) - target) < Math.abs(Math.log(ba / bb) - target) ? r : best;
+  });
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -156,11 +202,14 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parts: any[] = [];
 
+  let aspectRatio: string | undefined;
   if (req.imageBase64) {
     const rawBase64 = req.imageBase64.replace(/^data:image\/[a-z+]+;base64,/, "");
     const mimeMatch = req.imageBase64.match(/^data:(image\/[a-z+]+);base64,/);
     const mimeType  = mimeMatch?.[1] ?? "image/jpeg";
     parts.push({ inlineData: { mimeType, data: rawBase64 } });
+    const size = imageSize(Buffer.from(rawBase64, "base64"));
+    if (size && size.w > 0 && size.h > 0) aspectRatio = closestAspectRatio(size.w, size.h);
   }
   parts.push({ text: prompt });
 
@@ -168,15 +217,22 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
   let lastError = "";
   let allBusy   = true;   // tracks whether every failure was a capacity 503
 
-  for (const modelName of MODELS) {
+  for (const { name: modelName, imageSize: size } of MODELS) {
+    const imageConfig = {
+      ...(aspectRatio && { aspectRatio }),
+      ...(size && { imageSize: size }),
+    };
     const maxAttempts = 2;  // 1 initial + 1 retry on 503
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        console.info(`[generate] Trying ${modelName} (attempt ${attempt})`);
+        console.info(`[generate] Trying ${modelName} (attempt ${attempt}) ${JSON.stringify(imageConfig)}`);
         const model  = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent({
           contents: [{ role: "user", parts }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            ...(Object.keys(imageConfig).length > 0 && { imageConfig }),
+          },
         });
 
         console.info(`[generate] Response received from: ${modelName}`);

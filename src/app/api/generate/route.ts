@@ -60,6 +60,7 @@ interface GenerateRequest {
     customFloorColor?:  string | null;
     customWallColor?:   string | null;
     tileStyle?:         string | null;
+    keepExisting?:      string[] | null;
     lightingOption?:    string | null;
     structuralChanges?: {
       removeBathtub:   boolean;

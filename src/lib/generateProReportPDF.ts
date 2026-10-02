@@ -24,6 +24,7 @@ import {
   STORAGE_OPTIONS, WINDOW_TREATMENT_OPTIONS,
 } from "./roomTypes";
 import { formatAUD } from "./utils";
+import { isKept, selectionText, KEEP_TEXT } from "./keepExisting";
 
 // ── Input ────────────────────────────────────────────────────────────────────
 
@@ -134,13 +135,13 @@ function buildMatRows(
 
     const rows: MatRow[] = [
       { label: "Kitchen Size",     value: sizeLabel },
-      { label: "Cabinetry Style",  value: cabinetOpt?.label  ?? "Not selected" },
-      { label: "Benchtop",         value: benchtopOpt?.label ?? "Not selected" },
-      { label: "Splashback",       value: splashOpt?.label   ?? "Not selected" },
-      { label: "Mixer & Sink",     value: mixerOpt?.label    ?? "Not selected" },
-      { label: "Cooktop",          value: kitchen.cooktop === "induction" ? "Induction" : "Gas" },
-      { label: "Dishwasher",       value: kitchen.dishwasher === "integrated" ? "Integrated (panel-match)" : "Freestanding" },
-      { label: "Ceiling Treatment",value: ceilingOpt?.label  ?? "Standard White" },
+      { label: "Cabinetry Style",  value: selectionText(cabinetOpt?.label,  isKept(kitchen.keepExisting, "cabinetry")) },
+      { label: "Benchtop",         value: selectionText(benchtopOpt?.label, isKept(kitchen.keepExisting, "benchtop")) },
+      { label: "Splashback",       value: selectionText(splashOpt?.label,   isKept(kitchen.keepExisting, "splashback")) },
+      { label: "Mixer & Sink",     value: selectionText(mixerOpt?.label,    isKept(kitchen.keepExisting, "mixer")) },
+      { label: "Cooktop",          value: kitchen.cooktop ? (kitchen.cooktop === "induction" ? "Induction" : "Gas") : selectionText(null, isKept(kitchen.keepExisting, "appliances")) },
+      { label: "Dishwasher",       value: kitchen.dishwasher ? (kitchen.dishwasher === "integrated" ? "Integrated (panel-match)" : "Freestanding") : selectionText(null, isKept(kitchen.keepExisting, "appliances")) },
+      { label: "Ceiling Treatment",value: ceilingOpt?.label  ?? (isKept(kitchen.keepExisting, "ceiling") ? KEEP_TEXT : "Standard White") },
     ];
     if (kitchen.hasIsland)           rows.push({ label: "Island Bench",       value: "Included — plumbing/gas advisory applies", highlight: true });
     if (kitchen.hasApplianceRoughin) rows.push({ label: "Appliance Rough-ins",value: "New gas point or 15A circuit", highlight: true });
@@ -165,12 +166,12 @@ function buildMatRows(
 
     const rows: MatRow[] = [
       { label: "Room Size",         value: sizeLabel },
-      { label: "Flooring",          value: flooringOpt?.label ?? "Not selected" },
-      { label: "Wall Treatment",    value: wallOpt?.label     ?? "Not selected" },
-      { label: "Lighting",          value: lightOpt?.label    ?? "Not selected" },
-      { label: "Storage / Joinery", value: storageOpt?.label  ?? "Not selected" },
-      { label: "Window Treatment",  value: windowOpt?.label   ?? "Not selected" },
-      { label: "Ceiling Treatment", value: ceilingOpt?.label  ?? "Standard White" },
+      { label: "Flooring",          value: selectionText(flooringOpt?.label, isKept(bedroom.keepExisting, "flooring")) },
+      { label: "Wall Treatment",    value: selectionText(wallOpt?.label,     isKept(bedroom.keepExisting, "walls")) },
+      { label: "Lighting",          value: selectionText(lightOpt?.label,    isKept(bedroom.keepExisting, "lighting")) },
+      { label: "Storage / Joinery", value: selectionText(storageOpt?.label,  isKept(bedroom.keepExisting, "storage")) },
+      { label: "Window Treatment",  value: selectionText(windowOpt?.label,   isKept(bedroom.keepExisting, "windows")) },
+      { label: "Ceiling Treatment", value: ceilingOpt?.label  ?? (isKept(bedroom.keepExisting, "ceiling") ? KEEP_TEXT : "Standard White") },
     ];
     if (bedroom.hasVJWall)         rows.push({ label: "VJ Feature Wall",    value: "Floor-to-ceiling tongue-and-groove boards" });
     if (bedroom.hasMediaJoinery)   rows.push({ label: "Media Joinery",      value: "Built-in TV unit with integrated shelving" });
@@ -180,11 +181,11 @@ function buildMatRows(
   }
 
   // Bathroom
-  const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : "Not selected";
-  const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : "Not selected";
+  const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : selectionText(null, isKept(sel.keepExisting, "vanity"));
+  const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : selectionText(null, isKept(sel.keepExisting, "tapware"));
   const rows: MatRow[] = [
-    { label: "Floor Tile",    value: sel.floorTile?.name  ?? "Not selected" },
-    { label: "Wall Tile",     value: sel.wallTile?.name   ?? "Not selected" },
+    { label: "Floor Tile",    value: selectionText(sel.floorTile?.name, isKept(sel.keepExisting, "floor")) },
+    { label: "Wall Tile",     value: selectionText(sel.wallTile?.name,  isKept(sel.keepExisting, "walls")) },
     { label: "Vanity Type",   value: vanityLabel },
     { label: "Tapware Finish",value: tapwareLabel },
   ];

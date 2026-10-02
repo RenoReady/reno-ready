@@ -9,6 +9,8 @@
  * Cost benchmarks calibrated to QLD 2026 mid-range renovations.
  */
 
+import { isKept, type KitchenKeepKey, type BedroomKeepKey } from "./keepExisting";
+
 // ── Room type ────────────────────────────────────────────────────────────────
 
 export type RoomType = "bathroom" | "kitchen" | "bedroom";
@@ -88,6 +90,8 @@ export interface KitchenSelections {
   hasSinkRoughin:       boolean;  // moving the plumbing stack
   hasWallChange:        boolean;  // open-plan wall removal/addition
   hasButlersPantry:     boolean;  // butler's pantry integration
+  /** Categories kept as they are — no cost, left untouched in the render */
+  keepExisting:         KitchenKeepKey[];
   budget:               number;   // user's target budget (AUD)
   customNote:           string;
 }
@@ -366,6 +370,8 @@ export interface BedroomSelections {
   hasVJWall:         boolean;  // VJ feature wall (structural add)
   hasMediaJoinery:   boolean;  // built-in media/TV joinery
   hasPendantRoughin: boolean;  // bedside sconce/pendant rough-ins
+  /** Categories kept as they are — no cost, left untouched in the render */
+  keepExisting:      BedroomKeepKey[];
   budget:            number;   // user's target budget (AUD)
   customNote:        string;
 }
@@ -682,6 +688,13 @@ function photoSpatialLock(roomWord: string, dimNote: string): string {
   ].filter(Boolean).join("\n");
 }
 
+/** Prompt line for a category the client is keeping as-is */
+function keepLine(category: string, thing: string, hasPhoto: boolean): string {
+  return hasPhoto
+    ? `${category}: KEEP the existing ${thing} exactly as it appears in the reference photo — do not change its colour, material or style.`
+    : `${category}: the client is keeping their existing ${thing} — show a plain, standard ${thing} rather than an upgrade.`;
+}
+
 /** Per-size dimension note added to the spatial lock block */
 function kitchenDimNote(sel: KitchenSelections): string {
   if (sel.roomSize === "custom" && sel.customLength > 0 && sel.customWidth > 0) {
@@ -725,6 +738,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const cooktop  = sel.cooktop ? (sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop") : "cooktop (type not specified)";
   const dw       = sel.dishwasher ? (sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher") : "dishwasher (type not specified)";
   const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
+  const kept = (k: KitchenKeepKey) => isKept(sel.keepExisting, k);
 
   // ── No-photo mode: generate from scratch ─────────────────────────────────
   if (!hasPhoto) {
@@ -740,14 +754,14 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
       `Compose ${sizeDesc} from a slightly elevated angle showing cabinetry, benchtop, splashback and appliances.`,
       "Remove all clutter. Produce a high-end architectural photography result at 2K resolution.",
       "",
-      cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
-      benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
-      mixer    ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`                    : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
-      splash   ? `Splashback: ${splash}.`                                                            : "Splashback: select a material that complements the cabinetry.",
-      floor    ? `Kitchen Floor: ${floor}${floorColorNote}.`                                         : "Kitchen Floor: large format neutral porcelain or timber-look planks.",
-      wallColorNote ?? "Kitchen Walls: clean white or warm neutral paint.",
-      `Appliances: ${cooktop}, ${dw}. Include a counter-depth integrated refrigerator.`,
-      `Ceiling: ${ceiling}.`,
+      kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", false)          : cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
+      kept("benchtop")   ? keepLine("Benchtop", "benchtop", false)            : benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
+      kept("mixer")      ? keepLine("Sink & Mixer", "sink and mixer tap", false) : mixer ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`              : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
+      kept("splashback") ? keepLine("Splashback", "splashback", false)        : splash   ? `Splashback: ${splash}.`                                                            : "Splashback: select a material that complements the cabinetry.",
+      kept("floor")      ? keepLine("Kitchen Floor", "floor", false)          : floor    ? `Kitchen Floor: ${floor}${floorColorNote}.`                                         : "Kitchen Floor: large format neutral porcelain or timber-look planks.",
+      kept("walls")      ? keepLine("Kitchen Walls", "wall paint", false)     : wallColorNote ?? "Kitchen Walls: clean white or warm neutral paint.",
+      kept("appliances") ? keepLine("Appliances", "cooktop and dishwasher", false) + " Include a counter-depth refrigerator." : `Appliances: ${cooktop}, ${dw}. Include a counter-depth integrated refrigerator.`,
+      kept("ceiling")    ? keepLine("Ceiling", "ceiling", false)              : `Ceiling: ${ceiling}.`,
       "Style: warm Australian natural light, realistic textures, high-fidelity 2K render.",
     ];
 
@@ -765,14 +779,14 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const materials = [
     "",
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`                : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
-    benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`          : "Benchtop: apply a premium material that complements the cabinetry.",
-    mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`              : "Sink & Mixer: replace with a quality gooseneck mixer.",
-    splash   ? `Splashback: Re-surface the splashback with ${splash}.`                                 : "Splashback: choose a finish that suits the cabinetry.",
-    floor    ? `Kitchen Floor: Re-texture the floor with ${floor}${floorColorNote}.`                   : "Kitchen Floor: retain the existing floor or choose a clean, neutral finish.",
-    wallColorNote ?? "Kitchen Walls: Retain existing wall colour unless specified.",
-    `Appliances: ${cooktop}, ${dw}. Fit into the existing appliance spaces — do not add new ones outside the existing footprint.`,
-    `Ceiling: ${ceiling}.`,
+    kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", true)              : cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`                : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
+    kept("benchtop")   ? keepLine("Benchtop", "benchtop", true)                : benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`          : "Benchtop: apply a premium material that complements the cabinetry.",
+    kept("mixer")      ? keepLine("Sink & Mixer", "sink and mixer tap", true)  : mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`              : "Sink & Mixer: replace with a quality gooseneck mixer.",
+    kept("splashback") ? keepLine("Splashback", "splashback", true)            : splash   ? `Splashback: Re-surface the splashback with ${splash}.`                                 : "Splashback: choose a finish that suits the cabinetry.",
+    kept("floor")      ? keepLine("Kitchen Floor", "floor", true)              : floor    ? `Kitchen Floor: Re-texture the floor with ${floor}${floorColorNote}.`                   : "Kitchen Floor: retain the existing floor or choose a clean, neutral finish.",
+    kept("walls")      ? keepLine("Kitchen Walls", "wall paint", true)         : wallColorNote ?? "Kitchen Walls: Retain existing wall colour unless specified.",
+    kept("appliances") ? keepLine("Appliances", "cooktop and dishwasher", true) : `Appliances: ${cooktop}, ${dw}. Fit into the existing appliance spaces — do not add new ones outside the existing footprint.`,
+    kept("ceiling")    ? keepLine("Ceiling", "ceiling", true)                  : `Ceiling: ${ceiling}.`,
     "Remove all personal items, appliances on benchtops, and clutter.",
     "Style: warm Australian natural light, realistic textures, high-fidelity 2K render.",
   ].join("\n");
@@ -803,6 +817,8 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
   const window_  = sel.windowTreatment ? (WINDOW_TREATMENT_OPTIONS.find((o)  => o.id === sel.windowTreatment)?.label ?? sel.windowTreatment) : null;
   const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
 
+  const kept = (k: BedroomKeepKey) => isKept(sel.keepExisting, k);
+
   const lightDesc = !light
     ? "quality ambient lighting appropriate to the style"
     : sel.lighting === "led-cove"
@@ -825,12 +841,12 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
       `Compose ${sizeDesc} showing the bedhead feature wall, flooring, storage and window treatments at 2K resolution.`,
       "Remove all clutter and personal items. Produce a high-end editorial photography result.",
       "",
-      flooring ? `Flooring: ${flooring} — lay full room width.`                             : "Flooring: choose a premium flooring appropriate to the style.",
-      wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`          : "Wall treatment: designer's choice appropriate to the room palette.",
-      `Lighting: ${lightDesc}.`,
-      storage  ? `Storage: ${storage} — full-height, floor-to-ceiling.`                    : "Storage: appropriate built-in wardrobe solution for the space.",
-      window_  ? `Window treatment: ${window_} — floor-length, ceiling-mounted track.`     : "Window treatment: quality window covering appropriate to the style.",
-      `Ceiling: ${ceiling}.`,
+      kept("flooring") ? keepLine("Flooring", "flooring", false)                     : flooring ? `Flooring: ${flooring} — lay full room width.`                             : "Flooring: choose a premium flooring appropriate to the style.",
+      kept("walls")    ? keepLine("Wall treatment", "wall finish", false)            : wall     ? `Wall treatment: ${wall} — apply to feature wall behind bedhead.`          : "Wall treatment: designer's choice appropriate to the room palette.",
+      kept("lighting") ? keepLine("Lighting", "light fittings", false)               : `Lighting: ${lightDesc}.`,
+      kept("storage")  ? keepLine("Storage", "wardrobe and storage", false)          : storage  ? `Storage: ${storage} — full-height, floor-to-ceiling.`                    : "Storage: appropriate built-in wardrobe solution for the space.",
+      kept("windows")  ? keepLine("Window treatment", "window coverings", false)     : window_  ? `Window treatment: ${window_} — floor-length, ceiling-mounted track.`     : "Window treatment: quality window covering appropriate to the style.",
+      kept("ceiling")  ? keepLine("Ceiling", "ceiling", false)                       : `Ceiling: ${ceiling}.`,
       "Style: warm natural Australian light, editorial photography, high-fidelity 2K render.",
     ];
 
@@ -848,12 +864,12 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
   const materials = [
     "",
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    flooring ? `Flooring: Replace the existing floor surface with ${flooring} — cover the full visible floor area.`  : "Flooring: apply a premium flooring material appropriate to the style.",
-    wall     ? `Wall treatment: Apply ${wall} to the feature wall behind where the bedhead would be.`               : "Wall treatment: designer's choice appropriate to the room palette.",
-    `Lighting: ${lightDesc} — fit within the existing ceiling structure.`,
-    storage  ? `Storage: Replace or re-face existing wardrobe/storage with ${storage}.`                             : "Storage: retain existing storage and apply a quality finish.",
-    window_  ? `Window treatment: Replace window coverings with ${window_} — floor-length, ceiling-mounted track.`  : "Window treatment: apply quality window covering appropriate to the style.",
-    `Ceiling: ${ceiling}.`,
+    kept("flooring") ? keepLine("Flooring", "flooring", true)                 : flooring ? `Flooring: Replace the existing floor surface with ${flooring} — cover the full visible floor area.`  : "Flooring: apply a premium flooring material appropriate to the style.",
+    kept("walls")    ? keepLine("Wall treatment", "wall finish", true)        : wall     ? `Wall treatment: Apply ${wall} to the feature wall behind where the bedhead would be.`               : "Wall treatment: designer's choice appropriate to the room palette.",
+    kept("lighting") ? keepLine("Lighting", "light fittings", true)           : `Lighting: ${lightDesc} — fit within the existing ceiling structure.`,
+    kept("storage")  ? keepLine("Storage", "wardrobe and storage", true)      : storage  ? `Storage: Replace or re-face existing wardrobe/storage with ${storage}.`                             : "Storage: retain existing storage and apply a quality finish.",
+    kept("windows")  ? keepLine("Window treatment", "window coverings", true) : window_  ? `Window treatment: Replace window coverings with ${window_} — floor-length, ceiling-mounted track.`  : "Window treatment: apply quality window covering appropriate to the style.",
+    kept("ceiling")  ? keepLine("Ceiling", "ceiling", true)                   : `Ceiling: ${ceiling}.`,
     "Remove all personal items, clothes, and clutter.",
     "Style: warm natural Australian light, editorial photography, high-fidelity 2K render.",
   ].join("\n");

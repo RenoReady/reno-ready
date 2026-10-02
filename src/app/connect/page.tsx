@@ -24,6 +24,7 @@ import Button from "@/components/ui/Button";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import Card from "@/components/ui/Card";
 import { useBuilderStore } from "@/lib/store";
+import { isKept, selectionText } from "@/lib/keepExisting";
 import {
   VANITY_OPTIONS,
   TAPWARE_OPTIONS,
@@ -103,12 +104,13 @@ export default function ConnectPage() {
     lightingOption,
     useCustomDimensions,
     generateDescription,
+    keepExisting,
   } = useBuilderStore();
 
   const hasGeneratedImage = !!generatedImageUrl;
 
-  const vanityLabel  = vanity  ? (VANITY_OPTIONS.find((v)  => v.id === vanity)?.label  ?? vanity)  : "Not selected";
-  const tapwareLabel = tapware ? (TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware) : "Not selected";
+  const vanityLabel  = vanity  ? (VANITY_OPTIONS.find((v)  => v.id === vanity)?.label  ?? vanity)  : selectionText(null, isKept(keepExisting, "vanity"));
+  const tapwareLabel = tapware ? (TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware) : selectionText(null, isKept(keepExisting, "tapware"));
   const tileStyleLabel = tileStyle
     ? TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.label ?? tileStyle
     : null;
@@ -162,12 +164,12 @@ export default function ConnectPage() {
         : sizeOpt?.label ?? kitchenSelections.roomSize;
       return [
         { label: "Kitchen Size",  value: sizeLabel },
-        { label: "Cabinetry",     value: cabinet  ?? "Not selected" },
-        { label: "Benchtop",      value: benchtop ?? "Not selected" },
-        { label: "Splashback",    value: splash   ?? "Not selected" },
-        { label: "Mixer",         value: mixer    ?? "Not selected" },
-        { label: "Cooktop",       value: kitchenSelections.cooktop === "induction" ? "Induction" : "Gas" },
-        { label: "Dishwasher",    value: kitchenSelections.dishwasher === "integrated" ? "Integrated" : "Freestanding" },
+        { label: "Cabinetry",     value: selectionText(cabinet,  isKept(kitchenSelections.keepExisting, "cabinetry")) },
+        { label: "Benchtop",      value: selectionText(benchtop, isKept(kitchenSelections.keepExisting, "benchtop")) },
+        { label: "Splashback",    value: selectionText(splash,   isKept(kitchenSelections.keepExisting, "splashback")) },
+        { label: "Mixer",         value: selectionText(mixer,    isKept(kitchenSelections.keepExisting, "mixer")) },
+        { label: "Cooktop",       value: kitchenSelections.cooktop ? (kitchenSelections.cooktop === "induction" ? "Induction" : "Gas") : selectionText(null, isKept(kitchenSelections.keepExisting, "appliances")) },
+        { label: "Dishwasher",    value: kitchenSelections.dishwasher ? (kitchenSelections.dishwasher === "integrated" ? "Integrated" : "Freestanding") : selectionText(null, isKept(kitchenSelections.keepExisting, "appliances")) },
       ];
     }
     if (roomType === "bedroom") {
@@ -182,22 +184,22 @@ export default function ConnectPage() {
         : sizeOpt?.label ?? bedroomSelections.roomSize;
       return [
         { label: "Bedroom Size",      value: sizeLabel },
-        { label: "Flooring",          value: flooring ?? "Not selected" },
-        { label: "Wall Treatment",    value: wall_    ?? "Not selected" },
-        { label: "Lighting",          value: light    ?? "Not selected" },
-        { label: "Storage",           value: storage  ?? "Not selected" },
-        { label: "Window Treatment",  value: window_  ?? "Not selected" },
+        { label: "Flooring",          value: selectionText(flooring, isKept(bedroomSelections.keepExisting, "flooring")) },
+        { label: "Wall Treatment",    value: selectionText(wall_,    isKept(bedroomSelections.keepExisting, "walls")) },
+        { label: "Lighting",          value: selectionText(light,    isKept(bedroomSelections.keepExisting, "lighting")) },
+        { label: "Storage",           value: selectionText(storage,  isKept(bedroomSelections.keepExisting, "storage")) },
+        { label: "Window Treatment",  value: selectionText(window_,  isKept(bedroomSelections.keepExisting, "windows")) },
       ];
     }
     // Bathroom
     return [
-      { label: "Floor Tile", value: floorTile?.name ?? "Not selected", color: customFloorColor },
-      { label: "Wall Tile",  value: wallTile?.name  ?? "Not selected", color: customWallColor  },
+      { label: "Floor Tile", value: selectionText(floorTile?.name, isKept(keepExisting, "floor")), color: customFloorColor },
+      { label: "Wall Tile",  value: selectionText(wallTile?.name,  isKept(keepExisting, "walls")), color: customWallColor  },
       { label: "Vanity",     value: vanityLabel },
       { label: "Tapware",    value: tapwareLabel },
       ...(tileStyleLabel ? [{ label: "Tile Layout", value: tileStyleLabel }] : []),
     ];
-  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel, keepExisting]);
 
   // ── Room-aware structural labels ──────────────────────────────────────────
   const structuralLabels = useMemo(() => {
@@ -234,8 +236,8 @@ export default function ConnectPage() {
   // ── Right-panel brief rows ────────────────────────────────────────────────
   const briefRows = useMemo(() => {
     if (roomType === "kitchen") {
-      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : "Not selected";
-      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : "Not selected";
+      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : selectionText(null, isKept(kitchenSelections.keepExisting, "cabinetry"));
+      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : selectionText(null, isKept(kitchenSelections.keepExisting, "benchtop"));
       return [
         { icon: Layers,     label: "Cabinetry",     value: cabinet  },
         { icon: Layers,     label: "Benchtop",      value: benchtop },
@@ -244,8 +246,8 @@ export default function ConnectPage() {
       ];
     }
     if (roomType === "bedroom") {
-      const flooring = bedroomSelections.flooring ? BEDROOM_FLOORING_OPTIONS.find((o) => o.id === bedroomSelections.flooring)?.label ?? bedroomSelections.flooring : "Not selected";
-      const wall_    = bedroomSelections.wallTreatment ? WALL_TREATMENT_OPTIONS.find((o) => o.id === bedroomSelections.wallTreatment)?.label ?? bedroomSelections.wallTreatment : "Not selected";
+      const flooring = bedroomSelections.flooring ? BEDROOM_FLOORING_OPTIONS.find((o) => o.id === bedroomSelections.flooring)?.label ?? bedroomSelections.flooring : selectionText(null, isKept(bedroomSelections.keepExisting, "flooring"));
+      const wall_    = bedroomSelections.wallTreatment ? WALL_TREATMENT_OPTIONS.find((o) => o.id === bedroomSelections.wallTreatment)?.label ?? bedroomSelections.wallTreatment : selectionText(null, isKept(bedroomSelections.keepExisting, "walls"));
       return [
         { icon: Layers,     label: "Flooring",      value: flooring },
         { icon: Layers,     label: "Wall Treatment", value: wall_    },
@@ -255,14 +257,14 @@ export default function ConnectPage() {
     }
     // Bathroom
     return [
-      { icon: Layers,     label: "Floor Tile",     value: floorTile?.name ?? "Not selected", accent: customFloorColor },
-      { icon: Layers,     label: "Wall Tile",       value: wallTile?.name  ?? "Not selected", accent: customWallColor  },
+      { icon: Layers,     label: "Floor Tile",     value: selectionText(floorTile?.name, isKept(keepExisting, "floor")), accent: customFloorColor },
+      { icon: Layers,     label: "Wall Tile",       value: selectionText(wallTile?.name,  isKept(keepExisting, "walls")), accent: customWallColor  },
       { icon: Layers,     label: "Vanity",          value: vanityLabel },
       { icon: Droplets,   label: "Tapware",         value: tapwareLabel },
       { icon: DollarSign, label: "Budget Target",   value: formatAUD(budget) },
       { icon: DollarSign, label: "Estimated Cost",  value: formatAUD(estimatedCost), bold: true },
     ];
-  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, budget, estimatedCost]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, customFloorColor, customWallColor, vanityLabel, tapwareLabel, budget, estimatedCost, keepExisting]);
 
   const roomLabel = roomType === "kitchen" ? "Kitchen"
     : roomType === "bedroom" ? "Bedroom"

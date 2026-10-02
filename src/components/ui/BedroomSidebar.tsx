@@ -29,6 +29,8 @@ import {
 } from "@/lib/roomTypes";
 import { Ruler, SlidersHorizontal } from "lucide-react";
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
+import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
+import { isKept, keepPatch, BEDROOM_KEEP_FIELDS, type BedroomKeepKey } from "@/lib/keepExisting";
 
 // ── Section label ─────────────────────────────────────────────────────────────
 
@@ -51,12 +53,15 @@ interface BedroomSidebarProps {
 export default function BedroomSidebar({ selections, onChange, part }: BedroomSidebarProps) {
   if (part === "layout") return <BedroomLayout selections={selections} onChange={onChange} />;
   if (part === "budget") return <BedroomBudget selections={selections} onChange={onChange} />;
+  const keep = (key: BedroomKeepKey, on: boolean) =>
+    onChange(keepPatch(BEDROOM_KEEP_FIELDS, selections.keepExisting, key, on) as Partial<BedroomSelections>);
   return (
     <div className="flex flex-col gap-6">
 
       {/* Flooring */}
       <div>
         <SectionLabel>Flooring</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="flooring" className="mb-2" active={isKept(selections.keepExisting, "flooring")} onToggle={(on) => keep("flooring", on)} />
         <div className="flex flex-col gap-2">
           {BEDROOM_FLOORING_OPTIONS.map((opt) => {
             const active = selections.flooring === opt.id;
@@ -101,6 +106,7 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
       {/* Wall Treatment */}
       <div>
         <SectionLabel>Wall Treatment</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="wall finish" className="mb-2" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
         <div className="flex flex-col gap-2">
           {WALL_TREATMENT_OPTIONS.map((opt) => {
             const active = selections.wallTreatment === opt.id;
@@ -140,6 +146,7 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
       {/* Ceiling Treatment (moved up to group with surfaces) */}
       <div>
         <SectionLabel>Ceiling Treatment</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="ceiling" className="mb-2" active={isKept(selections.keepExisting, "ceiling")} onToggle={(on) => keep("ceiling", on)} />
         <div className="flex flex-col gap-2">
           {CEILING_OPTIONS.map((opt) => {
             const active = selections.ceilingStyle === opt.id;
@@ -181,6 +188,7 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
       {/* Lighting & Atmosphere */}
       <div>
         <SectionLabel>Lighting &amp; Atmosphere</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="light fittings" className="mb-2" active={isKept(selections.keepExisting, "lighting")} onToggle={(on) => keep("lighting", on)} />
         <div className="flex flex-col gap-2">
           {BEDROOM_LIGHTING_OPTIONS.map((opt) => {
             const active = selections.lighting === opt.id;
@@ -225,6 +233,7 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
       {/* Storage & Joinery */}
       <div>
         <SectionLabel>Storage &amp; Joinery</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="wardrobe and storage" className="mb-2" active={isKept(selections.keepExisting, "storage")} onToggle={(on) => keep("storage", on)} />
         <div className="flex flex-col gap-2">
           {STORAGE_OPTIONS.map((opt) => {
             const active = selections.storage === opt.id;
@@ -256,6 +265,7 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
       {/* Window Treatments */}
       <div>
         <SectionLabel>Window Treatments</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="window coverings" className="mb-2" active={isKept(selections.keepExisting, "windows")} onToggle={(on) => keep("windows", on)} />
         <div className="flex flex-col gap-2">
           {WINDOW_TREATMENT_OPTIONS.map((opt) => {
             const active = selections.windowTreatment === opt.id;

@@ -145,6 +145,8 @@ export interface BuilderSelections {
   wallTile:             TileOption | null;
   vanity:               VanityType | null;
   tapware:              TapwareFinish | null;
+  /** Categories the client is keeping as they are — no cost, left untouched in the render */
+  keepExisting:         import("./keepExisting").BathroomKeepKey[];
   budget:               number;             // AUD — user's target/limit
   customNote:           string;             // free-text design note → Gemini prompt
   customFloorColor:     string | null;      // hex colour for floor (custom picker)

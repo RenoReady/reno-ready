@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import {
+  type BathroomKeepKey,
+  BATHROOM_KEEP_FIELDS, KITCHEN_KEEP_FIELDS, BEDROOM_KEEP_FIELDS,
+  keepPatch, withKeepReleased,
+} from "./keepExisting";
+import {
   BuilderSelections,
   BathroomSize,
   StructuralChanges,
@@ -61,6 +66,7 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
     customLength:         s.customLength,
     customWidth:          s.customWidth,
     layoutTemplate:       s.layoutTemplate,
+    keepExisting:         s.keepExisting,
     pendingGenerate,
   };
   try {
@@ -101,6 +107,7 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption | null);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);
     if (saved.layoutTemplate)             store.setLayoutTemplate(saved.layoutTemplate as string);
+    if (Array.isArray(saved.keepExisting)) useBuilderStore.setState({ keepExisting: saved.keepExisting as BathroomKeepKey[] });
     if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
     if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
     if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType | null);
@@ -142,6 +149,7 @@ const defaultKitchenSelections: KitchenSelections = {
   hasSinkRoughin:      false,
   hasWallChange:       false,
   hasButlersPantry:    false,
+  keepExisting:        [],
   budget:              KITCHEN_BUDGET_DEFAULT,
   customNote:          "",
 };
@@ -164,6 +172,7 @@ const defaultBedroomSelections: BedroomSelections = {
   hasVJWall:         false,
   hasMediaJoinery:   false,
   hasPendantRoughin: false,
+  keepExisting:      [],
   budget:            BEDROOM_BUDGET_DEFAULT,
   customNote:        "",
 };
@@ -213,6 +222,8 @@ interface BuilderStore extends BuilderSelections {
   setCustomWallColor:     (color: string | null)           => void;
   setTileStyle:           (style: TileStyle | null)        => void;
   setStructuralChanges:   (c: Partial<StructuralChanges>)  => void;
+  /** Keep a bathroom category as it is (clears its selection, so it costs nothing) */
+  setBathroomKeep:        (key: BathroomKeepKey, on: boolean) => void;
   setProjectBrief:        (b: ProjectBrief | null)         => void;
   setLightingOption:      (o: LightingOption | null)       => void;
   setBathroomSize:        (s: BathroomSize | null)         => void;
@@ -240,6 +251,7 @@ const defaults: BuilderSelections = {
   wallTile:            null,
   vanity:              null,
   tapware:             null,
+  keepExisting:        [],
   budget:              DEFAULT_BUDGET,
   customNote:          "",
   customFloorColor:    null,
@@ -256,6 +268,11 @@ const defaults: BuilderSelections = {
   generatedImageUrl:   null,
   generateDescription: null,
 };
+
+/** Picking a bathroom finish switches off "keep existing" for that category */
+function releaseKeep(st: { keepExisting: BathroomKeepKey[] }, key: BathroomKeepKey, value: unknown) {
+  return value ? { keepExisting: st.keepExisting.filter((k) => k !== key) } : {};
+}
 
 const BLANK_ROOMS: Record<RoomType, boolean> = { bathroom: false, kitchen: false, bedroom: false };
 
@@ -304,6 +321,7 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
       wallTile:          null,
       vanity:            null,
       tapware:           null,
+      keepExisting:      [],
       lightingOption:    null,
       bathroomSize:      null,
       projectBrief:      null,
@@ -321,11 +339,12 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
 
   // ── Kitchen ───────────────────────────────────────────────────────────────
   kitchenSelections:     defaultKitchenSelections,
-  setKitchenSelections:  (s) => set((st) => ({ kitchenSelections: { ...st.kitchenSelections, ...s } })),
+  // choosing a finish in a kept category switches that keep off
+  setKitchenSelections:  (s) => set((st) => ({ kitchenSelections: { ...st.kitchenSelections, ...withKeepReleased(KITCHEN_KEEP_FIELDS, st.kitchenSelections.keepExisting, s) } })),
 
   // ── Bedroom ───────────────────────────────────────────────────────────────
   bedroomSelections:     defaultBedroomSelections,
-  setBedroomSelections:  (s) => set((st) => ({ bedroomSelections: { ...st.bedroomSelections, ...s } })),
+  setBedroomSelections:  (s) => set((st) => ({ bedroomSelections: { ...st.bedroomSelections, ...withKeepReleased(BEDROOM_KEEP_FIELDS, st.bedroomSelections.keepExisting, s) } })),
 
   // ── Multi-room ────────────────────────────────────────────────────────────
   savedRooms: [],
@@ -358,14 +377,15 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
 
   // ── Existing setters ───────────────────────────────────────────────────────
   setRoomPhotoUrl:        (url)   => set(url ? { roomPhotoUrl: url, layoutTemplate: null } : { roomPhotoUrl: null }),
-  setFloorTile:           (tile)  => set({ floorTile: tile }),
-  setWallTile:            (tile)  => set({ wallTile: tile }),
-  setVanity:              (v)     => set({ vanity: v }),
-  setTapware:             (t)     => set({ tapware: t }),
+  setFloorTile:           (tile)  => set((st) => ({ floorTile: tile, ...releaseKeep(st, "floor", tile) })),
+  setWallTile:            (tile)  => set((st) => ({ wallTile: tile, ...releaseKeep(st, "walls", tile) })),
+  setVanity:              (v)     => set((st) => ({ vanity: v, ...releaseKeep(st, "vanity", v) })),
+  setTapware:             (t)     => set((st) => ({ tapware: t, ...releaseKeep(st, "tapware", t) })),
+  setBathroomKeep:        (key, on) => set((st) => keepPatch(BATHROOM_KEEP_FIELDS, st.keepExisting, key, on) as Partial<BuilderStore>),
   setBudget:              (n)     => set({ budget: n }),
   setCustomNote:          (note)  => set({ customNote: note }),
-  setCustomFloorColor:    (color) => set({ customFloorColor: color }),
-  setCustomWallColor:     (color) => set({ customWallColor: color }),
+  setCustomFloorColor:    (color) => set((st) => ({ customFloorColor: color, ...releaseKeep(st, "floor", color) })),
+  setCustomWallColor:     (color) => set((st) => ({ customWallColor: color, ...releaseKeep(st, "walls", color) })),
   setTileStyle:           (style) => set({ tileStyle: style }),
   setStructuralChanges:   (c)     => set((s) => ({
     structuralChanges: { ...s.structuralChanges, ...c },

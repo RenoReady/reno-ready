@@ -28,6 +28,8 @@ import {
 } from "@/lib/roomTypes";
 import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } from "lucide-react";
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
+import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
+import { isKept, keepPatch, KITCHEN_KEEP_FIELDS, type KitchenKeepKey } from "@/lib/keepExisting";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -47,12 +49,15 @@ interface KitchenSidebarProps {
 export default function KitchenSidebar({ selections, onChange, part }: KitchenSidebarProps) {
   if (part === "layout") return <KitchenLayout selections={selections} onChange={onChange} />;
   if (part === "budget") return <KitchenBudget selections={selections} onChange={onChange} />;
+  const keep = (key: KitchenKeepKey, on: boolean) =>
+    onChange(keepPatch(KITCHEN_KEEP_FIELDS, selections.keepExisting, key, on) as Partial<KitchenSelections>);
   return (
     <div className="flex flex-col gap-6">
 
       {/* Cabinetry Style */}
       <div>
         <SectionLabel>Cabinetry Style</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="cabinetry" className="mb-2" active={isKept(selections.keepExisting, "cabinetry")} onToggle={(on) => keep("cabinetry", on)} />
         <div className="flex flex-col gap-2">
           {CABINETRY_OPTIONS.map((opt) => {
             const active = selections.cabinetry === opt.id;
@@ -90,6 +95,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       {/* Benchtop Material */}
       <div>
         <SectionLabel>Benchtop Material</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="benchtop" className="mb-2" active={isKept(selections.keepExisting, "benchtop")} onToggle={(on) => keep("benchtop", on)} />
         <div className="flex flex-col gap-2">
           {BENCHTOP_OPTIONS.map((opt) => {
             const active = selections.benchtop === opt.id;
@@ -126,6 +132,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       {/* Work Triangle Finishes */}
       <div>
         <SectionLabel>Mixer &amp; Sink Finish</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="sink and mixer tap" className="mb-2" active={isKept(selections.keepExisting, "mixer")} onToggle={(on) => keep("mixer", on)} />
         <div className="grid grid-cols-3 gap-2">
           {MIXER_OPTIONS.map((opt) => {
             const active = selections.mixer === opt.id;
@@ -154,6 +161,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       {/* Splashback */}
       <div>
         <SectionLabel>Splashback</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="splashback" className="mb-2" active={isKept(selections.keepExisting, "splashback")} onToggle={(on) => keep("splashback", on)} />
         <div className="flex flex-col gap-2">
           {SPLASHBACK_OPTIONS.map((opt) => {
             const active = selections.splashback === opt.id;
@@ -190,6 +198,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
 
         {/* Floor finish */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-2">Kitchen Floor</p>
+        <KeepExistingToggle room="kitchen" thing="kitchen floor" className="mb-2" active={isKept(selections.keepExisting, "floor")} onToggle={(on) => keep("floor", on)} />
         <div className="grid grid-cols-3 gap-2 mb-2">
           {KITCHEN_FLOOR_OPTIONS.map((opt) => {
             const active = selections.floorFinish === opt.id && !selections.floorColor;
@@ -230,6 +239,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
 
         {/* Wall paint colour */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-2 mt-4">Wall Paint Colour</p>
+        <KeepExistingToggle room="kitchen" thing="wall colour" className="mb-2" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
         <div className="grid grid-cols-3 gap-2 mb-2">
           {KITCHEN_WALL_OPTIONS.map((opt) => {
             const active = selections.wallColor === opt.color;
@@ -267,6 +277,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       {/* Appliance Integration */}
       <div>
         <SectionLabel>Appliance Integration</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="cooktop and dishwasher" className="mb-3" active={isKept(selections.keepExisting, "appliances")} onToggle={(on) => keep("appliances", on)} />
 
         {/* Cooktop */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-1.5">Cooktop</p>
@@ -324,6 +335,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       {/* Ceiling Style */}
       <div>
         <SectionLabel>Ceiling Treatment</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="ceiling" className="mb-2" active={isKept(selections.keepExisting, "ceiling")} onToggle={(on) => keep("ceiling", on)} />
         <div className="flex flex-col gap-2">
           {CEILING_OPTIONS.map((opt) => {
             const active = selections.ceilingStyle === opt.id;

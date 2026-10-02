@@ -48,6 +48,8 @@ interface PromptInput {
     tileStyle?:         TileStyle | string | null;
     lightingOption?:    LightingOption | string | null;
     structuralChanges?: BuilderSelections["structuralChanges"];
+    /** Bathroom categories the client is keeping as they are */
+    keepExisting?:      readonly string[] | null;
   };
 }
 
@@ -102,6 +104,12 @@ function buildRoomPrompt(req: PromptInput): string {
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
 
+  // Categories the client is keeping as-is
+  const keep = (k: string) => !!selections.keepExisting?.includes(k);
+  const keepLine = (category: string, thing: string) => isPhotoMode
+    ? `${category}: KEEP the existing ${thing} exactly as it appears in the reference photo — do not change its colour, material or style.`
+    : `${category}: the client is keeping their existing ${thing} — show a plain, standard ${thing} rather than an upgrade.`;
+
   const vanityStyle = selections.vanity === "floating"
     ? "a floating wall-mounted vanity with concealed plumbing"
     : "a freestanding floor-mounted vanity";
@@ -146,10 +154,10 @@ function buildRoomPrompt(req: PromptInput): string {
     "",
     // ── Materials ────────────────────────────────────────────────────────────
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
-    `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
-    `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
-    `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
+    keep("floor")   ? keepLine("Floor surface", "floor tiles")  : `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
+    keep("walls")   ? keepLine("Wall surface", "wall tiles")    : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
+    keep("tapware") ? keepLine("Tapware finish", "tapware")     : `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
+    keep("vanity")  ? keepLine("Vanity style", "vanity")        : `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
     "",
     "Remove all personal clutter, towels, and toiletries. The result should look like a",
     "professional architectural photography shot — clean, staged, Australian styling.",
@@ -177,10 +185,10 @@ function buildRoomPrompt(req: PromptInput): string {
     "- Every fixture (vanity, toilet, shower tray, fittings) must be fully grounded on a surface.",
     "",
     // ── Materials ─────────────────────────────────────────────────────────────
-    `Floor surface: ${floorDesc}.`,
-    `Wall surface: ${wallDesc}.`,
-    `Tapware: ${tapwareFmt} finish throughout.`,
-    `Vanity: ${vanityStyle}.`,
+    keep("floor")   ? keepLine("Floor surface", "floor tiles") : `Floor surface: ${floorDesc}.`,
+    keep("walls")   ? keepLine("Wall surface", "wall tiles")   : `Wall surface: ${wallDesc}.`,
+    keep("tapware") ? keepLine("Tapware", "tapware")           : `Tapware: ${tapwareFmt} finish throughout.`,
+    keep("vanity")  ? keepLine("Vanity", "vanity")             : `Vanity: ${vanityStyle}.`,
     "Style: High-end architectural photography, natural Australian daylight, clean staging.",
     "Output: 2K image, no text labels, no watermarks, no annotations on any surface.",
     "",
@@ -193,7 +201,7 @@ function buildRoomPrompt(req: PromptInput): string {
   const tileStyleId = typeof selections.tileStyle === "string" ? selections.tileStyle : selections.tileStyle ?? "";
 
   // ── Tile style / layout (only meaningful when tiles are being changed) ──
-  const tileStyleSection = tileStyleId && TILE_STYLE_PHRASES[tileStyleId]
+  const tileStyleSection = tileStyleId && TILE_STYLE_PHRASES[tileStyleId] && !(keep("floor") && keep("walls"))
     ? `\n\nTile layout: Apply the tiles using ${TILE_STYLE_PHRASES[tileStyleId]}.`
     : "";
 

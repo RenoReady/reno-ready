@@ -19,6 +19,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
 import { useBuilderStore } from "@/lib/store";
+import { isKept, selectionText } from "@/lib/keepExisting";
 import {
   VANITY_OPTIONS,
   TAPWARE_OPTIONS,
@@ -57,6 +58,7 @@ export default function PreviewPage() {
     generatedImageUrl,
     generateDescription,
     roomPhotoUrl,
+    keepExisting,
     customNote,
     customFloorColor,
     customWallColor,
@@ -127,6 +129,7 @@ export default function PreviewPage() {
           wallTile,
           vanity,
           tapware,
+          keepExisting,
           budget,
           customNote,
           customFloorColor,
@@ -448,20 +451,20 @@ export default function PreviewPage() {
               <div className="grid grid-cols-2 gap-2">
                 {(
                   roomType === "kitchen" ? [
-                    { label: "Cabinetry",  value: kitchenSelections.cabinetry  ?? "Not selected" },
-                    { label: "Benchtop",   value: kitchenSelections.benchtop   ?? "Not selected" },
-                    { label: "Splashback", value: kitchenSelections.splashback ?? "Not selected" },
-                    { label: "Cooktop",    value: kitchenSelections.cooktop },
+                    { label: "Cabinetry",  value: selectionText(kitchenSelections.cabinetry,  isKept(kitchenSelections.keepExisting, "cabinetry")) },
+                    { label: "Benchtop",   value: selectionText(kitchenSelections.benchtop,   isKept(kitchenSelections.keepExisting, "benchtop")) },
+                    { label: "Splashback", value: selectionText(kitchenSelections.splashback, isKept(kitchenSelections.keepExisting, "splashback")) },
+                    { label: "Cooktop",    value: selectionText(kitchenSelections.cooktop,    isKept(kitchenSelections.keepExisting, "appliances")) },
                   ] : roomType === "bedroom" ? [
-                    { label: "Flooring",  value: bedroomSelections.flooring      ?? "Not selected" },
-                    { label: "Wall",      value: bedroomSelections.wallTreatment ?? "Not selected" },
-                    { label: "Lighting",  value: bedroomSelections.lighting      ?? "Not selected" },
-                    { label: "Storage",   value: bedroomSelections.storage       ?? "Not selected" },
+                    { label: "Flooring",  value: selectionText(bedroomSelections.flooring,      isKept(bedroomSelections.keepExisting, "flooring")) },
+                    { label: "Wall",      value: selectionText(bedroomSelections.wallTreatment, isKept(bedroomSelections.keepExisting, "walls")) },
+                    { label: "Lighting",  value: selectionText(bedroomSelections.lighting,      isKept(bedroomSelections.keepExisting, "lighting")) },
+                    { label: "Storage",   value: selectionText(bedroomSelections.storage,       isKept(bedroomSelections.keepExisting, "storage")) },
                   ] : [
-                    { label: "Floor",   value: floorTile?.name ?? "Not selected" },
-                    { label: "Wall",    value: wallTile?.name  ?? "Not selected" },
-                    { label: "Vanity",  value: vanityLabel },
-                    { label: "Tapware", value: tapwareLabel },
+                    { label: "Floor",   value: selectionText(floorTile?.name, isKept(keepExisting, "floor")) },
+                    { label: "Wall",    value: selectionText(wallTile?.name,  isKept(keepExisting, "walls")) },
+                    { label: "Vanity",  value: selectionText(vanity ? vanityLabel : null,   isKept(keepExisting, "vanity")) },
+                    { label: "Tapware", value: selectionText(tapware ? tapwareLabel : null, isKept(keepExisting, "tapware")) },
                   ]
                 ).map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-sand-50 border border-sand-200 px-3 py-2.5">

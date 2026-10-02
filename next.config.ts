@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The admin dashboard lives at /admin — send /dashboard there too
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/admin", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

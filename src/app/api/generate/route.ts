@@ -12,8 +12,8 @@
  *                    "AI Preview Simulated" badge.
  *
  *  REAL            — GOOGLE_API_KEY is set in .env.local.
- *                    Tries gemini-3.1-flash-image-preview first;
- *                    falls back to gemini-2.5-flash-image if the
+ *                    Tries gemini-2.5-flash-image first;
+ *                    falls back to gemini-3.1-flash-image if the
  *                    primary model is unavailable in your region.
  *                    If a room photo is provided it is passed as
  *                    an inlineData part so the model can apply
@@ -127,10 +127,12 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
 }
 
 // ── Models — fastest first ─────────────────────────────────────────
-// Try 2.5-flash first; fall back to 3.1-flash-preview if it fails.
+// gemini-2.5-flash-image   — fastest, primary
+// gemini-3.1-flash-image   — stable GA (replaces -preview per Google's
+//                            Aug 2026 deprecation notice for Imagen 4 endpoints)
 const MODELS = [
   "gemini-2.5-flash-image",
-  "gemini-3.1-flash-image-preview",
+  "gemini-3.1-flash-image",
 ];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

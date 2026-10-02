@@ -18,7 +18,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
-    overflow-x: hidden;
+    overflow-x: clip;   /* clip, not hidden: hidden turns this into a scroll container and breaks position: sticky */
   }
 
   h1, h2, h3, h4, h5, h6 {

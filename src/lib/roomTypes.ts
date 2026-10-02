@@ -25,12 +25,6 @@ export const ROOM_DESCRIPTIONS: Record<RoomType, string> = {
   bedroom:  "Flooring, joinery, wall treatments & lighting",
 };
 
-export const ROOM_ICONS: Record<RoomType, string> = {
-  bathroom: "🛁",
-  kitchen:  "🏗️",
-  bedroom:  "🛏️",
-};
-
 // ── Global ceiling ────────────────────────────────────────────────────────────
 
 export type CeilingStyle = "standard-white" | "vj-paneling" | "exposed-beam" | "coffered";

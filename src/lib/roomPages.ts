@@ -19,7 +19,6 @@ export interface RoomVideo {
 export interface RoomPage {
   room:        RoomType;
   path:        `/${RoomType}`;
-  emoji:       string;
   eyebrow:     string;
   title:       string;
   /** Link text used when pointing at this room from elsewhere */
@@ -41,11 +40,10 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
   bathroom: {
     room:     "bathroom",
     path:     "/bathroom",
-    emoji:    "🛁",
     eyebrow:  "The Sanctuary",
-    title:    "Design your bathroom",
+    title:    "Design Your Dream Bathroom",
     exploreLabel: "Explore Bathrooms",
-    intro:    "Pick your tiles, vanity and tapware, preview it with AI, and see an itemised cost estimate in seconds.",
+    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
     features: [
       "Nude Travertine & Zellige tile library",
       "Walk-in showers, niches & structural changes",
@@ -59,11 +57,10 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
   kitchen: {
     room:     "kitchen",
     path:     "/kitchen",
-    emoji:    "🏗️",
     eyebrow:  "The Heart",
-    title:    "Design your kitchen",
+    title:    "Design Your Dream Kitchen",
     exploreLabel: "Explore Kitchens",
-    intro:    "Choose cabinetry, benchtops and splashbacks, preview it with AI, and get an itemised estimate before you call a builder.",
+    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
     features: [
       "Cabinetry, benchtop & splashback combos",
       "Island bench design with cost advisor",
@@ -77,11 +74,10 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
   bedroom: {
     room:     "bedroom",
     path:     "/bedroom",
-    emoji:    "🛏️",
     eyebrow:  "The Retreat",
-    title:    "Design your bedroom",
+    title:    "Design Your Dream Bedroom",
     exploreLabel: "Explore Bedrooms",
-    intro:    "Try flooring, wall treatments and lighting, preview it with AI, and get an itemised estimate for your living or master suite.",
+    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
     features: [
       "Flooring: oak herringbone to polished concrete",
       "Wall treatments: VJ, limewash, feature paint",

@@ -11,14 +11,14 @@
  */
 
 import { useState } from "react";
-import { ArrowRight, Plus, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Plus, CheckCircle2, Bath, ChefHat, BedDouble, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type RoomType, ROOM_LABELS, ROOM_DESCRIPTIONS } from "@/lib/roomTypes";
 import type { SavedRoom } from "@/lib/roomTypes";
 
 const ROOM_CARDS: {
   type:        RoomType;
-  emoji:       string;
+  icon:        LucideIcon;
   label:       string;
   accentBorder: string;
   accentBg:    string;
@@ -29,7 +29,7 @@ const ROOM_CARDS: {
 }[] = [
   {
     type:        "bathroom",
-    emoji:       "🛁",
+    icon:        Bath,
     label:       "Bathroom",
     accentBorder: "border-terracotta",
     accentBg:    "bg-terracotta/5",
@@ -40,7 +40,7 @@ const ROOM_CARDS: {
   },
   {
     type:        "kitchen",
-    emoji:       "🏗️",
+    icon:        ChefHat,
     label:       "Kitchen",
     accentBorder: "border-amber-500",
     accentBg:    "bg-amber-500/5",
@@ -51,7 +51,7 @@ const ROOM_CARDS: {
   },
   {
     type:        "bedroom",
-    emoji:       "🛏️",
+    icon:        BedDouble,
     label:       "Bedroom / Living",
     accentBorder: "border-blue-500",
     accentBg:    "bg-blue-500/5",
@@ -139,7 +139,7 @@ export default function RoomRouter({ onSelect, savedRooms = [] }: RoomRouterProp
                 "relative w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-all",
                 isHighlighted ? "bg-white/80 shadow-warm-sm" : "bg-sand-100 group-hover:bg-sand-200",
               )}>
-                {card.emoji}
+                <card.icon size={26} strokeWidth={1.75} className={isHighlighted ? card.accentText : "text-charcoal/50"} />
               </div>
 
               {/* Label & description */}
@@ -199,7 +199,7 @@ export default function RoomRouter({ onSelect, savedRooms = [] }: RoomRouterProp
         {pendingCard && (
           <div className="bg-white border-2 border-sand-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-warm-lg">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-2xl">{pendingCard.emoji}</span>
+              <pendingCard.icon size={24} strokeWidth={1.75} className={pendingCard.accentText} />
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-charcoal/40 uppercase tracking-wider">
                   {isAddingRoom ? "Add to project" : "You selected"}

@@ -60,6 +60,7 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
     useCustomDimensions:  s.useCustomDimensions,
     customLength:         s.customLength,
     customWidth:          s.customWidth,
+    layoutTemplate:       s.layoutTemplate,
     pendingGenerate,
   };
   try {
@@ -99,6 +100,7 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.projectBrief   !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
     if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption | null);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);
+    if (saved.layoutTemplate)             store.setLayoutTemplate(saved.layoutTemplate as string);
     if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
     if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
     if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType | null);
@@ -194,6 +196,11 @@ interface BuilderStore extends BuilderSelections {
   removeSavedRoom:  (id: string)     => void;
   clearSavedRooms:  ()               => void;
 
+  // ── Step 3: a sample layout, used instead of a photo ────────────────────────
+  layoutTemplate:         string | null;
+  /** Picking a template clears the photo, and uploading a photo clears the template */
+  setLayoutTemplate:      (id: string | null)             => void;
+
   // ── Existing setters ───────────────────────────────────────────────────────
   setRoomPhotoUrl:        (url: string | null)            => void;
   setFloorTile:           (tile: TileOption | null)        => void;
@@ -277,6 +284,7 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
       generatedImageUrl: null,
       generateDescription: null,
       roomPhotoUrl:      null,                 // clear photo when switching rooms
+      layoutTemplate:    null,                 // templates are room-specific
       roomsInitialised:  { ...st.roomsInitialised, [r]: true },
     };
 
@@ -344,8 +352,12 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
   removeSavedRoom: (id)  => set((st) => ({ savedRooms: st.savedRooms.filter((r) => r.id !== id) })),
   clearSavedRooms: ()    => set({ savedRooms: [] }),
 
+  // ── Step 3 ────────────────────────────────────────────────────────────────
+  layoutTemplate:         null,
+  setLayoutTemplate:      (id)    => set(id ? { layoutTemplate: id, roomPhotoUrl: null } : { layoutTemplate: null }),
+
   // ── Existing setters ───────────────────────────────────────────────────────
-  setRoomPhotoUrl:        (url)   => set({ roomPhotoUrl: url }),
+  setRoomPhotoUrl:        (url)   => set(url ? { roomPhotoUrl: url, layoutTemplate: null } : { roomPhotoUrl: null }),
   setFloorTile:           (tile)  => set({ floorTile: tile }),
   setWallTile:            (tile)  => set({ wallTile: tile }),
   setVanity:              (v)     => set({ vanity: v }),

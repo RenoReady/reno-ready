@@ -24,7 +24,6 @@ interface CategoryLink {
   label: string;
   sub:   string;
   url:   string;      // hardcoded stable retailer category page
-  emoji: string;
 }
 
 interface FeaturedProduct {
@@ -50,37 +49,31 @@ const KITCHEN_CATEGORIES: CategoryLink[] = [
     label: "Cabinet Doors & Panels",
     sub:   "Kaboodle flatpack, full range of colours and profiles",
     url:   "https://www.bunnings.com.au/kaboodle-it/products/doors-and-panels",
-    emoji: "🚪",
   },
   {
     label: "Benchtops",
     sub:   "Laminate, stone-look and timber options",
     url:   "https://www.bunnings.com.au/kaboodle-it/products/benchtops",
-    emoji: "🔲",
   },
   {
     label: "Kitchen Hardware",
     sub:   "Handles, hinges, runners and soft-close fittings",
     url:   "https://www.bunnings.com.au/products/kitchen/kitchen-storage-organisation/cabinet-hardware",
-    emoji: "🔧",
   },
   {
     label: "Sinks & Mixers",
     sub:   "Undermount, drop-in and butler sinks with mixers",
     url:   "https://www.bunnings.com.au/products/kitchen/kitchen-sinks-and-taps",
-    emoji: "🚿",
   },
   {
     label: "Splashback Tiles",
     sub:   "Subway, stone-look and glass splashback options",
     url:   "https://www.beaumonttiles.com.au/collections/splashback-tiles",
-    emoji: "🟦",
   },
   {
     label: "Kitchen Appliances",
     sub:   "Cooktops, ovens, rangehoods and dishwashers",
     url:   "https://www.appliancesonline.com.au/category/kitchen-appliances",
-    emoji: "🍳",
   },
 ];
 
@@ -89,37 +82,31 @@ const BATHROOM_CATEGORIES: CategoryLink[] = [
     label: "Vanities",
     sub:   "Wall-hung and freestanding vanities, all sizes",
     url:   "https://www.reece.com.au/bathroom/vanities",
-    emoji: "🪞",
   },
   {
     label: "Tapware & Mixers",
     sub:   "Matte black, brushed gold, chrome and brushed nickel",
     url:   "https://www.highgrovebathrooms.com.au/tapware",
-    emoji: "🚰",
   },
   {
     label: "Showers & Screens",
     sub:   "Frameless, semi-frameless and framed enclosures",
     url:   "https://www.reece.com.au/bathroom/showers",
-    emoji: "🚿",
   },
   {
     label: "Toilets & Suites",
     sub:   "Wall-hung, close-coupled and in-wall cistern suites",
     url:   "https://www.reece.com.au/bathroom/toilets",
-    emoji: "🪣",
   },
   {
     label: "Floor & Wall Tiles",
     sub:   "Porcelain, travertine, zellige and mosaic options",
     url:   "https://www.beaumonttiles.com.au/collections/bathroom-tiles",
-    emoji: "🟫",
   },
   {
     label: "Bathroom Accessories",
     sub:   "Towel rails, hooks, mirrors and soap dispensers",
     url:   "https://www.highgrovebathrooms.com.au/accessories",
-    emoji: "🪥",
   },
 ];
 
@@ -128,37 +115,31 @@ const BEDROOM_CATEGORIES: CategoryLink[] = [
     label: "Carpet",
     sub:   "Wool, nylon and solution-dyed nylon loop pile",
     url:   "https://www.carpetcourt.com.au/carpets",
-    emoji: "🟤",
   },
   {
     label: "Timber & Hybrid Flooring",
     sub:   "Engineered oak, solid timber and hybrid planks",
     url:   "https://www.flooringxtra.com.au/timber-flooring",
-    emoji: "🪵",
   },
   {
     label: "Built-in Wardrobes",
     sub:   "Sliding, hinged and walk-in robe systems",
     url:   "https://www.kinsman.com.au/wardrobes",
-    emoji: "👔",
   },
   {
     label: "Bedroom Lighting",
     sub:   "Pendants, downlights, LED cove and bedside sconces",
     url:   "https://www.beacon.com.au/bedroom-lighting",
-    emoji: "💡",
   },
   {
     label: "Wall Treatments",
     sub:   "Paint, limewash, VJ panels and wallpaper",
     url:   "https://www.dulux.com.au/colour/bedroom",
-    emoji: "🎨",
   },
   {
     label: "Window Furnishings",
     sub:   "Sheers, blockout rollers and plantation shutters",
     url:   "https://www.blinds.com.au",
-    emoji: "🪟",
   },
 ];
 
@@ -498,8 +479,7 @@ function CategoryCard({ cat }: { cat: CategoryLink }) {
         "hover:border-blue-400/50 hover:bg-blue-50/40 transition-all duration-200 group",
       )}
     >
-      <div className="flex items-start justify-between">
-        <span className="text-xl leading-none">{cat.emoji}</span>
+      <div className="flex items-start justify-end">
         <ExternalLink size={11} className="text-charcoal/25 group-hover:text-blue-500 transition-colors flex-shrink-0 mt-0.5" />
       </div>
       <p className="text-xs font-bold text-charcoal/80 leading-snug group-hover:text-blue-600 transition-colors">

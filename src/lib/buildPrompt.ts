@@ -27,6 +27,7 @@ import {
   buildKitchenPrompt,
   buildBedroomPrompt,
 } from "./roomTypes";
+import { findTemplate } from "./layoutTemplates";
 
 interface PromptInput {
   imageBase64?: string | null;       // present if user uploaded a photo
@@ -34,6 +35,8 @@ interface PromptInput {
   roomType?: RoomType;               // defaults to "bathroom"
   kitchenSelections?: KitchenSelections | null;
   bedroomSelections?: BedroomSelections | null;
+  /** Step 3 sample layout id — only used when there is no photo */
+  layoutTemplate?: string | null;
   selections: {
     floorTile?:         { id: string; name: string } | TileOption | null;
     wallTile?:          { id: string; name: string } | TileOption | null;
@@ -60,6 +63,17 @@ const TILE_STYLE_PHRASES: Record<string, string> = {
 };
 
 export function buildGeminiPrompt(req: PromptInput): string {
+  // A sample layout from Step 3 stands in for the photo
+  const template = req.imageBase64 ? null : findTemplate(req.layoutTemplate, req.roomType ?? "bathroom");
+  const layoutSection = template
+    ? `
+
+ROOM LAYOUT (follow this floor plan): Render ${template.promptLine}`
+    : "";
+  return buildRoomPrompt(req) + layoutSection;
+}
+
+function buildRoomPrompt(req: PromptInput): string {
   // ── Route to room-specific prompt builders ─────────────────────
   if (req.roomType === "kitchen" && req.kitchenSelections) {
     return buildKitchenPrompt(req.kitchenSelections, !!req.imageBase64);

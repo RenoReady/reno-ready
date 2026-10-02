@@ -45,6 +45,8 @@ interface GenerateRequest {
   kitchenSelections?: Record<string, unknown> | null;
   /** Bedroom-specific selections (present when roomType === "bedroom") */
   bedroomSelections?: Record<string, unknown> | null;
+  /** Step 3 sample layout id, used when there is no photo (looked up server-side) */
+  layoutTemplate?: string | null;
   /** Human-readable prompt derived from the user's selections */
   prompt: string;
   /** Structured selections for logging / prompt enrichment */
@@ -102,6 +104,7 @@ function buildGeminiPrompt(req: GenerateRequest): string {
     kitchenSelections: req.kitchenSelections as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bedroomSelections: req.bedroomSelections as any,
+    layoutTemplate:    typeof req.layoutTemplate === "string" ? req.layoutTemplate : null,
     selections:        req.selections,
   });
 }

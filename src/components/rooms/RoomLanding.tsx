@@ -7,14 +7,17 @@
  */
 
 import Link from "next/link";
-import { ArrowDown, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowDown, ArrowRight, Bath, BedDouble, CheckCircle2, ChefHat } from "lucide-react";
 import HeroVideo from "@/components/ui/HeroVideo";
 import RoomConfigurator from "@/components/builder/RoomConfigurator";
 import { ROOM_PAGES, type RoomPage } from "@/lib/roomPages";
 import type { RoomType } from "@/lib/roomTypes";
 
+const ROOM_ICON = { bathroom: Bath, kitchen: ChefHat, bedroom: BedDouble } as const;
+
 // Shown until a room has its own reel — matches the builder's blueprint viewport
 function StaticReel({ page }: { page: RoomPage }) {
+  const Icon = ROOM_ICON[page.room];
   return (
     <div
       className="relative aspect-video w-full overflow-hidden rounded-3xl shadow-warm-xl"
@@ -27,8 +30,8 @@ function StaticReel({ page }: { page: RoomPage }) {
     >
       <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-terracotta/25 blur-3xl" />
       <div className="relative flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-4xl sm:h-20 sm:w-20 sm:text-5xl">
-          {page.emoji}
+        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 sm:h-20 sm:w-20">
+          <Icon size={34} strokeWidth={1.6} className="text-white/85" />
         </span>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-terracotta">{page.eyebrow}</p>
         <div className="hidden flex-wrap justify-center gap-2 sm:flex">
@@ -55,7 +58,7 @@ export default function RoomLanding({ room }: { room: RoomType }) {
         <div className="relative mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-12">
           <div className="flex flex-col gap-5 sm:gap-6">
             <p className="text-sm font-bold uppercase tracking-widest text-terracotta">
-              {page.emoji} {page.eyebrow}
+              {page.eyebrow}
             </p>
             <h1 className="text-balance text-4xl font-bold leading-[1.05] text-charcoal sm:text-5xl xl:text-6xl">
               {page.title}
@@ -76,7 +79,7 @@ export default function RoomLanding({ room }: { room: RoomType }) {
                 href="#configurator"
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-7 py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] transition-all hover:bg-blue-700"
               >
-                Start designing <ArrowDown size={18} />
+                Start with Step 1 <ArrowDown size={18} />
               </a>
               {others.map((o) => (
                 <Link
@@ -84,7 +87,7 @@ export default function RoomLanding({ room }: { room: RoomType }) {
                   href={o.path}
                   className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-sm font-bold text-charcoal/60 transition-colors hover:text-terracotta"
                 >
-                  {o.emoji} {o.exploreLabel} <ArrowRight size={14} />
+                  {o.exploreLabel} <ArrowRight size={14} />
                 </Link>
               ))}
             </div>

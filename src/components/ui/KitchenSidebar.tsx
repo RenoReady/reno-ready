@@ -3,8 +3,10 @@
 /**
  * KitchenSidebar
  *
- * The 5-category design selection panel for Kitchen renovations.
- * Mirrors the bathroom sidebar's UX pattern — card selectors with cost indicators.
+ * Kitchen selectors, rendered in two parts by the visualiser:
+ *   part="finishes" (Step 1) — cabinetry, benchtop, mixer, splashback, colours,
+ *                              appliances, ceiling, additional request
+ *   part="layout"   (Step 2) — kitchen size, island bench, budget
  */
 
 import { cn } from "@/lib/utils";
@@ -39,78 +41,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 interface KitchenSidebarProps {
   selections:  KitchenSelections;
   onChange:    (s: Partial<KitchenSelections>) => void;
+  part:        "finishes" | "layout" | "budget";
 }
 
-export default function KitchenSidebar({ selections, onChange }: KitchenSidebarProps) {
+export default function KitchenSidebar({ selections, onChange, part }: KitchenSidebarProps) {
+  if (part === "layout") return <KitchenLayout selections={selections} onChange={onChange} />;
+  if (part === "budget") return <KitchenBudget selections={selections} onChange={onChange} />;
   return (
     <div className="flex flex-col gap-6">
 
-      {/* 0 — Kitchen Size */}
+      {/* Cabinetry Style */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Ruler size={12} className="text-charcoal/40" />
-          <SectionLabel>0 — Kitchen Size</SectionLabel>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {KITCHEN_SIZE_OPTIONS.map((opt) => {
-            const active = selections.roomSize === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ roomSize: selections.roomSize === opt.id ? null : opt.id as KitchenRoomSize, customLength: 0, customWidth: 0 })}
-                className={cn(
-                  "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                )}
-              >
-                <p className={cn("text-xs font-bold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
-                <p className="text-[10px] text-charcoal/45 leading-snug">{opt.sub}</p>
-                {opt.approxSqm && (
-                  <p className={cn("text-[10px] font-semibold mt-0.5", active ? "text-terracotta/70" : "text-charcoal/35")}>{opt.approxSqm}</p>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Custom dimension inputs */}
-        {selections.roomSize === "custom" && (
-          <div className="flex flex-col gap-2 mt-3">
-            <p className="text-[11px] text-charcoal/50 font-medium">Enter dimensions (metres):</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Length</label>
-                <input
-                  type="number" min={1} max={30} step={0.1}
-                  value={selections.customLength || ""}
-                  onChange={(e) => onChange({ customLength: Number(e.target.value) })}
-                  placeholder="e.g. 5.0"
-                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Width</label>
-                <input
-                  type="number" min={1} max={30} step={0.1}
-                  value={selections.customWidth || ""}
-                  onChange={(e) => onChange({ customWidth: Number(e.target.value) })}
-                  placeholder="e.g. 4.0"
-                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
-                />
-              </div>
-            </div>
-            {selections.customLength > 0 && selections.customWidth > 0 && (
-              <p className="text-[11px] text-terracotta font-semibold">
-                {(selections.customLength * selections.customWidth).toFixed(1)} m² — AI will maintain these exact proportions
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 1 — Cabinetry Style */}
-      <div>
-        <SectionLabel>1 — Cabinetry Style</SectionLabel>
+        <SectionLabel>Cabinetry Style</SectionLabel>
         <div className="flex flex-col gap-2">
           {CABINETRY_OPTIONS.map((opt) => {
             const active = selections.cabinetry === opt.id;
@@ -145,9 +87,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 2 — Benchtop Material */}
+      {/* Benchtop Material */}
       <div>
-        <SectionLabel>2 — Benchtop Material</SectionLabel>
+        <SectionLabel>Benchtop Material</SectionLabel>
         <div className="flex flex-col gap-2">
           {BENCHTOP_OPTIONS.map((opt) => {
             const active = selections.benchtop === opt.id;
@@ -181,9 +123,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 3 — Work Triangle Finishes */}
+      {/* Work Triangle Finishes */}
       <div>
-        <SectionLabel>3 — Mixer &amp; Sink Finish</SectionLabel>
+        <SectionLabel>Mixer &amp; Sink Finish</SectionLabel>
         <div className="grid grid-cols-3 gap-2">
           {MIXER_OPTIONS.map((opt) => {
             const active = selections.mixer === opt.id;
@@ -209,9 +151,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 4 — Splashback */}
+      {/* Splashback */}
       <div>
-        <SectionLabel>4 — Splashback</SectionLabel>
+        <SectionLabel>Splashback</SectionLabel>
         <div className="flex flex-col gap-2">
           {SPLASHBACK_OPTIONS.map((opt) => {
             const active = selections.splashback === opt.id;
@@ -242,9 +184,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 5 — Floor & Wall Colour */}
+      {/* Floor & Wall Colour */}
       <div>
-        <SectionLabel>5 — Floor &amp; Wall Colour</SectionLabel>
+        <SectionLabel>Floor &amp; Wall Colour</SectionLabel>
 
         {/* Floor finish */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-2">Kitchen Floor</p>
@@ -322,9 +264,9 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </div>
       </div>
 
-      {/* 6 — Appliance Integration */}
+      {/* Appliance Integration */}
       <div>
-        <SectionLabel>6 — Appliance Integration</SectionLabel>
+        <SectionLabel>Appliance Integration</SectionLabel>
 
         {/* Cooktop */}
         <p className="text-[10px] font-semibold text-charcoal/50 mb-1.5">Cooktop</p>
@@ -377,7 +319,128 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
           })}
         </div>
 
-        {/* Island toggle */}
+      </div>
+
+      {/* Ceiling Style */}
+      <div>
+        <SectionLabel>Ceiling Treatment</SectionLabel>
+        <div className="flex flex-col gap-2">
+          {CEILING_OPTIONS.map((opt) => {
+            const active = selections.ceilingStyle === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
+                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
+                )}
+              >
+                <div className="min-w-0">
+                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
+                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {opt.cost > 0 && (
+                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
+                      +${(opt.cost / 1000).toFixed(1)}k
+                    </span>
+                  )}
+                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Custom note */}
+      <div>
+        <SectionLabel>Additional Request</SectionLabel>
+        <textarea
+          value={selections.customNote}
+          onChange={(e) => onChange({ customNote: e.target.value })}
+          placeholder="e.g. I want a butler's pantry behind the main kitchen..."
+          rows={2}
+          className="w-full px-3 py-2.5 rounded-xl border-2 border-sand-200 bg-white/60 text-xs text-charcoal focus:outline-none focus:border-terracotta/50 resize-none transition-all"
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Step 2 part: size, island bench, budget ───────────────────────
+
+function KitchenLayout({ selections, onChange }: Omit<KitchenSidebarProps, "part">) {
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* Kitchen Size */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Ruler size={12} className="text-charcoal/40" />
+          <SectionLabel>Kitchen Size</SectionLabel>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {KITCHEN_SIZE_OPTIONS.map((opt) => {
+            const active = selections.roomSize === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => onChange({ roomSize: selections.roomSize === opt.id ? null : opt.id as KitchenRoomSize, customLength: 0, customWidth: 0 })}
+                className={cn(
+                  "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200",
+                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                )}
+              >
+                <p className={cn("text-xs font-bold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
+                <p className="text-[10px] text-charcoal/45 leading-snug">{opt.sub}</p>
+                {opt.approxSqm && (
+                  <p className={cn("text-[10px] font-semibold mt-0.5", active ? "text-terracotta/70" : "text-charcoal/35")}>{opt.approxSqm}</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom dimension inputs */}
+        {selections.roomSize === "custom" && (
+          <div className="flex flex-col gap-2 mt-3">
+            <p className="text-[11px] text-charcoal/50 font-medium">Enter dimensions (metres):</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Length</label>
+                <input
+                  type="number" min={1} max={30} step={0.1}
+                  value={selections.customLength || ""}
+                  onChange={(e) => onChange({ customLength: Number(e.target.value) })}
+                  placeholder="e.g. 5.0"
+                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Width</label>
+                <input
+                  type="number" min={1} max={30} step={0.1}
+                  value={selections.customWidth || ""}
+                  onChange={(e) => onChange({ customWidth: Number(e.target.value) })}
+                  placeholder="e.g. 4.0"
+                  className="w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200 focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80"
+                />
+              </div>
+            </div>
+            {selections.customLength > 0 && selections.customWidth > 0 && (
+              <p className="text-[11px] text-terracotta font-semibold">
+                {(selections.customLength * selections.customWidth).toFixed(1)} m² — AI will maintain these exact proportions
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Island bench */}
+      <div>
+        <SectionLabel>Layout Options</SectionLabel>
         <button
           onClick={() => onChange({ hasIsland: !selections.hasIsland })}
           className={cn(
@@ -410,39 +473,15 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
         </button>
       </div>
 
-      {/* 7 — Ceiling Style */}
-      <div>
-        <SectionLabel>7 — Ceiling Treatment</SectionLabel>
-        <div className="flex flex-col gap-2">
-          {CEILING_OPTIONS.map((opt) => {
-            const active = selections.ceilingStyle === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {opt.cost > 0 && (
-                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                      +${(opt.cost / 1000).toFixed(1)}k
-                    </span>
-                  )}
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    </div>
+  );
+}
 
+// ── Step 2 part, shown last: budget ───────────────────────────────
+
+function KitchenBudget({ selections, onChange }: Omit<KitchenSidebarProps, "part">) {
+  return (
+    <>
       {/* Budget */}
       <div>
         <div className="flex items-center gap-2 mb-3">
@@ -475,18 +514,6 @@ export default function KitchenSidebar({ selections, onChange }: KitchenSidebarP
           </p>
         </div>
       </div>
-
-      {/* Custom note */}
-      <div>
-        <SectionLabel>Additional Request</SectionLabel>
-        <textarea
-          value={selections.customNote}
-          onChange={(e) => onChange({ customNote: e.target.value })}
-          placeholder="e.g. I want a butler's pantry behind the main kitchen..."
-          rows={2}
-          className="w-full px-3 py-2.5 rounded-xl border-2 border-sand-200 bg-white/60 text-xs text-charcoal focus:outline-none focus:border-terracotta/50 resize-none transition-all"
-        />
-      </div>
-    </div>
+    </>
   );
 }

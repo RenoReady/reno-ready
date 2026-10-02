@@ -11,6 +11,8 @@ import BuyButton from "@/components/ui/BuyButton";
 import PricingMotion from "@/components/ui/PricingMotion";
 import Marquee from "@/components/ui/Marquee";
 import { type PlanKey } from "@/lib/plans";
+import HeroVideo from "@/components/ui/HeroVideo";
+import { MARKETING_VIDEO, ROOM_PAGES } from "@/lib/roomPages";
 
 // ── Tile swatch preview ────────────────────────────────────────────
 function TileSwatch({ bgClass }: { bgClass: string }) {
@@ -135,12 +137,12 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO
       ══════════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden pt-16 pb-24 px-6">
+      <section className="relative overflow-hidden pt-6 sm:pt-16 pb-16 sm:pb-24 px-6">
         <div className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full bg-terracotta/6 blur-3xl pointer-events-none" />
         <div className="absolute top-40 -left-40 w-[400px] h-[400px] rounded-full bg-sand-300/60 blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-14 items-center">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 lg:gap-14 items-center">
 
             {/* Left: copy */}
             <ScrollReveal>
@@ -155,36 +157,34 @@ export default function LandingPage() {
 
                 {/* Headline */}
                 <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-charcoal leading-[1.05] text-balance">
-                  Visualize Your Dream Home Renovation{" "}
-                  <span className="text-terracotta">in Seconds.</span>
+                  Renovation Planning,{" "}
+                  <span className="text-terracotta">Made Simple.</span>
                 </h1>
 
                 {/* Sub-headline */}
-                <p className="text-xl text-charcoal/60 leading-relaxed max-w-[520px]">
-                  Professional AI designs and realistic cost breakdowns for your{" "}
-                  <span className="font-semibold text-charcoal/80">Bathroom</span>,{" "}
-                  <span className="font-semibold text-charcoal/80">Kitchen</span>, and{" "}
-                  <span className="font-semibold text-charcoal/80">Master Suite</span>.
-                  Stop guessing and start building with Reno Ready.
+                <p className="text-xl text-charcoal/60 leading-relaxed max-w-[540px]">
+                  Design your bathroom, kitchen, or bedroom in seconds, get an instant itemised
+                  cost estimate, and generate a builder brief.
                 </p>
 
-                {/* Primary CTA — Royal Blue */}
-                <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <Link href="/builder">
-                    <button className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-blue-600 text-white text-lg font-bold shadow-[0_8px_24px_rgba(37,99,235,0.35)] hover:bg-blue-700 hover:scale-[1.02] active:scale-100 transition-all duration-200">
-                      Start My Free Preview
-                      <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform duration-200" />
-                    </button>
+                {/* Room CTAs */}
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+                  <Link
+                    href={ROOM_PAGES.bathroom.path}
+                    className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-blue-600 text-white text-lg font-bold shadow-[0_8px_24px_rgba(37,99,235,0.35)] hover:bg-blue-700 transition-all duration-200"
+                  >
+                    Design Bathroom
+                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform duration-200" />
                   </Link>
-                </div>
-
-                {/* Whole-home nudge */}
-                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 max-w-[480px]">
-                  <Home size={14} className="text-blue-500 flex-shrink-0 mt-0.5" strokeWidth={2.5} />
-                  <p className="text-sm text-blue-700 leading-snug">
-                    <span className="font-semibold">Planning a whole-home refresh?</span>{" "}
-                    Easily add multiple rooms to a single project report for your builder.
-                  </p>
+                  {[ROOM_PAGES.kitchen, ROOM_PAGES.bedroom].map((p) => (
+                    <Link
+                      key={p.room}
+                      href={p.path}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-sand-300 bg-white/70 text-charcoal text-base font-bold hover:border-terracotta/50 hover:text-terracotta transition-all duration-200"
+                    >
+                      {p.exploreLabel}
+                    </Link>
+                  ))}
                 </div>
 
                 {/* Trust badges */}
@@ -199,16 +199,12 @@ export default function LandingPage() {
               </div>
             </ScrollReveal>
 
-            {/* Right: before/after slider */}
-            <ScrollReveal variant="scaleIn" delay={0.15}>
-              <div className="flex flex-col gap-4">
-                <BeforeAfterSlider height={420} className="w-full" />
-                <p className="text-xs text-charcoal/45 text-center leading-relaxed px-2">
-                  <span className="font-semibold text-charcoal/60">Prompt used:</span>{" "}
-                  Modernize this space with terracotta floor tiles, charcoal vanity, and brushed gold tapware.
-                </p>
-              </div>
-            </ScrollReveal>
+            {/* Right: 15-second walkthrough (not wrapped in ScrollReveal, so the poster paints immediately) */}
+            <HeroVideo
+              {...MARKETING_VIDEO}
+              className="order-first lg:order-none"
+              label="Reno Ready in 15 seconds: design a bathroom, see the cost, then talk to a builder"
+            />
 
           </div>
         </div>
@@ -270,7 +266,7 @@ export default function LandingPage() {
 
             {/* The Sanctuary — Bathroom */}
             <ScrollReveal delay={0}>
-              <Link href="/builder" className="group block h-full">
+              <Link href={ROOM_PAGES.bathroom.path} className="group block h-full">
                 <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-terracotta/50 hover:shadow-warm-lg transition-all duration-300 h-full overflow-hidden cursor-pointer">
                   {/* Hover stat pill */}
                   <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-terracotta/10 border border-terracotta/20 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
@@ -308,7 +304,7 @@ export default function LandingPage() {
 
             {/* The Heart — Kitchen */}
             <ScrollReveal delay={0.1}>
-              <Link href="/builder" className="group block h-full">
+              <Link href={ROOM_PAGES.kitchen.path} className="group block h-full">
                 <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-amber-500/50 hover:shadow-[0_8px_32px_rgba(245,158,11,0.15)] transition-all duration-300 h-full overflow-hidden cursor-pointer">
                   {/* Hover stat pill */}
                   <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
@@ -346,7 +342,7 @@ export default function LandingPage() {
 
             {/* The Retreat — Bedroom */}
             <ScrollReveal delay={0.2}>
-              <Link href="/builder" className="group block h-full">
+              <Link href={ROOM_PAGES.bedroom.path} className="group block h-full">
                 <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-blue-500/50 hover:shadow-[0_8px_32px_rgba(59,130,246,0.12)] transition-all duration-300 h-full overflow-hidden cursor-pointer">
                   {/* Hover stat pill */}
                   <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">

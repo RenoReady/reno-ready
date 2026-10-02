@@ -45,6 +45,6 @@ export const config = {
    * the OAuth flow can complete unimpeded.
    */
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|logo.png|.*\\.(?:png|jpg|jpeg|webp|svg|gif|ico)$|auth/callback).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logo.png|.*\\.(?:png|jpg|jpeg|webp|svg|gif|ico|mp4|webm)$|auth/callback).*)",
   ],
 };

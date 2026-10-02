@@ -29,6 +29,7 @@ import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary, { STYLE_PRESETS, type StylePreset } from "@/components/ui/StyleLibrary";
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
+import { ROOM_PAGES } from "@/lib/roomPages";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
 import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
@@ -1324,7 +1325,14 @@ function InlineBriefPanel({
 // ══════════════════════════════════════════════════════════════════
 //  MAIN PAGE
 // ══════════════════════════════════════════════════════════════════
-export default function BuilderPage() {
+interface RoomConfiguratorProps {
+  /** Lock the configurator to one room (used by /bathroom, /kitchen, /bedroom). Omit for the room picker. */
+  room?:     RoomType;
+  /** Rendered below a landing-page hero, so the page title is an h2 */
+  embedded?: boolean;
+}
+
+export default function RoomConfigurator({ room, embedded = false }: RoomConfiguratorProps) {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const photoUploadRef    = useRef<HTMLDivElement>(null);
@@ -1400,7 +1408,14 @@ export default function BuilderPage() {
   const [generateError,      setGenerateError]     = useState<string | null>(null);
   // Only show picker if the user hasn't confirmed a room yet this session.
   // Back-navigation from /preview must NOT re-show the picker.
-  const [showRoomRouter,     setShowRoomRouter]     = useState(!roomConfirmed);
+  const [showRoomRouter,     setShowRoomRouter]     = useState(!room && !roomConfirmed);
+
+  // Room pages own their room: sync the store to it on arrival
+  useEffect(() => {
+    if (!room) return;
+    if (useBuilderStore.getState().roomType !== room) setRoomType(room);
+    setRoomConfirmed(true);
+  }, [room, setRoomType, setRoomConfirmed]);
   const [showAuthModal,      setShowAuthModal]      = useState(false);
   const [showPaywallModal,   setShowPaywallModal]   = useState(false);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
@@ -1732,6 +1747,8 @@ export default function BuilderPage() {
     { key: "inWallCistern",   label: "In-Wall Cistern",            sub: "+$1,500 est." },
   ];
 
+  const Heading = embedded ? "h2" : "h1";
+
   return (
     <div className="min-h-screen bg-sand">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-5 sm:py-8">
@@ -1753,9 +1770,11 @@ export default function BuilderPage() {
                 selected={roomType}
                 savedRooms={savedRooms}
                 onSelect={(r) => {
+                  setShowRoomRouter(false);
+                  // On a room page, another room means another page
+                  if (room && r !== room) { router.push(ROOM_PAGES[r].path); return; }
                   setRoomType(r);
                   setRoomConfirmed(true);   // don't re-show on back-navigation
-                  setShowRoomRouter(false);
                 }}
               />
             </div>
@@ -1764,9 +1783,9 @@ export default function BuilderPage() {
 
         <div className="mb-5 sm:mb-8">
           <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-            <h1 className="text-xl sm:text-3xl font-bold text-charcoal">
+            <Heading className="text-xl sm:text-3xl font-bold text-charcoal">
               {roomType === "kitchen" ? "Kitchen Configurator" : roomType === "bedroom" ? "Bedroom Configurator" : "Bathroom Configurator"}
-            </h1>
+            </Heading>
             <button
               onClick={() => setShowRoomRouter(true)}
               className="text-[11px] font-bold text-charcoal/40 border border-sand-200 rounded-full px-3 py-1 hover:border-terracotta/40 hover:text-terracotta transition-all"

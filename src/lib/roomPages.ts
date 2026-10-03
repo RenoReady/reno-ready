@@ -90,6 +90,10 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
     ],
     metaTitle:       "Bedroom & Living Renovation Designer & Cost Estimator",
     metaDescription: "Design your Australian bedroom or living room renovation with AI. Try flooring, wall treatments and lighting, and get an instant cost estimate.",
-    video:    null,
+    video:    {
+      src:       "/videos/renoready-bedroom-video.mp4",
+      mobileSrc: "/videos/renoready-bedroom-video-720.mp4",
+      poster:    "/videos/renoready-bedroom-video-poster.jpg",
+    },
   },
 };

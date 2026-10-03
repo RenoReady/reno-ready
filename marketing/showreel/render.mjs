@@ -12,7 +12,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const FPS  = +(process.env.FPS ?? 60);
 const SUB  = +(process.env.SUB ?? 4);        // sub-frames blended per output frame
 const DUR  = 15;
-const OUT  = process.env.OUT ?? path.join(here, "out", "video.mp4");
+const PAGE = process.env.PAGE ?? "index.html";                 // kitchen.html for the kitchen reel
+const NAME = path.basename(PAGE, ".html") === "index" ? "" : path.basename(PAGE, ".html") + "-";
+const OUT  = process.env.OUT ?? path.join(here, "out", `${NAME}video.mp4`);
 const BROWSERS = [
   process.env.BROWSER,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -39,7 +41,7 @@ const page = await browser.newPage();
 await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
 page.on("pageerror", (e) => console.error("PAGE ERROR:", e.message));
 page.on("console", (m) => { if (m.type() === "error") console.error("CONSOLE:", m.text()); });
-await page.goto(pathToFileURL(path.join(here, "index.html")).href + "?render=1");
+await page.goto(pathToFileURL(path.join(here, PAGE)).href + "?render=1");
 await page.waitForFunction("window.__ready === true", { timeout: 30000 });
 
 const shot = async (t, type = "jpeg") => {
@@ -50,7 +52,7 @@ const shot = async (t, type = "jpeg") => {
 if (process.env.STILLS) {
   for (const s of process.env.STILLS.split(",")) {
     const t = parseFloat(s);
-    writeFileSync(path.join(here, "out", `still-${t.toFixed(2).padStart(5, "0")}.jpg`), await shot(t));
+    writeFileSync(path.join(here, "out", `${NAME}still-${t.toFixed(2).padStart(5, "0")}.jpg`), await shot(t));
   }
   await page.close();
   await browser.disconnect();
@@ -85,9 +87,9 @@ await browser.close();
 console.log("wrote", OUT);
 
 // add the soundtrack from audio.mjs if it has been generated
-const wav = path.join(here, "out", "audio.wav");
+const wav = path.join(here, "out", `${NAME}audio.wav`);
 if (existsSync(wav)) {
-  const final = path.join(here, "out", "reno-ready-showreel.mp4");
+  const final = path.join(here, "out", NAME ? `reno-ready-${NAME}reel.mp4` : "reno-ready-showreel.mp4");
   const mux = spawn(ffmpegPath, ["-y", "-loglevel", "error", "-i", OUT, "-i", wav, "-map", "0:v", "-map", "1:a",
     "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", final], { stdio: "inherit" });
   await new Promise((r) => mux.on("close", r));

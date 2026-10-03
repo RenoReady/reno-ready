@@ -69,7 +69,11 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
     ],
     metaTitle:       "Kitchen Renovation Designer & Cost Estimator",
     metaDescription: "Design your Australian kitchen renovation with AI. Compare cabinetry, benchtops and splashbacks, preview the result and get an instant cost estimate.",
-    video:    null,
+    video:    {
+      src:       "/videos/renoready-kitchen-video.mp4",
+      mobileSrc: "/videos/renoready-kitchen-video-720.mp4",
+      poster:    "/videos/renoready-kitchen-video-poster.jpg",
+    },
   },
   bedroom: {
     room:     "bedroom",

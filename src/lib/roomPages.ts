@@ -48,7 +48,7 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
       "Nude Travertine & Zellige tile library",
       "Walk-in showers, niches & structural changes",
       "Chrome, matte black or brushed gold tapware",
-      "Avg. cost: $15k – $35k",
+      "Avg. cost: $15k – $40k",
     ],
     metaTitle:       "Bathroom Renovation Designer & Cost Estimator",
     metaDescription: "Design your Australian bathroom renovation with AI. Choose tiles, vanity and tapware, preview the result and get an instant itemised cost estimate.",

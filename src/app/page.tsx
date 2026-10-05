@@ -14,6 +14,51 @@ import { type PlanKey } from "@/lib/plans";
 import HeroVideo from "@/components/ui/HeroVideo";
 import { MARKETING_VIDEO, ROOM_PAGES } from "@/lib/roomPages";
 
+const HOME_ROOM_CARDS: {
+  room:     keyof typeof ROOM_PAGES;
+  title:    string;
+  bullets:  string[];
+  cost:     string;
+  ctaLabel: string;
+  trend:    string;
+  hover:    string;
+  pill:     string;
+  dot:      string;
+  badge:    string;
+  cta:      string;
+}[] = [
+  {
+    room: "bathroom", title: "Bathroom",
+    bullets: ["Vanities, tiles & tapware", "Full strip-outs & layouts"],
+    cost: "$15k – $40k", ctaLabel: "Design my bathroom", trend: "2026 Trend: Nude Travertine",
+    hover: "hover:border-terracotta/50 hover:shadow-warm-lg",
+    pill:  "bg-terracotta/10 border-terracotta/20 text-terracotta",
+    dot:   "bg-terracotta",
+    badge: "bg-terracotta/10 text-terracotta",
+    cta:   "text-terracotta",
+  },
+  {
+    room: "kitchen", title: "Kitchen",
+    bullets: ["Stone benchtops & cabinetry", "Island & appliance planning"],
+    cost: "$22k – $45k", ctaLabel: "Design my kitchen", trend: "Average ROI: 85%",
+    hover: "hover:border-amber-500/50 hover:shadow-[0_8px_32px_rgba(245,158,11,0.15)]",
+    pill:  "bg-amber-50 border-amber-200 text-amber-700",
+    dot:   "bg-amber-500",
+    badge: "bg-amber-500/10 text-amber-700",
+    cta:   "text-amber-600",
+  },
+  {
+    room: "bedroom", title: "Bedroom / Living",
+    bullets: ["Flooring & feature walls", "Joinery & lighting plans"],
+    cost: "$8k – $28k", ctaLabel: "Design my bedroom", trend: "Top Pick: VJ Paneling",
+    hover: "hover:border-blue-500/50 hover:shadow-[0_8px_32px_rgba(59,130,246,0.12)]",
+    pill:  "bg-blue-50 border-blue-200 text-blue-700",
+    dot:   "bg-blue-500",
+    badge: "bg-blue-500/10 text-blue-700",
+    cta:   "text-blue-600",
+  },
+];
+
 // ── Tile swatch preview ────────────────────────────────────────────
 function TileSwatch({ bgClass }: { bgClass: string }) {
   return (
@@ -264,119 +309,38 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-3 gap-6">
 
-            {/* The Sanctuary — Bathroom */}
-            <ScrollReveal delay={0}>
-              <Link href={ROOM_PAGES.bathroom.path} className="group block h-full">
-                <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-terracotta/50 hover:shadow-warm-lg transition-all duration-300 h-full overflow-hidden cursor-pointer">
-                  {/* Hover stat pill */}
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-terracotta/10 border border-terracotta/20 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                    <span className="text-[10px] font-bold text-terracotta uppercase tracking-wide">2026 Trend: Nude Travertine</span>
+            {HOME_ROOM_CARDS.map((card, i) => (
+              <ScrollReveal key={card.room} delay={i * 0.1}>
+                <Link href={ROOM_PAGES[card.room].path} className="group block h-full">
+                  <div className={`relative flex flex-col gap-6 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 transition-all duration-300 h-full overflow-hidden cursor-pointer ${card.hover}`}>
+                    {/* Hover stat pill */}
+                    <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full border opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 ${card.pill}`}>
+                      <span className="text-[10px] font-bold uppercase tracking-wide">{card.trend}</span>
+                    </div>
+
+                    <h3 className="text-3xl font-bold text-charcoal tracking-tight">{card.title}</h3>
+
+                    <ul className="flex flex-col gap-3">
+                      {card.bullets.map((b) => (
+                        <li key={b} className="flex items-center gap-3 text-lg font-medium text-charcoal/80">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${card.dot}`} />
+                          {b}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className={`self-start inline-flex items-baseline gap-2 px-4 py-2 rounded-full ${card.badge}`}>
+                      <span className="text-xs font-bold uppercase tracking-wider opacity-70">Est. Cost</span>
+                      <span className="text-lg font-bold">{card.cost}</span>
+                    </div>
+
+                    <div className={`mt-auto flex items-center gap-1.5 text-base font-bold group-hover:gap-2.5 transition-all duration-200 ${card.cta}`}>
+                      {card.ctaLabel} <ArrowRight size={17} />
+                    </div>
                   </div>
-
-                  {/* Icon */}
-                  <div className="w-16 h-16 rounded-2xl bg-terracotta/10 flex items-center justify-center text-4xl group-hover:bg-terracotta/20 transition-colors duration-300">
-                    🛁
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-terracotta/70 uppercase tracking-widest mb-1">The Sanctuary</p>
-                    <h3 className="text-2xl font-bold text-charcoal mb-2">Bathroom</h3>
-                    <p className="text-charcoal/55 leading-relaxed text-sm">
-                      Spa-like finishes, wall-hung vanities, frameless shower screens. From a $15k cosmetic refresh to a $40k full strip-out.
-                    </p>
-                  </div>
-
-                  <ul className="flex flex-col gap-2 mt-auto">
-                    {["Nude Travertine & Zellige tile library", "Structural changes: walk-in shower, niches", "Tapware in chrome, matte black, brushed gold", "Avg. cost: $15k – $35k"].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-xs text-charcoal/60">
-                        <span className="w-1 h-1 rounded-full bg-terracotta flex-shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="flex items-center gap-1.5 text-sm font-bold text-terracotta group-hover:gap-2.5 transition-all duration-200">
-                    Design my bathroom <ArrowRight size={15} />
-                  </div>
-                </div>
-              </Link>
-            </ScrollReveal>
-
-            {/* The Heart — Kitchen */}
-            <ScrollReveal delay={0.1}>
-              <Link href={ROOM_PAGES.kitchen.path} className="group block h-full">
-                <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-amber-500/50 hover:shadow-[0_8px_32px_rgba(245,158,11,0.15)] transition-all duration-300 h-full overflow-hidden cursor-pointer">
-                  {/* Hover stat pill */}
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Average ROI: 85%</span>
-                  </div>
-
-                  {/* Icon */}
-                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center text-4xl group-hover:bg-amber-500/20 transition-colors duration-300">
-                    🏗️
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest mb-1">The Heart</p>
-                    <h3 className="text-2xl font-bold text-charcoal mb-2">Kitchen</h3>
-                    <p className="text-charcoal/55 leading-relaxed text-sm">
-                      Stone benchtops, shaker or handleless cabinetry, modern splashbacks. The room that sells a home.
-                    </p>
-                  </div>
-
-                  <ul className="flex flex-col gap-2 mt-auto">
-                    {["Cabinetry, benchtop & splashback combos", "Island bench design with cost advisor", "Integrated appliance planning", "Avg. cost: $22k – $45k"].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-xs text-charcoal/60">
-                        <span className="w-1 h-1 rounded-full bg-amber-500 flex-shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="flex items-center gap-1.5 text-sm font-bold text-amber-600 group-hover:gap-2.5 transition-all duration-200">
-                    Design my kitchen <ArrowRight size={15} />
-                  </div>
-                </div>
-              </Link>
-            </ScrollReveal>
-
-            {/* The Retreat — Bedroom */}
-            <ScrollReveal delay={0.2}>
-              <Link href={ROOM_PAGES.bedroom.path} className="group block h-full">
-                <div className="relative flex flex-col gap-5 p-8 rounded-3xl border-2 border-sand-200 bg-white/60 hover:border-blue-500/50 hover:shadow-[0_8px_32px_rgba(59,130,246,0.12)] transition-all duration-300 h-full overflow-hidden cursor-pointer">
-                  {/* Hover stat pill */}
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                    <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">Top Pick: VJ Paneling</span>
-                  </div>
-
-                  {/* Icon */}
-                  <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center text-4xl group-hover:bg-blue-500/20 transition-colors duration-300">
-                    🛏️
-                  </div>
-
-                  <div>
-                    <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest mb-1">The Retreat</p>
-                    <h3 className="text-2xl font-bold text-charcoal mb-2">Bedroom / Living</h3>
-                    <p className="text-charcoal/55 leading-relaxed text-sm">
-                      VJ paneling, architectural downlights, engineered oak flooring. The space that defines how you live.
-                    </p>
-                  </div>
-
-                  <ul className="flex flex-col gap-2 mt-auto">
-                    {["Flooring: oak herringbone to polished concrete", "Wall treatments: VJ, limewash, feature paint", "Lighting & joinery cost estimates", "Avg. cost: $8k – $28k"].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-xs text-charcoal/60">
-                        <span className="w-1 h-1 rounded-full bg-blue-500 flex-shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="flex items-center gap-1.5 text-sm font-bold text-blue-600 group-hover:gap-2.5 transition-all duration-200">
-                    Design my bedroom <ArrowRight size={15} />
-                  </div>
-                </div>
-              </Link>
-            </ScrollReveal>
+                </Link>
+              </ScrollReveal>
+            ))}
 
           </div>
 
@@ -734,7 +698,7 @@ export default function LandingPage() {
               { q: "Which rooms can I design with Reno Ready?",
                 a: "Reno Ready supports three room types: Bathroom, Kitchen, and Bedroom/Living. Each room has its own tailored AI prompt engine, material library, and cost model. You can add multiple rooms to a single project and generate a consolidated builder brief at the end." },
               { q: "How much does a typical Australian renovation cost?",
-                a: "It varies significantly by room. Bathrooms typically run $15,000–$35,000. Kitchens range from $22,000–$50,000 depending on cabinetry and benchtop choices. Bedrooms are more cosmetic — usually $8,000–$28,000. Reno Ready gives you an itemised estimate per room based on current QLD/Australian market averages." },
+                a: "It varies significantly by room. Bathrooms typically run $15,000–$40,000. Kitchens range from $22,000–$50,000 depending on cabinetry and benchtop choices. Bedrooms are more cosmetic — usually $8,000–$28,000. Reno Ready gives you an itemised estimate per room based on current QLD/Australian market averages." },
               { q: "Can I show this design to my builder?",
                 a: "Absolutely. The AI preview and cost breakdown are designed to start the conversation. You can download a Pro Report — a multi-page A4 PDF with your room render, materials specification, and itemised cost breakdown — and hand it directly to any builder or architect to get an accurate quote faster." },
               { q: "How accurate is the cost estimate?",

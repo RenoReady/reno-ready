@@ -3,6 +3,7 @@ import {
   ArrowRight, Sparkles, DollarSign, Users, CheckCircle2,
   ChevronDown, PencilRuler, FileText, BadgeCheck,
   Zap, Repeat2, Check, TriangleAlert, Home,
+  Bath, ChefHat, BedDouble,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
@@ -561,13 +562,13 @@ export default function LandingPage() {
               {/* Room count visual */}
               <div className="relative flex items-center gap-3 flex-shrink-0">
                 {[
-                  { emoji: "🛁", label: "Bathroom", color: "bg-terracotta/20 border-terracotta/30" },
-                  { emoji: "🏗️", label: "Kitchen",  color: "bg-amber-500/20 border-amber-500/30" },
-                  { emoji: "🛏️", label: "Bedroom",  color: "bg-blue-500/20 border-blue-500/30" },
+                  { icon: Bath,      label: "Bathroom", color: "bg-terracotta/20 border-terracotta/30", tint: "text-terracotta" },
+                  { icon: ChefHat,   label: "Kitchen",  color: "bg-amber-500/20 border-amber-500/30",   tint: "text-amber-400" },
+                  { icon: BedDouble, label: "Bedroom",  color: "bg-blue-500/20 border-blue-500/30",     tint: "text-blue-300" },
                 ].map((r, i) => (
                   <div key={r.label} className={`relative flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl border ${r.color}`}
                        style={{ transform: `rotate(${(i - 1) * 3}deg)` }}>
-                    <span className="text-2xl">{r.emoji}</span>
+                    <r.icon size={26} strokeWidth={1.75} className={r.tint} />
                     <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider">{r.label}</span>
                   </div>
                 ))}

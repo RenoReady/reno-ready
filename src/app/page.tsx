@@ -698,7 +698,7 @@ export default function LandingPage() {
               { q: "Which rooms can I design with Reno Ready?",
                 a: "Reno Ready supports three room types: Bathroom, Kitchen, and Bedroom/Living. Each room has its own tailored AI prompt engine, material library, and cost model. You can add multiple rooms to a single project and generate a consolidated builder brief at the end." },
               { q: "How much does a typical Australian renovation cost?",
-                a: "It varies significantly by room. Bathrooms typically run $15,000–$40,000. Kitchens range from $22,000–$50,000 depending on cabinetry and benchtop choices. Bedrooms are more cosmetic — usually $8,000–$28,000. Reno Ready gives you an itemised estimate per room based on current QLD/Australian market averages." },
+                a: "It varies significantly by room. Bathrooms typically run $15,000–$40,000. Kitchens range from $22,000–$45,000 depending on cabinetry and benchtop choices. Bedrooms are more cosmetic — usually $8,000–$28,000. Reno Ready gives you an itemised estimate per room based on current QLD/Australian market averages." },
               { q: "Can I show this design to my builder?",
                 a: "Absolutely. The AI preview and cost breakdown are designed to start the conversation. You can download a Pro Report — a multi-page A4 PDF with your room render, materials specification, and itemised cost breakdown — and hand it directly to any builder or architect to get an accurate quote faster." },
               { q: "How accurate is the cost estimate?",

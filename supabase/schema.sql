@@ -73,19 +73,48 @@ as $$
    where id = uid;
 $$;
 
--- ── 2. generations storage bucket ───────────────────────────────
--- Stores the AI-generated images so they appear in the admin gallery.
--- Files should be uploaded with the path: <user_id>/<timestamp>.png
-insert into storage.buckets (id, name, public)
-  values ('generations', 'generations', true)
-  on conflict (id) do nothing;
+-- ── 2. generations: stored AI previews ──────────────────────────
+-- Every successful preview is uploaded to the private `generations`
+-- bucket at <user_id>/<timestamp>-<id>.<ext> by /api/generate and
+-- recorded in this table. The admin dashboard lists them per user
+-- through short-lived signed URLs.
+-- (Also shipped as supabase/migrations/20261008_generations.sql.)
+create table if not exists public.generations (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  room_type   text not null default 'bathroom'
+              check (room_type in ('bathroom','kitchen','bedroom')),
+  image_path  text not null,
+  prompt      text,
+  had_photo   boolean not null default false,
+  created_at  timestamptz not null default now()
+);
 
--- Public read (so the admin gallery's getPublicUrl works) but
--- authenticated-only writes scoped to the user's own folder.
+create index if not exists generations_user_created_idx
+  on public.generations (user_id, created_at desc);
+
+alter table public.generations enable row level security;
+
+drop policy if exists "users read own generations" on public.generations;
+create policy "users read own generations"
+  on public.generations for select
+  using (auth.uid() = user_id);
+
+insert into storage.buckets (id, name, public)
+  values ('generations', 'generations', false)
+  on conflict (id) do update set public = false;
+
+-- Renders are of people's homes: no public read. Users may read their
+-- own folder; the server writes and the admin reads with the service role.
 drop policy if exists "public read generations" on storage.objects;
-create policy "public read generations"
+
+drop policy if exists "users read own generations files" on storage.objects;
+create policy "users read own generations files"
   on storage.objects for select
-  using (bucket_id = 'generations');
+  using (
+    bucket_id = 'generations'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 drop policy if exists "users upload to own folder" on storage.objects;
 create policy "users upload to own folder"

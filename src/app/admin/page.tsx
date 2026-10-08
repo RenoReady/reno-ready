@@ -5,9 +5,10 @@
  * may reach this route). This page additionally re-checks the session
  * server-side as a defence-in-depth measure.
  *
- * Reads:
- *   - profiles table (RLS bypassed via service-role client)
- *   - storage.objects in the `generations` bucket
+ * Reads (RLS bypassed via the service-role client):
+ *   - profiles table
+ *   - generations table + the private `generations` bucket, through
+ *     short-lived signed URLs (see supabase/migrations/20261008_generations.sql)
  */
 
 import { redirect } from "next/navigation";
@@ -17,7 +18,9 @@ import {
 } from "lucide-react";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL, PAID_USER_PRICE_CENTS } from "@/lib/config";
+import { GENERATIONS_BUCKET } from "@/lib/generations";
 import { cn, formatAUD } from "@/lib/utils";
+import UserDesigns, { type AdminDesign } from "./UserDesigns";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +33,22 @@ interface ProfileRow {
   generation_count:   number | null;
 }
 
-interface GalleryImage {
-  name:     string;
-  url:      string;
-  size:     number;
-  created:  string;
+interface GenerationRow {
+  id:         string;
+  user_id:    string;
+  room_type:  string;
+  image_path: string;
+  prompt:     string | null;
+  had_photo:  boolean;
+  created_at: string;
 }
+
+type StoredDesign = AdminDesign & { userId: string };
+
+/** Most recent designs loaded for the per-user galleries */
+const DESIGN_LIMIT = 500;
+/** Signed links last an hour; reloading the page issues fresh ones */
+const SIGNED_URL_TTL = 60 * 60;
 
 // ── Data fetchers (graceful when tables/buckets don't exist) ──────
 async function fetchProfiles(): Promise<{ rows: ProfileRow[]; error: string | null }> {
@@ -53,33 +66,41 @@ async function fetchProfiles(): Promise<{ rows: ProfileRow[]; error: string | nu
   }
 }
 
-async function fetchGallery(): Promise<{ images: GalleryImage[]; error: string | null }> {
+async function fetchDesigns(): Promise<{ designs: StoredDesign[]; total: number; error: string | null }> {
   try {
     const supabase = createSupabaseServiceRoleClient();
-    const bucket   = "generations";
-    const { data: files, error } = await supabase
-      .storage.from(bucket)
-      .list("", { limit: 24, sortBy: { column: "created_at", order: "desc" } });
+    const [{ count, error: countError }, { data, error }] = await Promise.all([
+      supabase.from("generations").select("id", { count: "exact", head: true }),
+      supabase
+        .from("generations")
+        .select("id, user_id, room_type, image_path, prompt, had_photo, created_at")
+        .order("created_at", { ascending: false })
+        .limit(DESIGN_LIMIT),
+    ]);
+    if (countError || error) return { designs: [], total: 0, error: (countError ?? error)!.message };
 
-    if (error) return { images: [], error: error.message };
-    if (!files) return { images: [], error: null };
+    const rows = (data ?? []) as GenerationRow[];
+    const signed = new Map<string, string>();
+    if (rows.length > 0) {
+      const { data: urls, error: signError } = await supabase.storage
+        .from(GENERATIONS_BUCKET)
+        .createSignedUrls(rows.map((r) => r.image_path), SIGNED_URL_TTL);
+      if (signError) console.warn("[admin] signing design URLs failed:", signError.message);
+      urls?.forEach((u) => { if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl); });
+    }
 
-    const images = await Promise.all(
-      files
-        .filter((f) => f.name && !f.name.endsWith("/"))
-        .map(async (f) => {
-          const { data } = supabase.storage.from(bucket).getPublicUrl(f.name);
-          return {
-            name:    f.name,
-            url:     data.publicUrl,
-            size:    f.metadata?.size ?? 0,
-            created: f.created_at ?? "",
-          };
-        }),
-    );
-    return { images, error: null };
+    const designs = rows.map((r) => ({
+      id:        r.id,
+      userId:    r.user_id,
+      url:       signed.get(r.image_path) ?? null,
+      roomType:  r.room_type,
+      prompt:    r.prompt,
+      hadPhoto:  r.had_photo,
+      createdAt: r.created_at,
+    }));
+    return { designs, total: count ?? rows.length, error: null };
   } catch (err: unknown) {
-    return { images: [], error: err instanceof Error ? err.message : "Unknown error" };
+    return { designs: [], total: 0, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
 
@@ -100,8 +121,13 @@ export default async function AdminPage() {
     redirect("/?admin_error=forbidden");
   }
 
-  const [{ rows: profiles, error: profilesError }, { images, error: galleryError }] =
-    await Promise.all([fetchProfiles(), fetchGallery()]);
+  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }] =
+    await Promise.all([fetchProfiles(), fetchDesigns()]);
+
+  const designsByUser = new Map<string, StoredDesign[]>();
+  for (const d of designs) designsByUser.set(d.userId, [...(designsByUser.get(d.userId) ?? []), d]);
+  const emailById  = new Map(profiles.map((p) => [p.id, p.email ?? "—"]));
+  const recent     = designs.slice(0, 24);
 
   // ── Stats ───────────────────────────────────────────────────
   const totalUsers     = profiles.length;
@@ -134,7 +160,8 @@ export default async function AdminPage() {
           <StatCard icon={CreditCard} accent="emerald"   label="Paid Users"       value={paidUsers.toString()} hint={`${freeUsers} free`} />
           <StatCard icon={DollarSign} accent="terracotta" label="Total Revenue"    value={formatAUD(totalRevenueCents / 100)} hint={`@ ${formatAUD(PAID_USER_PRICE_CENTS / 100)} / paid user`} />
           <StatCard icon={Sparkles}   accent="charcoal"   label="AI Generations"   value={totalGenerations.toString()} />
-          <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={images.length.toString()} />
+          <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={storedDesigns.toString()}
+                    hint={totalGenerations > storedDesigns ? "Saving started 8 Oct 2026" : undefined} />
         </section>
 
         {/* ── User table ──────────────────────────────────────── */}
@@ -168,6 +195,7 @@ export default async function AdminPage() {
                       <Th>Signup</Th>
                       <Th>Plan</Th>
                       <Th align="right">Generations</Th>
+                      <Th>Designs</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -196,6 +224,9 @@ export default async function AdminPage() {
                         <Td align="right">
                           <span className="font-bold text-charcoal tabular-nums">{p.generation_count ?? 0}</span>
                         </Td>
+                        <Td>
+                          <UserDesigns email={p.email ?? "—"} designs={designsByUser.get(p.id) ?? []} />
+                        </Td>
                       </tr>
                     ))}
                   </tbody>
@@ -209,43 +240,50 @@ export default async function AdminPage() {
         <section>
           <div className="flex items-end justify-between mb-4 gap-4 flex-wrap">
             <h2 className="text-2xl font-bold text-charcoal">Recent Generations</h2>
-            <p className="text-sm text-charcoal/45">Top {images.length} from the <code className="text-charcoal/65">generations</code> bucket</p>
+            <p className="text-sm text-charcoal/45">Latest {recent.length} of {storedDesigns} stored</p>
           </div>
 
-          {galleryError ? (
+          {designsError ? (
             <SetupCard
-              title="Storage bucket not available"
-              detail={galleryError}
+              title="Stored designs not available"
+              detail={designsError}
               steps={[
-                "Create a storage bucket named `generations` in Supabase.",
-                "Make it public OR generate signed URLs in code.",
+                "Run supabase/migrations/20261008_generations.sql in the Supabase SQL editor.",
+                "Check SUPABASE_SERVICE_ROLE_KEY is set in your Vercel env vars.",
                 "Reload this page.",
               ]}
             />
-          ) : images.length === 0 ? (
+          ) : recent.length === 0 ? (
             <div className="rounded-2xl bg-white border border-sand-200 p-10 text-center">
               <ImageIcon size={28} className="text-charcoal/25 mx-auto mb-3" />
-              <p className="text-sm text-charcoal/55">No generations yet — once users save designs, they&apos;ll appear here.</p>
+              <p className="text-sm text-charcoal/55">No stored designs yet. Every new AI preview is saved here automatically.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {images.map((img) => (
+              {recent.map((d) => (
                 <a
-                  key={img.name}
-                  href={img.url}
+                  key={d.id}
+                  href={d.url ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group relative aspect-square rounded-2xl overflow-hidden bg-sand-100 ring-1 ring-sand-200 hover:ring-terracotta hover:ring-2 transition-all"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.url}
-                    alt={img.name}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                    <p className="text-[10px] font-mono text-white/85 truncate">{img.name}</p>
+                  {d.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={d.url}
+                      alt={`${d.roomType} design`}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon size={24} className="text-charcoal/25" />
+                    </div>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/75 to-transparent">
+                    <p className="text-[10px] font-mono text-white/90 truncate">{emailById.get(d.userId) ?? d.userId}</p>
+                    <p className="text-[10px] text-white/65 capitalize">{d.roomType} · {formatDate(d.createdAt)}</p>
                   </div>
                 </a>
               ))}

@@ -21,10 +21,11 @@
  * ─────────────────────────────────────────────────────────────────
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
+import { saveGeneration } from "@/lib/generations";
 
 // Vercel hobby plan caps serverless functions at 60 s.
 // We set 55 s here so we have time to return a clean error rather than a raw 504.
@@ -359,13 +360,28 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       result = await handleReal(body);
     }
 
-    // ── Increment count on success (free tier only, after generation) ──
-    // Only increments when the generation actually completed — failed
-    // calls don't cost the user a credit.
-    if (result.success && !isAdmin) {
-      const svc = createSupabaseServiceRoleClient();
-      svc.rpc("increment_generation_count", { uid: user.id }).then(({ error }) => {
-        if (error) console.warn("[generate] Failed to increment count:", error.message);
+    // ── After a successful generation ─────────────────────────────
+    // Runs once the response has been sent (after() keeps the function
+    // alive on Vercel until it finishes), so the user never waits on it.
+    //  - count it against the free tier (failed calls don't cost a credit)
+    //  - store the image + prompt so it shows in the admin dashboard
+    if (result.success) {
+      const imageUrl = result.imageUrl;
+      after(async () => {
+        if (!isAdmin) {
+          const { error } = await createSupabaseServiceRoleClient()
+            .rpc("increment_generation_count", { uid: user.id });
+          if (error) console.warn("[generate] Failed to increment count:", error.message);
+        }
+        if (imageUrl?.startsWith("data:")) {
+          await saveGeneration({
+            userId:   user.id,
+            roomType: body.roomType ?? "bathroom",
+            dataUrl:  imageUrl,
+            prompt:   buildGeminiPrompt(body),
+            hadPhoto: !!body.imageBase64,
+          });
+        }
       });
     }
 

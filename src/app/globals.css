@@ -79,6 +79,18 @@
   50%       { top: calc(100% - 1px); }
 }
 
+/* Each visualiser step fades up into place */
+@keyframes step-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.step-enter {
+  animation: step-enter 0.35s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-enter { animation: none; }
+}
+
 /* ── Utilities ─────────────────────────────────────────────── */
 @layer utilities {
   .text-balance {

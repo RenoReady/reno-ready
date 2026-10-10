@@ -1,13 +1,14 @@
 /**
  * RoomLanding — shared layout for /bathroom, /kitchen and /bedroom.
  *
- *   ┌─ hero: copy + CTAs ─────┬─ room reel (video, or a static panel) ─┐
- *   └─────────────────────────┴────────────────────────────────────────┘
- *   configurator (material selectors, estimator, AI preview) locked to the room
+ *   title
+ *   configurator locked to the room — opens on Step 1, the photo upload
+ *   ┌─ how it works: copy + links ─┬─ room reel (video, or a static panel) ─┐
+ *   └──────────────────────────────┴────────────────────────────────────────┘
  */
 
 import Link from "next/link";
-import { ArrowDown, ArrowRight, Bath, BedDouble, CheckCircle2, ChefHat } from "lucide-react";
+import { ArrowRight, ArrowUp, Bath, BedDouble, CheckCircle2, ChefHat } from "lucide-react";
 import HeroVideo from "@/components/ui/HeroVideo";
 import RoomConfigurator from "@/components/builder/RoomConfigurator";
 import { ROOM_PAGES, type RoomPage } from "@/lib/roomPages";
@@ -52,19 +53,26 @@ export default function RoomLanding({ room }: { room: RoomType }) {
 
   return (
     <div className="bg-sand">
-      <section className="relative overflow-hidden px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-12">
+      {/* The tool comes first: visitors land straight on Step 1, the photo upload */}
+      <section className="relative overflow-hidden px-4 pt-6 sm:px-6 sm:pt-10">
         <div className="pointer-events-none absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full bg-terracotta/6 blur-3xl" />
+        <div className="relative mx-auto max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-widest text-terracotta sm:text-sm">{page.eyebrow}</p>
+          <h1 className="mt-2 text-balance text-3xl font-bold leading-[1.1] text-charcoal sm:text-4xl xl:text-5xl">
+            {page.title}
+          </h1>
+        </div>
+      </section>
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-12">
-          <div className="flex flex-col gap-5 sm:gap-6">
-            <p className="text-sm font-bold uppercase tracking-widest text-terracotta">
-              {page.eyebrow}
-            </p>
-            <h1 className="text-balance text-4xl font-bold leading-[1.05] text-charcoal sm:text-5xl xl:text-6xl">
-              {page.title}
-            </h1>
+      <section id="configurator" className="scroll-mt-24">
+        <RoomConfigurator room={room} embedded />
+      </section>
+
+      {/* How it works — below the tool for anyone who wants the detail first */}
+      <section className="border-t border-sand-200 px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-12">
+          <div className="flex flex-col gap-5">
             <p className="max-w-xl text-lg leading-relaxed text-charcoal/60">{page.intro}</p>
-
             <ul className="grid gap-2 sm:grid-cols-2">
               {page.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-charcoal/70">
@@ -73,19 +81,18 @@ export default function RoomLanding({ room }: { room: RoomType }) {
                 </li>
               ))}
             </ul>
-
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <a
                 href="#configurator"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-7 py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] transition-all hover:bg-blue-700"
+                className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-terracotta px-7 text-base font-bold text-white shadow-warm transition-colors hover:bg-terracotta-600"
               >
-                Start with Step 1 <ArrowDown size={18} />
+                Upload a photo <ArrowUp size={18} />
               </a>
               {others.map((o) => (
                 <Link
                   key={o.room}
                   href={o.path}
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-sm font-bold text-charcoal/60 transition-colors hover:text-terracotta"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 px-2 text-sm font-bold text-charcoal/60 transition-colors hover:text-terracotta"
                 >
                   {o.exploreLabel} <ArrowRight size={14} />
                 </Link>
@@ -94,15 +101,11 @@ export default function RoomLanding({ room }: { room: RoomType }) {
           </div>
 
           {page.video ? (
-            <HeroVideo {...page.video} className="order-first lg:order-none" label={`Reno Ready ${page.room} walkthrough: design, see the cost, then talk to a builder`} />
+            <HeroVideo {...page.video} label={`Reno Ready ${page.room} walkthrough: design, see the cost, then talk to a builder`} />
           ) : (
-            <div className="order-first lg:order-none"><StaticReel page={page} /></div>
+            <StaticReel page={page} />
           )}
         </div>
-      </section>
-
-      <section id="configurator" className="scroll-mt-24 border-t border-sand-200">
-        <RoomConfigurator room={room} embedded />
       </section>
     </div>
   );

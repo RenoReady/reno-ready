@@ -2,76 +2,81 @@
 
 /**
  * The visualiser's 3-step guided flow:
- *   StepTracker — progress pills at the top, each jumps to its step
- *   StepCard    — a numbered section with a "Step N of 3" badge and helper text
- *   LayoutTemplatePicker — Step 3 sample layouts, drawn as small floor plans
+ *   StepTracker — progress pills at the top ("Step 2 of 3: Choose Style")
+ *   PhotoStep   — Step 1, the photo upload (or a sample room)
+ *   StepPanel   — a titled card used to group Step 2 options
  */
 
-import { Check, ArrowLeftRight } from "lucide-react";
+import { useRef, useState } from "react";
+import { Check, ArrowLeftRight, ArrowRight, Camera, ChevronDown, Loader2, AlertCircle, ImagePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { templatesFor, type PlanShape } from "@/lib/layoutTemplates";
+import { SAMPLE_ROOMS } from "@/lib/roomPhoto";
 import type { RoomType } from "@/lib/roomTypes";
 
+export type FlowStep = 1 | 2 | 3;
+
 export const STEP_COPY = [
-  {
-    id:     "step-1",
-    short:  "Finishes & Style",
-    title:  "Step 1: Choose Your Finishes & Style",
-    helper: "Select your preferred tiles, cabinetry, tapware, or color palette to set the design direction.",
-  },
-  {
-    id:     "step-2",
-    short:  "Room Layout",
-    title:  "Step 2: Define Room Layout",
-    helper: "Select your room configuration and approximate dimensions so we can structure your design accurately.",
-  },
-  {
-    id:     "step-3",
-    short:  "Your Space",
-    title:  "Step 3: Add Your Space",
-    helper: "Upload a photo of your existing room to overlay your design choices, or select a sample layout template below to proceed.",
-  },
+  { short: "Upload Photo" },
+  { short: "Choose Style" },
+  { short: "Get Estimate" },
 ] as const;
 
 // ── Progress tracker ──────────────────────────────────────────────
 
-export function StepTracker({ done, onChangeRoom, savedCount }: {
-  done:         [boolean, boolean, boolean];
+export function StepTracker({ current, canOpen, onStep, onChangeRoom, savedCount }: {
+  current:      FlowStep;
+  /** Whether a step can be opened yet (2 and 3 need a photo) */
+  canOpen:      (step: FlowStep) => boolean;
+  onStep:       (step: FlowStep) => void;
   onChangeRoom: () => void;
   savedCount:   number;
 }) {
-  // The first unfinished step is the one to focus on
-  const current = done.findIndex((d) => !d);
-
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <ol className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto" aria-label="Visualiser steps">
-        {STEP_COPY.map((step, i) => (
-          <li key={step.id} className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {i > 0 && <span className={cn("h-px w-4 sm:w-8", done[i - 1] ? "bg-charcoal/40" : "bg-charcoal/15")} />}
-            <a
-              href={`#${step.id}`}
-              aria-current={i === current ? "step" : undefined}
-              className={cn(
-                "flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-xs font-semibold transition-colors",
-                i === current
-                  ? "border-charcoal bg-charcoal text-white"
-                  : done[i]
-                    ? "border-sand-300 bg-white/70 text-charcoal/70 hover:border-charcoal/30"
-                    : "border-sand-200 bg-white/40 text-charcoal/45 hover:border-charcoal/30",
-              )}
-            >
-              <span className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold",
-                i === current ? "bg-white text-charcoal" : done[i] ? "bg-emerald-600 text-white" : "bg-sand-200 text-charcoal/50",
-              )}>
-                {done[i] && i !== current ? <Check size={11} strokeWidth={3} /> : i + 1}
-              </span>
-              {step.short}
-            </a>
-          </li>
-        ))}
-      </ol>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-terracotta" aria-live="polite">
+          Step {current} of 3: {STEP_COPY[current - 1].short}
+        </p>
+        <ol className="flex items-center gap-1.5 sm:gap-2" aria-label="Visualiser steps">
+          {STEP_COPY.map((step, i) => {
+            const n       = (i + 1) as FlowStep;
+            const active  = n === current;
+            const done    = n < current;
+            const enabled = canOpen(n);
+            return (
+              <li key={step.short} className="flex items-center gap-1.5 sm:gap-2">
+                {i > 0 && <span className={cn("h-px w-4 sm:w-8", done || active ? "bg-charcoal/40" : "bg-charcoal/15")} />}
+                <button
+                  type="button"
+                  onClick={() => onStep(n)}
+                  disabled={!enabled || active}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`Step ${n}: ${step.short}`}
+                  className={cn(
+                    "flex min-h-[40px] items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-xs font-semibold transition-colors",
+                    active
+                      ? "border-charcoal bg-charcoal text-white"
+                      : done
+                        ? "border-sand-300 bg-white/70 text-charcoal/70 hover:border-charcoal/30"
+                        : "border-sand-200 bg-white/40 text-charcoal/45",
+                    enabled && !active && "hover:border-charcoal/30",
+                    !enabled && "cursor-not-allowed",
+                  )}
+                >
+                  <span className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold",
+                    active ? "bg-white text-charcoal" : done ? "bg-emerald-600 text-white" : "bg-sand-200 text-charcoal/50",
+                  )}>
+                    {done ? <Check size={12} strokeWidth={3} /> : n}
+                  </span>
+                  {/* Phones show the label for the current step only */}
+                  <span className={cn(!active && "hidden sm:inline")}>{step.short}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
 
       <div className="flex items-center gap-3 text-xs">
         {savedCount > 0 && (
@@ -81,8 +86,9 @@ export function StepTracker({ done, onChangeRoom, savedCount }: {
           </span>
         )}
         <button
+          type="button"
           onClick={onChangeRoom}
-          className="flex items-center gap-1.5 rounded-full border border-sand-200 px-3 py-1.5 font-bold text-charcoal/50 transition-colors hover:border-terracotta/40 hover:text-terracotta"
+          className="flex min-h-[40px] items-center gap-1.5 rounded-full border border-sand-200 px-3 py-1.5 font-bold text-charcoal/50 transition-colors hover:border-terracotta/40 hover:text-terracotta"
         >
           <ArrowLeftRight size={12} />
           Change room
@@ -92,110 +98,182 @@ export function StepTracker({ done, onChangeRoom, savedCount }: {
   );
 }
 
-// ── Step section ──────────────────────────────────────────────────
+// ── Step 1: photo upload ──────────────────────────────────────────
 
-export function StepCard({ step, done, children }: {
-  step:     1 | 2 | 3;
-  done:     boolean;
-  children: React.ReactNode;
+export function PhotoStep({ room, photoUrl, busy, error, onFile, onSample, onContinue }: {
+  room:       RoomType;
+  /** A photo already chosen (the user came back to Step 1) */
+  photoUrl:   string | null;
+  busy:       boolean;
+  error:      string | null;
+  onFile:     (file: File) => void;
+  onSample:   () => void;
+  onContinue: () => void;
 }) {
-  const copy = STEP_COPY[step - 1];
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const roomName = room;
+  const sample   = SAMPLE_ROOMS[room];
+  const browse   = () => { if (!busy) inputRef.current?.click(); };
+
   return (
-    <section
-      id={copy.id}
-      aria-labelledby={`${copy.id}-title`}
-      className="scroll-mt-28 overflow-hidden rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm"
-    >
-      <header className="flex items-start gap-4 border-b border-sand-200 bg-sand-50/80 px-5 py-5 sm:px-6">
-        <div className={cn(
-          "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors",
-          done ? "bg-emerald-600 text-white" : "bg-charcoal text-white",
-        )}>
-          {done ? <Check size={18} strokeWidth={3} /> : step}
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-terracotta">
-            Step {step} of 3{done && <span className="text-emerald-600"> · Complete</span>}
-          </p>
-          <h2 id={`${copy.id}-title`} className="mt-0.5 text-lg font-bold leading-snug text-charcoal">{copy.title}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-charcoal/55">{copy.helper}</p>
-        </div>
-      </header>
-      <div className="flex flex-col gap-6 p-5 sm:p-6">{children}</div>
-    </section>
-  );
-}
-
-// ── Sample layouts ────────────────────────────────────────────────
-
-const SHAPE_STYLE: Record<PlanShape["kind"], { fill: string; stroke: string; dash?: string }> = {
-  wet:     { fill: "rgba(210,125,94,0.18)", stroke: "rgba(210,125,94,0.75)" },
-  joinery: { fill: "rgba(44,62,80,0.12)",   stroke: "rgba(44,62,80,0.55)" },
-  soft:    { fill: "rgba(196,179,148,0.35)", stroke: "rgba(139,115,85,0.6)" },
-  glass:   { fill: "rgba(99,179,237,0.15)", stroke: "rgba(66,133,190,0.7)", dash: "2 1.5" },
-};
-
-function PlanThumb({ shapes }: { shapes: PlanShape[] }) {
-  return (
-    <svg viewBox="0 0 100 72" className="h-auto w-full" aria-hidden>
-      <rect x="2" y="2" width="96" height="68" rx="2" fill="#FDFAF5" stroke="#2C3E50" strokeWidth="1.6" />
-      {/* door gap */}
-      <line x1="40" y1="70" x2="56" y2="70" stroke="#FDFAF5" strokeWidth="2.4" />
-      <path d="M40 70 A14 14 0 0 1 54 56" fill="none" stroke="rgba(44,62,80,0.35)" strokeWidth="0.8" strokeDasharray="1.5 1.5" />
-      {shapes.map((s, i) => {
-        const st = SHAPE_STYLE[s.kind];
-        return (
-          <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={s.round ? Math.min(s.w, s.h) / 2.5 : 1.2}
-            fill={st.fill} stroke={st.stroke} strokeWidth="0.8" strokeDasharray={st.dash} />
-        );
-      })}
-    </svg>
-  );
-}
-
-export function LayoutTemplatePicker({ room, value, onChange }: {
-  room:     RoomType;
-  value:    string | null;
-  onChange: (id: string | null) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-sand-200" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-charcoal/40">No photo? Start from a sample layout</span>
-        <span className="h-px flex-1 bg-sand-200" />
+    <div className="step-enter mx-auto flex w-full max-w-2xl flex-col gap-5">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-charcoal sm:text-3xl">Upload a photo of your space</h2>
+        <p className="mt-1.5 text-sm text-charcoal/60 sm:text-base">We&apos;ll design on top of your real {roomName}.</p>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-        {templatesFor(room).map((t) => {
-          const active = value === t.id;
-          return (
+
+      {/* image/* lets phones offer the camera roll and the camera */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";   // so picking the same file again still fires
+          if (f) onFile(f);
+        }}
+      />
+
+      {photoUrl && !busy ? (
+        <div className="flex flex-col gap-3 rounded-3xl border-2 border-charcoal/15 bg-white p-3 shadow-warm-sm">
+          <div className="relative aspect-video overflow-hidden rounded-2xl bg-sand-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photoUrl} alt={`Your ${roomName}`} className="h-full w-full object-cover" />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
-              key={t.id}
               type="button"
-              onClick={() => onChange(active ? null : t.id)}
-              aria-pressed={active}
-              className={cn(
-                "relative flex items-center gap-3 rounded-2xl border-2 p-2.5 text-left transition-all duration-200 sm:flex-col sm:items-stretch lg:flex-row lg:items-center xl:flex-col xl:items-stretch",
-                active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/60 hover:border-terracotta/40",
-              )}
+              onClick={onContinue}
+              className="flex min-h-[56px] flex-1 items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-bold text-white shadow-warm transition-colors hover:bg-terracotta-600"
             >
-              {active && (
-                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-terracotta text-white">
-                  <Check size={11} strokeWidth={3} />
-                </span>
-              )}
-              <div className="w-24 flex-shrink-0 sm:w-full lg:w-24 xl:w-full">
-                <PlanThumb shapes={t.plan} />
-              </div>
-              <div className="min-w-0 px-0.5">
-                <p className={cn("text-xs font-bold", active ? "text-terracotta" : "text-charcoal/80")}>{t.label}</p>
-                <p className="text-[10px] leading-snug text-charcoal/50">{t.sub}</p>
-                <p className="mt-0.5 text-[10px] font-semibold text-charcoal/35">{t.size}</p>
-              </div>
+              Continue with this photo <ArrowRight size={18} />
             </button>
-          );
-        })}
+            <button
+              type="button"
+              onClick={browse}
+              className="flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border-2 border-charcoal/20 px-6 text-base font-bold text-charcoal transition-colors hover:border-charcoal/40"
+            >
+              <ImagePlus size={18} /> Use a different photo
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Upload a photo of your ${roomName}`}
+          aria-busy={busy}
+          onClick={browse}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); browse(); } }}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            const f = e.dataTransfer.files[0];
+            if (f && !busy) onFile(f);
+          }}
+          className={cn(
+            "flex min-h-[260px] cursor-pointer flex-col items-center justify-center gap-4 rounded-3xl border-[3px] border-dashed bg-white px-6 py-10 text-center outline-none transition-all duration-200 sm:min-h-[320px]",
+            "focus-visible:ring-4 focus-visible:ring-terracotta/30",
+            dragging ? "scale-[1.01] border-terracotta bg-terracotta/5" : "border-charcoal/30 hover:border-terracotta",
+            busy && "cursor-wait",
+          )}
+        >
+          {busy ? (
+            <>
+              <Loader2 size={40} className="animate-spin text-terracotta" />
+              <p className="text-lg font-bold text-charcoal">Preparing your photo…</p>
+            </>
+          ) : (
+            <>
+              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-charcoal text-white">
+                <Camera size={30} strokeWidth={1.8} />
+              </span>
+              <div>
+                <p className="text-lg font-bold text-charcoal sm:text-xl">
+                  <span className="sm:hidden">Tap to add a photo</span>
+                  <span className="hidden sm:inline">Drag &amp; drop your photo here</span>
+                </p>
+                <p className="mt-1 text-sm text-charcoal/55">From your camera roll or a new shot · JPG, PNG, HEIC</p>
+              </div>
+              <span className="inline-flex min-h-[52px] items-center gap-2 rounded-2xl bg-terracotta px-7 text-base font-bold text-white shadow-warm">
+                <ImagePlus size={18} /> Choose photo
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+          {error}
+        </p>
+      )}
+
+      <div className="flex items-center gap-3">
+        <span className="h-px flex-1 bg-sand-300" />
+        <span className="text-xs font-bold uppercase tracking-[0.16em] text-charcoal/45">No photo handy?</span>
+        <span className="h-px flex-1 bg-sand-300" />
       </div>
+
+      <button
+        type="button"
+        onClick={onSample}
+        disabled={busy}
+        className="flex min-h-[72px] items-center gap-4 rounded-2xl border-2 border-sand-300 bg-white/80 p-2.5 pr-5 text-left transition-colors hover:border-terracotta disabled:cursor-wait disabled:opacity-60"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={sample.src} alt="" className="h-14 w-14 flex-shrink-0 rounded-xl object-cover" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-bold text-charcoal">Try with a sample {roomName}</span>
+          <span className="block text-xs text-charcoal/50">{sample.label}</span>
+        </span>
+        <ArrowRight size={18} className="flex-shrink-0 text-terracotta" />
+      </button>
     </div>
+  );
+}
+
+// ── Step 2 group ──────────────────────────────────────────────────
+
+export function StepPanel({ title, hint, collapsible = false, children }: {
+  title:        string;
+  hint?:        string;
+  /** Starts closed behind a tap target — for optional detail */
+  collapsible?: boolean;
+  children:     React.ReactNode;
+}) {
+  const [open, setOpen] = useState(!collapsible);
+  const heading = (
+    <span className="min-w-0">
+      <span className="block text-base font-bold text-charcoal">{title}</span>
+      {hint && <span className="block text-xs font-medium text-charcoal/50">{hint}</span>}
+    </span>
+  );
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm">
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className={cn(
+            "flex min-h-[64px] w-full items-center justify-between gap-3 bg-sand-50/80 px-5 py-4 text-left sm:px-6",
+            open && "border-b border-sand-200",
+          )}
+        >
+          {heading}
+          <ChevronDown size={20} className={cn("flex-shrink-0 text-charcoal/50 transition-transform", open && "rotate-180")} />
+        </button>
+      ) : (
+        <h3 className="border-b border-sand-200 bg-sand-50/80 px-5 py-4 sm:px-6">{heading}</h3>
+      )}
+      {open && <div className="flex flex-col gap-6 p-5 sm:p-6">{children}</div>}
+    </section>
   );
 }

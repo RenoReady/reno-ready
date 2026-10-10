@@ -10,9 +10,12 @@
  * isAdmin    — email matches ADMIN_EMAIL env var; unlimited access
  * isPremium  — active day_pass / monthly / annual subscription
  * freeLimit  — how many free generations are allowed (3)
+ * anonPreviewUsed — signed out, and this browser has had its one free preview
  */
 
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { ANON_PREVIEW_COOKIE } from "@/lib/anonPreview";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 
@@ -26,6 +29,7 @@ interface UserStatusResponse {
   isPremium:       boolean;
   generationCount: number;
   freeLimit:       number;
+  anonPreviewUsed: boolean;
 }
 
 export async function GET(): Promise<NextResponse<UserStatusResponse>> {
@@ -35,13 +39,18 @@ export async function GET(): Promise<NextResponse<UserStatusResponse>> {
     isPremium:       false,
     generationCount: 0,
     freeLimit:       FREE_GENERATION_LIMIT,
+    anonPreviewUsed: false,
   };
 
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) return NextResponse.json(empty);
+    if (!user) {
+      // The server also checks the visitor's IP; the cookie is enough for the label
+      const used = !!(await cookies()).get(ANON_PREVIEW_COOKIE);
+      return NextResponse.json({ ...empty, anonPreviewUsed: used });
+    }
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
@@ -70,6 +79,7 @@ export async function GET(): Promise<NextResponse<UserStatusResponse>> {
       isPremium,
       generationCount,
       freeLimit:       FREE_GENERATION_LIMIT,
+      anonPreviewUsed: false,
     });
   } catch (err) {
     console.error("[user-status]", err);

@@ -19,6 +19,8 @@ export interface UserStatus {
   isPremium:       boolean;
   generationCount: number;
   freeLimit:       number;
+  /** Signed out and this browser's one free preview is used */
+  anonPreviewUsed: boolean;
   loading:         boolean;
 }
 
@@ -28,6 +30,7 @@ const DEFAULT: UserStatus = {
   isPremium:       false,
   generationCount: 0,
   freeLimit:       5,
+  anonPreviewUsed: false,
   loading:         true,
 };
 

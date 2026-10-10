@@ -26,6 +26,7 @@ import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { saveGeneration } from "@/lib/generations";
+import { claimAnonPreview, releaseAnonPreview, anonPreviewCookie } from "@/lib/anonPreview";
 
 // Vercel hobby plan caps serverless functions at 60 s.
 // We set 55 s here so we have time to return a clean error rather than a raw 504.
@@ -82,6 +83,7 @@ interface GenerateResponse {
   error?:            string;
   upgrade_required?: boolean;         // true when the user must upgrade
   reason?:           "auth_required" | "limit_reached";
+  anonymous?:        boolean;         // true when this was the visitor's one free preview without an account
 }
 
 /** Free tier limit */
@@ -301,6 +303,8 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
 
 // ── Route handler ──────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse<GenerateResponse>> {
+  // Set when a signed-out visitor's free preview is claimed; released if no preview comes back
+  let anonClaim: string | null = null;
   try {
     const body: GenerateRequest = await req.json();
 
@@ -309,18 +313,22 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Signed-out visitors get one free preview, then sign in for the free tier
     if (!user) {
-      return NextResponse.json({
-        success:          false,
-        upgrade_required: true,
-        reason:           "auth_required",
-        error:            "Sign in to generate previews.",
-      });
+      anonClaim = await claimAnonPreview(req);
+      if (!anonClaim) {
+        return NextResponse.json({
+          success:          false,
+          upgrade_required: true,
+          reason:           "auth_required",
+          error:            `You've used your free preview. Sign in free for ${FREE_GENERATION_LIMIT} more.`,
+        });
+      }
     }
 
-    const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const isAdmin = !!user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-    if (!isAdmin) {
+    if (user && !isAdmin) {
       // Look up profile for subscription status + count
       const svc = createSupabaseServiceRoleClient();
       const { data: profile } = await svc
@@ -365,7 +373,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     // alive on Vercel until it finishes), so the user never waits on it.
     //  - count it against the free tier (failed calls don't cost a credit)
     //  - store the image + prompt so it shows in the admin dashboard
-    if (result.success) {
+    // A signed-out visitor's preview isn't stored (there's no user to file it under).
+    if (!result.success && anonClaim) {
+      await releaseAnonPreview(anonClaim);
+      anonClaim = null;
+    }
+    if (result.success && user) {
       const imageUrl = result.imageUrl;
       after(async () => {
         if (!isAdmin) {
@@ -385,9 +398,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       });
     }
 
-    return NextResponse.json(result);
+    if (!anonClaim) return NextResponse.json(result);
+    const res = NextResponse.json({ ...result, anonymous: true });
+    res.cookies.set(anonPreviewCookie);
+    return res;
 
   } catch (err: unknown) {
+    if (anonClaim) await releaseAnonPreview(anonClaim);
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[generate] Error:", message);
     return NextResponse.json(

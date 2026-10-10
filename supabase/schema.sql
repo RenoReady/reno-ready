@@ -124,3 +124,15 @@ create policy "users upload to own folder"
     and auth.role() = 'authenticated'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ── 3. anon_previews: one free preview without an account ───────
+-- Visitors who aren't signed in get one AI preview. Each one claims a
+-- row keyed by a keyed hash of their IP address (the raw IP is never
+-- stored). Only the server's service-role key can read or write it.
+-- (Also shipped as supabase/migrations/20261010_anon_previews.sql.)
+create table if not exists public.anon_previews (
+  ip_hash     text primary key,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.anon_previews enable row level security;

@@ -1354,6 +1354,8 @@ interface GenerateResult {
   error?:            string;
   upgrade_required?: boolean;
   reason?:           "auth_required" | "limit_reached";
+  /** The signed-out visitor's one free preview */
+  anonymous?:        boolean;
 }
 
 async function readGenerateResponse(res: Response): Promise<GenerateResult> {
@@ -1403,6 +1405,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [paymentBanner,        setPaymentBanner]         = useState(false);
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
+  // Signed-out visitors get one free preview; set once it's used this visit
+  const [anonPreviewUsedLocal, setAnonPreviewUsedLocal] = useState(false);
+  // Sign-in opened from the counter shouldn't kick off a generation afterwards
+  const generateAfterAuthRef = useRef(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1618,8 +1624,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   }, []);
 
   const executeGenerate = useCallback(async () => {
-    if (!isAuthed()) {
+    // Signed out: the first preview is free, after that ask them to sign in.
+    // (The API enforces this too, by cookie and IP.)
+    if (!isAuthed() && !userStatus.userId && (userStatus.anonPreviewUsed || anonPreviewUsedLocal)) {
       saveBuilderStateForAuth(true); // snapshot before OAuth redirect
+      generateAfterAuthRef.current = true;
       setShowAuthModal(true);
       return;
     }
@@ -1703,6 +1712,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       if (data.upgrade_required) {
         if (data.reason === "auth_required") {
           saveBuilderStateForAuth(true);
+          setAnonPreviewUsedLocal(true);
+          generateAfterAuthRef.current = true;
           setShowAuthModal(true);
         } else {
           setShowPaywallModal(true);
@@ -1721,7 +1732,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setViewportState("ready");
       if (data.imageUrl) pushToHistory(data.imageUrl);
       // Instantly decrement the displayed free counter without waiting for a re-fetch
-      if (!userStatus.isAdmin && !userStatus.isPremium) {
+      if (data.anonymous) {
+        setAnonPreviewUsedLocal(true);
+      } else if (!userStatus.isAdmin && !userStatus.isPremium) {
         setLocalGenerationBump((b) => b + 1);
       }
       // Also bust the cache so it syncs the real count in the background
@@ -1734,7 +1747,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, pushToHistory]);
+  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, anonPreviewUsedLocal, pushToHistory]);
 
   const handleGenerate = useCallback(async () => {
     // Every render is built on their room photo — without one, back to Step 1
@@ -1817,8 +1830,14 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       const data = await readGenerateResponse(res);
       if (data.upgrade_required) {
-        if (data.reason === "auth_required") setShowAuthModal(true);
-        else setShowPaywallModal(true);
+        if (data.reason === "auth_required") {
+          saveBuilderStateForAuth(false);
+          setAnonPreviewUsedLocal(true);
+          generateAfterAuthRef.current = false;
+          setShowAuthModal(true);
+        } else {
+          setShowPaywallModal(true);
+        }
         // Put the render back rather than leaving the viewport mid-generation
         setGeneratedImageUrl(previous.image);
         setGenerateDescription(previous.description);
@@ -2592,8 +2611,30 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <div className="order-first lg:order-none flex flex-col gap-4 min-w-0 [&>*]:shrink-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pb-2">
               {viewport}
 
-              {/* Free generation counter (hide for admin / premium) */}
-              {!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium && (() => {
+              {/* Free preview counter (hidden for admin / premium) */}
+              {!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium && (
+                !userStatus.userId && !isAuthed() ? (
+                  // Signed out: one preview with no sign-up, then a free account for more
+                  userStatus.anonPreviewUsed || anonPreviewUsedLocal ? (
+                    <button
+                      onClick={() => {
+                        saveBuilderStateForAuth(false);
+                        generateAfterAuthRef.current = false;
+                        setShowAuthModal(true);
+                      }}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold bg-terracotta/10 text-terracotta border border-terracotta/20 hover:bg-terracotta/15 transition-colors"
+                    >
+                      <span>Free preview used</span>
+                      <span className="font-bold underline underline-offset-2 whitespace-nowrap">
+                        Sign in free for {userStatus.freeLimit} more
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="w-full px-4 py-2.5 rounded-xl text-xs font-semibold bg-sand-100 text-charcoal/55 border border-sand-200">
+                      1 free preview — no sign-up needed
+                    </p>
+                  )
+                ) : (() => {
                 const effectiveCount = userStatus.generationCount + localGenerationBump;
                 const remaining      = Math.max(0, userStatus.freeLimit - effectiveCount);
                 const isExhausted    = effectiveCount >= userStatus.freeLimit;
@@ -2620,7 +2661,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     )}
                   </button>
                 );
-              })()}
+                })()
+              )}
 
               {hasPreview && !isGenerating && (refinementMode ? refinePanel : (
                 <button
@@ -2857,7 +2899,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       {showAuthModal && (
         <AuthModal
-          onSuccess={() => { setShowAuthModal(false); executeGenerate(); }}
+          onSuccess={() => { setShowAuthModal(false); if (generateAfterAuthRef.current) executeGenerate(); }}
           onClose={() => setShowAuthModal(false)}
         />
       )}

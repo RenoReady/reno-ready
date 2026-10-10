@@ -201,6 +201,13 @@ export default function LandingPage() {
                   </span>
                 </div>
 
+                {/* TEMP: Spring 2026 update announcement — remove after campaign */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-charcoal/5 border border-charcoal/10 w-fit">
+                  <span className="text-sm font-semibold text-charcoal tracking-tight">
+                    ✨ Spring 2026 Update: Instant Builder Brief Export
+                  </span>
+                </div>
+
                 {/* Headline */}
                 <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-charcoal leading-[1.05] text-balance">
                   Renovation Planning,{" "}

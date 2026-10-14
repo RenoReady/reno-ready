@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import sharp from "sharp";
 const [name, list, cols = "3"] = process.argv.slice(2);
 execFileSync(process.execPath, ["render.mjs"], { env: { ...process.env, STILLS: list }, stdio: "inherit" });
-const ts = list.split(",").map(parseFloat), C = +cols, W = Math.floor(1920 / C), H = Math.round(W * 9 / 16);
+const ts = list.split(",").map(parseFloat), C = +cols, W = Math.floor(1920 / C), H = Math.round(W * ((process.env.PAGE ?? "").includes("vertical") ? 16 / 9 : 9 / 16));
 const tiles = await Promise.all(ts.map(async (t, i) => ({
   input: await sharp(`out/${process.env.PAGE ? process.env.PAGE.replace(".html", "") + "-" : ""}still-${t.toFixed(2).padStart(5, "0")}.jpg`).resize(W - 8, H - 8).toBuffer(),
   left: (i % C) * W + 4, top: Math.floor(i / C) * H + 4,

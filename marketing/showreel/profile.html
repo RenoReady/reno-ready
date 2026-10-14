@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reno Ready — profile picture</title>
+<style>
+/* 1080 × 1080. Facebook crops to a circle, so the mark sits well inside it. ?dark for the charcoal version */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1080px;overflow:hidden}
+#p{position:relative;width:1080px;height:1080px;overflow:hidden;
+  background:radial-gradient(620px 620px at 50% 42%,#FDFAF5 0%,#F5F0E8 62%,#EDE5D4 100%)}
+#p.dark{background:radial-gradient(640px 640px at 50% 40%,#34495f 0%,#2C3E50 55%,#1f2d3b 100%)}
+#glow{position:absolute;left:50%;top:50%;width:760px;height:760px;margin:-380px 0 0 -380px;border-radius:50%;background:radial-gradient(circle,rgba(210,125,94,.16),transparent 66%)}
+#mark{position:absolute;left:50%;top:50%;width:680px;height:723px;margin:-385px 0 0 -340px;overflow:visible}
+</style>
+</head>
+<body>
+<div id="p">
+  <div id="glow"></div>
+  <svg id="mark" viewBox="0 0 470 500">
+    <defs>
+      <linearGradient id="tg" x1="100" y1="300" x2="390" y2="170" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f6c3ad"/><stop offset=".55" stop-color="#f0a487"/><stop offset="1" stop-color="#ec9374"/></linearGradient>
+      <filter id="glowf" x="-30%" y="-30%" width="160%" height="170%"><feGaussianBlur stdDeviation="11"/></filter>
+    </defs>
+    <rect class="ink" x="102" y="130" width="37" height="64" fill="#2a3b4f"/>
+    <path class="inks" d="M53 424 L51 238 L230 97 L414 238 L414 424" fill="none" stroke="#2a3b4f" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="112,262 218,356 376,178" fill="none" stroke="#f0a487" stroke-opacity=".5" stroke-width="58" filter="url(#glowf)"/>
+    <polyline points="112,246 218,340 376,162" fill="none" stroke="url(#tg)" stroke-width="64" stroke-linejoin="miter"/>
+  </svg>
+</div>
+<script>
+if (new URLSearchParams(location.search).has("dark")) {
+  document.getElementById("p").classList.add("dark");
+  document.querySelector(".ink").setAttribute("fill", "#ffffff");
+  document.querySelector(".inks").setAttribute("stroke", "#ffffff");
+}
+</script>
+</body>
+</html>

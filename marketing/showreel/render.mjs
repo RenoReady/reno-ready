@@ -14,6 +14,7 @@ const SUB  = +(process.env.SUB ?? 4);        // sub-frames blended per output fr
 const DUR  = 15;
 const PAGE = process.env.PAGE ?? "index.html";                 // kitchen.html for the kitchen reel
 const NAME = path.basename(PAGE, ".html") === "index" ? "" : path.basename(PAGE, ".html") + "-";
+const [W, H] = (process.env.SIZE ?? (PAGE.includes("vertical") ? "1080x1920" : "1920x1080")).split("x").map(Number);
 const OUT  = process.env.OUT ?? path.join(here, "out", `${NAME}video.mp4`);
 const BROWSERS = [
   process.env.BROWSER,
@@ -38,7 +39,7 @@ if (!(await alive())) {
 }
 const browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${PORT}`, defaultViewport: null });
 const page = await browser.newPage();
-await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
+await page.setViewport({ width: W, height: H, deviceScaleFactor: 1 });
 page.on("pageerror", (e) => console.error("PAGE ERROR:", e.message));
 page.on("console", (m) => { if (m.type() === "error") console.error("CONSOLE:", m.text()); });
 await page.goto(pathToFileURL(path.join(here, PAGE)).href + "?render=1");

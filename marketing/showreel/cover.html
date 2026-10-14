@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reno Ready — Facebook cover</title>
+<style>
+/* Facebook cover, 1640 × 856. Desktop shows the middle 1640 × 624; phones show
+   the middle ~1520 × 856. Everything that matters sits inside both. */
+@font-face{font-family:"Geist";src:url("node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+@font-face{font-family:"Geist Mono";src:url("node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+:root{--charcoal:#2C3E50;--terra:#D27D5E;--sand:#F5F0E8;--sand2:#EDE5D4;--green:#1f9d6b}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1640px;height:856px;overflow:hidden;background:var(--sand)}
+#c{position:relative;width:1640px;height:856px;overflow:hidden;font-family:"Geist",sans-serif;color:var(--charcoal);-webkit-font-smoothing:antialiased;
+  background:radial-gradient(900px 700px at 78% 30%,rgba(210,125,94,.20),transparent 65%),radial-gradient(700px 600px at 8% 100%,rgba(143,166,139,.18),transparent 70%),var(--sand)}
+#c *{position:absolute}
+.grid{inset:0;background-image:linear-gradient(rgba(44,62,80,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(44,62,80,.05) 1px,transparent 1px);background-size:64px 64px;
+  -webkit-mask-image:linear-gradient(90deg,#000 0%,rgba(0,0,0,.5) 60%,transparent 100%)}
+
+#logo{left:120px;top:150px;height:76px}
+#kick{left:124px;top:262px;display:flex;align-items:center;gap:14px;font:600 17px "Geist Mono",monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--terra);white-space:nowrap}
+#kick i{position:relative;width:40px;height:2px;background:var(--terra)}
+#h{left:118px;top:304px;font-weight:800;font-size:78px;line-height:.98;letter-spacing:-.045em;white-space:nowrap}
+#h em{position:relative;font-style:normal;color:var(--terra)}
+#steps{left:122px;top:500px;display:flex;gap:12px}
+#steps span{position:relative;display:flex;align-items:center;gap:10px;padding:12px 20px 12px 12px;border-radius:999px;background:#fff;font-size:21px;font-weight:700;letter-spacing:-.01em;box-shadow:0 10px 24px -10px rgba(44,62,80,.25)}
+#steps b{position:relative;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--terra);color:#fff;font:700 14px "Geist Mono",monospace}
+#url{left:122px;top:590px;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:700;letter-spacing:-.01em;color:rgba(44,62,80,.75);white-space:nowrap}
+#url i{position:relative;width:11px;height:11px;border-radius:50%;background:var(--terra);box-shadow:0 0 0 5px rgba(210,125,94,.25)}
+
+/* photo stack */
+.card{border-radius:26px;padding:10px;background:#fff;box-shadow:0 40px 80px -24px rgba(44,62,80,.45),0 6px 18px rgba(44,62,80,.10)}
+.card .in{inset:10px;border-radius:18px;overflow:hidden;background:#ddd}
+.card img{inset:0;width:100%;height:100%;object-fit:cover}
+.chip{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:999px;font-weight:700;font-size:14px;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;color:#fff;box-shadow:0 6px 16px rgba(20,33,49,.3)}
+#c .chip svg{position:relative}
+.chip.k{background:var(--charcoal)}
+.chip.t{background:var(--terra)}
+.chip.w{background:#fff;color:var(--charcoal)}
+
+#kit{left:900px;top:150px;width:300px;height:400px;transform:rotate(-7deg)}
+#bed{left:1290px;top:170px;width:270px;height:470px;transform:rotate(6deg)}
+#bath{left:1035px;top:250px;width:390px;height:480px;transform:rotate(-1deg);z-index:2}
+#bath .before{inset:0;clip-path:inset(0 52% 0 0)}
+#bath .line{left:48%;top:0;bottom:0;width:5px;margin-left:-2.5px;background:#fff;box-shadow:0 0 18px rgba(0,0,0,.35)}
+#bath .knob{left:48%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 10px 24px rgba(20,33,49,.4)}
+#bath .knob svg{position:relative}
+
+#est{left:870px;top:560px;width:300px;padding:18px 22px;border-radius:22px;background:var(--charcoal);color:#fff;box-shadow:0 30px 60px -20px rgba(20,33,49,.6);z-index:3;transform:rotate(-3deg)}
+#est *{position:relative}
+#est .k{display:block;font:600 13px "Geist Mono",monospace;letter-spacing:.16em;color:rgba(255,255,255,.55)}
+#est .v{display:block;margin-top:4px;font-size:44px;font-weight:800;letter-spacing:-.04em}
+#est .v i{font-style:normal;color:var(--terra)}
+#est .ok{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:6px 12px;border-radius:999px;background:var(--green);font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+#est .ok svg{position:relative}
+#ai{left:1360px;top:640px;z-index:3;transform:rotate(4deg)}
+</style>
+</head>
+<body>
+<div id="c">
+  <div class="grid"></div>
+
+  <img id="logo" src="assets/logo-cropped.png" alt="">
+  <div id="kick"><i></i>AI renovation planning · Australia</div>
+  <div id="h">Renovation planning,<br><em>made simple.</em></div>
+  <div id="steps">
+    <span><b>01</b>Design</span>
+    <span><b>02</b>Quote</span>
+    <span><b>03</b>Renovate</span>
+  </div>
+  <div id="url"><i></i>renoready.com.au &nbsp;·&nbsp; Free to start</div>
+
+  <div class="card" id="kit"><div class="in"><img src="assets/kitchen/after.jpg" alt="" style="object-position:50% 40%"></div></div>
+  <div class="card" id="bed"><div class="in"><img src="assets/bedroom/after.jpg" alt="" style="object-position:50% 30%"></div></div>
+  <div class="card" id="bath"><div class="in">
+    <img src="assets/after.jpg" alt="">
+    <div class="before"><img src="assets/before.jpg" alt=""></div>
+    <div class="line"></div>
+    <div class="knob"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2C3E50" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></div>
+    <div class="chip k" style="left:14px;top:14px">Before</div>
+    <div class="chip w" style="right:14px;top:14px">After</div>
+  </div></div>
+
+  <div id="est">
+    <span class="k">ESTIMATED COST</span>
+    <span class="v"><i>$</i>26,528</span>
+    <span class="ok"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>Within budget</span>
+  </div>
+  <div class="chip t" id="ai"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>AI preview ready</div>
+</div>
+</body>
+</html>

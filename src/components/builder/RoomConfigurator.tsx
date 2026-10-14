@@ -29,7 +29,7 @@ import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary, { STYLE_PRESETS, type StylePreset } from "@/components/ui/StyleLibrary";
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
-import { StepCard, StepTracker, LayoutTemplatePicker } from "@/components/builder/Steps";
+import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept } from "@/lib/keepExisting";
 import { ROOM_PAGES } from "@/lib/roomPages";
@@ -771,7 +771,7 @@ function BlueprintIdle({ onGenerate }: { onGenerate: () => void }) {
 
           <div>
             <p className="text-xl font-bold text-white tracking-tight">Ready to Render</p>
-            <p className="text-sm text-blue-200/40 mt-1">Click to generate your 3D visual preview</p>
+            <p className="text-sm text-blue-200/40 mt-1">Click to generate your preview</p>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-blue-200/35">
@@ -1337,9 +1337,8 @@ interface RoomConfiguratorProps {
 
 export default function RoomConfigurator({ room, embedded = false }: RoomConfiguratorProps) {
   const router  = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const photoUploadRef    = useRef<HTMLDivElement>(null);
-  const photoDropzoneRef  = useRef<HTMLDivElement>(null);
+  // Top of the tool — each step change scrolls back here
+  const topRef = useRef<HTMLDivElement>(null);
 
   // Set to true when returning from OAuth with a pending generate request
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
@@ -1359,7 +1358,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       window.history.replaceState({}, "", clean.toString());
       // Restore builder state saved before the OAuth redirect
       const pending = restoreBuilderStateFromAuth();
-      if (pending) setShouldAutoGenerate(true);
+      const restored = useBuilderStore.getState();
+      if (restored.roomPhotoUrl) setStage("design");
+      // Only resume the generation if their photo survived the redirect
+      if (pending && restored.roomPhotoUrl) setShouldAutoGenerate(true);
     }
 
     if (params.get("payment_success") === "true") {
@@ -1401,8 +1403,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     bedroomSelections,  setBedroomSelections,
     savedRooms,         saveCurrentRoom,
     roomConfirmed,      setRoomConfirmed,
-    layoutTemplate,     setLayoutTemplate,
     keepExisting,       setBathroomKeep,
+    generatedImageUrl,
   } = useBuilderStore();
 
   // The preview + cost column — scrolled into view when generation starts on small screens
@@ -1414,9 +1416,20 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   const userStatus = useUserStatus(statusRefreshKey);
 
-  const [isDragging,         setIsDragging]        = useState(false);
-  const [viewportState,      setViewportState]     = useState<ViewportState>("idle");
+  // ── Photo-first flow: upload → design → estimate ──
+  // Back-navigation (e.g. from /preview) resumes where the user left off.
+  const [stage, setStage] = useState<Stage>(() => {
+    const st = useBuilderStore.getState();
+    return st.roomPhotoUrl ? (st.generatedImageUrl ? "estimate" : "design") : "upload";
+  });
+  const [photoBusy,  setPhotoBusy]  = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [viewportState,      setViewportState]     = useState<ViewportState>(
+    () => (useBuilderStore.getState().generatedImageUrl ? "ready" : "idle"),
+  );
   const [isGenerating,       setIsGenerating]      = useState(false);
+  const isGeneratingRef = useRef(false);
+  useEffect(() => { isGeneratingRef.current = isGenerating; }, [isGenerating]);
   const [generateError,      setGenerateError]     = useState<string | null>(null);
   // Only show picker if the user hasn't confirmed a room yet this session.
   // Back-navigation from /preview must NOT re-show the picker.
@@ -1438,7 +1451,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [refinementNote,     setRefinementNote]     = useState("");
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
-  const [showNoPhotoWarning, setShowNoPhotoWarning] = useState(false);
   // Controls whether the "Not quite right?" refinement UI is shown.
   // Starts false (before/after comparison shown); toggled by the orange button.
   const [refinementMode,     setRefinementMode]     = useState(false);
@@ -1451,7 +1463,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [historyIdx,    setHistoryIdx]    = useState(-1);
   const genHistoryRef = useRef<string[]>([]);
   const historyIdxRef = useRef(-1);
-  const [pulseUpload,        setPulseUpload]        = useState(false);
 
   // ── History helpers ────────────────────────────────────────────────────────
   const pushToHistory = useCallback((imageUrl: string) => {
@@ -1475,26 +1486,58 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setViewportState("ready");
   }, [setGeneratedImageUrl]);
 
+  const goTo = useCallback((next: Stage) => {
+    setStage(next);
+    requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, []);
+
+  /** Reads a photo (or the sample), downsizes it to 1280px JPEG and moves on to Step 2 */
   const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) return;
+    const fail = (msg: string) => { setPhotoBusy(false); setPhotoError(msg); };
+    if (file.type && !file.type.startsWith("image/")) { fail("That file isn't a photo. Please choose a JPG, PNG or HEIC image."); return; }
+    setPhotoError(null);
+    setPhotoBusy(true);
     const reader = new FileReader();
+    reader.onerror = () => fail("We couldn't read that photo. Please try another one.");
     reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
       const img = new Image();
+      img.onerror = () => fail("We couldn't open that photo. Please try a JPG or PNG.");
       img.onload = () => {
         const MAX = 1280;
         const scale = Math.min(1, MAX / Math.max(img.width, img.height));
         const canvas = document.createElement("canvas");
         canvas.width  = Math.round(img.width  * scale);
         canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d");
+        if (!ctx || !canvas.width || !canvas.height) { fail("We couldn't process that photo. Please try another one."); return; }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setRoomPhotoUrl(canvas.toDataURL("image/jpeg", 0.85));
+        setPhotoBusy(false);
+        goTo("design");
       };
-      img.src = dataUrl;
+      img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [setRoomPhotoUrl]);
+  }, [setRoomPhotoUrl, goTo]);
+
+  const handleSample = useCallback(async () => {
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const res = await fetch(SAMPLE_ROOMS[roomType]);
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      handleFile(new File([blob], `sample-${roomType}.jpg`, { type: blob.type || "image/jpeg" }));
+    } catch {
+      setPhotoBusy(false);
+      setPhotoError("The sample room didn't load. Please check your connection and try again.");
+    }
+  }, [roomType, handleFile]);
+
+  // Removing the photo (or switching rooms, which clears it) returns to Step 1
+  useEffect(() => {
+    if (!roomPhotoUrl && stage !== "upload" && !isGeneratingRef.current) setStage("upload");
+  }, [roomPhotoUrl, stage]);
 
   // Apply a style library preset to all tile/vanity/tapware selections
   // Clicking the already-active preset deselects everything
@@ -1564,13 +1607,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
     setRefinementMode(false);   // reset to comparison view for each new generation
-
-    // On phones the preview sits below the steps — bring it into view
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const top = canvas.getBoundingClientRect().top;
-      if (top < 0 || top > window.innerHeight * 0.6) canvas.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    goTo("estimate");
 
     try {
       const roomLabel = store.roomType === "kitchen" ? "kitchen"
@@ -1625,6 +1662,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         }
         setIsGenerating(false);
         setViewportState("idle");
+        setStage("design");
         return;
       }
 
@@ -1649,16 +1687,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, pushToHistory]);
+  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, pushToHistory, goTo]);
 
   const handleGenerate = useCallback(async () => {
-    const store = useBuilderStore.getState();
-    if (!store.roomPhotoUrl && !store.layoutTemplate) {
-      setShowNoPhotoWarning(true);
-      return;
-    }
+    // Every design starts from a photo (theirs or a sample)
+    if (!useBuilderStore.getState().roomPhotoUrl) { goTo("upload"); return; }
     await executeGenerate();
-  }, [executeGenerate]);
+  }, [executeGenerate, goTo]);
 
   // Auto-trigger generation when returning from Google OAuth redirect.
   // Waits until userStatus has finished loading so the paywall check
@@ -1770,19 +1805,48 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   const roomName = roomType === "kitchen" ? "Kitchen" : roomType === "bedroom" ? "Bedroom" : "Bathroom";
 
-  // Step completion drives the tracker and the step badges
-  const k = kitchenSelections, bd = bedroomSelections;
-  const step1Done =
-    (roomType === "kitchen" ? k.keepExisting : roomType === "bedroom" ? bd.keepExisting : keepExisting)?.length > 0 ||
-    (roomType === "kitchen" ? !!(k.cabinetry || k.benchtop || k.mixer || k.splashback || k.floorFinish || k.floorColor || k.wallColor || k.cooktop || k.dishwasher || k.ceilingStyle)
-    : roomType === "bedroom" ? !!(bd.flooring || bd.flooringColor || bd.wallTreatment || bd.wallColor || bd.lighting || bd.storage || bd.windowTreatment || bd.ceilingStyle)
-    : !!(floorTile || wallTile || customFloorColor || customWallColor || tileStyle || vanity || tapware || activeStylePreset));
-  const sizeDone = (size: string | null, l: number, w: number) => !!size && (size !== "custom" || (l > 0 && w > 0));
-  const step2Done =
-    roomType === "kitchen" ? sizeDone(k.roomSize, k.customLength, k.customWidth)
-    : roomType === "bedroom" ? sizeDone(bd.roomSize, bd.customLength, bd.customWidth)
-    : sizeDone(bathroomSize, customLength, customWidth);
-  const step3Done = !!roomPhotoUrl || !!layoutTemplate;
+  // ── Shared Step 2 controls ──
+  const hasPreview = !!generatedImageUrl || genHistory.length > 0;
+  const reachable  = roomPhotoUrl ? (hasPreview ? 2 : 1) : 0;
+
+  const liveEstimate = (() => {
+    if (roomType === "kitchen") return formatAUD(Math.round(calcKitchenCost(kitchenSelections).total / 500) * 500);
+    if (roomType === "bedroom") return formatAUD(Math.round(calcBedroomCost(bedroomSelections).total / 500) * 500);
+    const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
+    if (!est) return formatAUD(0);
+    return `${formatAUD(Math.round(est * 0.88 / 500) * 500)}–${formatAUD(Math.round(est * 1.12 / 500) * 500)}`;
+  })();
+
+  const showFreeCounter = !userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium;
+  const freeUsed        = userStatus.generationCount + localGenerationBump;
+  const freeRemaining   = Math.max(0, userStatus.freeLimit - freeUsed);
+  const freeExhausted   = freeUsed >= userStatus.freeLimit;
+  const freeLeftLabel   = showFreeCounter
+    ? (freeExhausted ? "Free previews used" : `${freeRemaining} free ${freeRemaining === 1 ? "preview" : "previews"} left`)
+    : null;
+
+  const freeCounter = showFreeCounter && (
+    <button
+      onClick={() => setShowPaywallModal(true)}
+      className={cn(
+        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300",
+        freeExhausted
+          ? "bg-terracotta/10 text-terracotta border border-terracotta/20 hover:bg-terracotta/15"
+          : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30 cursor-default",
+      )}
+    >
+      <span>{freeExhausted ? "Free previews used — tap to upgrade" : freeLeftLabel}</span>
+      {freeExhausted && <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">Upgrade</span>}
+    </button>
+  );
+
+  const generateButton = (
+    <Button variant="primary" size="lg" fullWidth onClick={handleGenerate} disabled={isGenerating} className="group min-h-[56px] text-base">
+      {isGenerating
+        ? <><Loader2 size={18} className="mr-2 animate-spin" />Generating…</>
+        : <><Sparkles size={18} className="mr-2" />Generate Preview<ArrowRight size={18} className="ml-2 group-hover:translate-x-0.5 transition-transform" /></>}
+    </Button>
+  );
 
   return (
     <div className="min-h-screen bg-sand">
@@ -1817,720 +1881,666 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         )}
 
         {/* ── Header + step tracker ── */}
-        <div className="mb-5 sm:mb-8 flex flex-col gap-4">
+        <div ref={topRef} className="mb-5 sm:mb-8 flex flex-col gap-4 scroll-mt-28">
           {!embedded && (
             <div>
               <h1 className="text-2xl sm:text-4xl font-bold text-charcoal">Design Your Dream {roomName}</h1>
               <p className="mt-1.5 text-sm sm:text-base text-charcoal/55">
-                Follow 3 simple steps below to visualise your renovated space and build a project summary.
+                Upload a photo, choose your style, get your estimate.
               </p>
             </div>
           )}
           <StepTracker
-            done={[step1Done, step2Done, step3Done]}
+            stage={stage}
+            reachable={reachable}
+            onStep={goTo}
             onChangeRoom={() => setShowRoomRouter(true)}
             savedCount={savedRooms.length}
           />
         </div>
 
-        <div className="grid lg:grid-cols-[420px_minmax(0,1fr)] xl:grid-cols-[460px_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
-
-          {/* ══ STEPS ═════════════════════════════════════════════ */}
-          <div className="flex flex-col gap-5 min-w-0">
-
-            {/* Hidden file input — always in DOM so fileRef works for all room types */}
-            <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-
-            {/* ── Step 1: finishes & style ── */}
-            <StepCard step={1} done={step1Done}>
-              {roomType === "bathroom" && (<>
-                <StyleLibrary activePresetId={activeStylePreset} onSelect={handleStylePreset} />
-                {/* 2. Floor Tiles */}
-                <SidebarSection icon={Layers} title="Floor Tiles (Colour)">
-                <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
-                  <div className="grid grid-cols-4 gap-2">
-                    {FLOOR_TILES.map((tile) => (
-                      <TileCard key={tile.id} tile={tile}
-                        selected={floorTile?.id === tile.id}
-                        onSelect={() => setFloorTile(floorTile?.id === tile.id ? null : tile)}
-                        onInfo={() => setModalTile(tile)} />
-                    ))}
-                    {/* Custom hex swatch */}
-                    <CustomHexSwatch
-                      value={customFloorColor}
-                      onChange={setCustomFloorColor}
-                      label="Custom Floor Colour"
-                    />
-                  </div>
-                  {floorTile && (
-                    <p className="text-[11px] text-charcoal/50 text-center">
-                      <span className="font-semibold text-charcoal/70">{floorTile.name}</span>
-                      {customFloorColor && <span className="text-terracotta font-semibold"> · {customFloorColor}</span>}
-                      {" — "}{floorTile.description.split(".")[0]}.
-                    </p>
-                  )}
-                  {!floorTile && customFloorColor && (
-                    <p className="text-[11px] text-charcoal/50 text-center">
-                      Custom colour <span className="font-semibold text-terracotta">{customFloorColor}</span> will be applied to the floor.
-                    </p>
-                  )}
-                </SidebarSection>
-
-                {/* 3. Wall Tiles */}
-                <SidebarSection icon={Layers} title="Wall Tiles (Colour)">
-                <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
-                  <div className="grid grid-cols-4 gap-2">
-                    {WALL_TILES.map((tile) => (
-                      <TileCard key={tile.id} tile={tile}
-                        selected={wallTile?.id === tile.id}
-                        onSelect={() => setWallTile(wallTile?.id === tile.id ? null : tile)}
-                        onInfo={() => setModalTile(tile)} />
-                    ))}
-                    {/* Custom hex swatch */}
-                    <CustomHexSwatch
-                      value={customWallColor}
-                      onChange={setCustomWallColor}
-                      label="Custom Wall Colour"
-                    />
-                  </div>
-                  {wallTile && (
-                    <p className="text-[11px] text-charcoal/50 text-center">
-                      <span className="font-semibold text-charcoal/70">{wallTile.name}</span>
-                      {customWallColor && <span className="text-terracotta font-semibold"> · {customWallColor}</span>}
-                      {" — "}{wallTile.description.split(".")[0]}.
-                    </p>
-                  )}
-                  {!wallTile && customWallColor && (
-                    <p className="text-[11px] text-charcoal/50 text-center">
-                      Custom colour <span className="font-semibold text-terracotta">{customWallColor}</span> will be applied to the walls.
-                    </p>
-                  )}
-                </SidebarSection>
-
-                {/* 4. Tile Layout & Texture */}
-                <SidebarSection icon={Layers} title="Tile Layout & Texture">
-                  <div className="grid grid-cols-4 gap-2">
-                    {TILE_STYLE_OPTIONS.map((style) => {
-                      const active = tileStyle === style.id;
-                      return (
-                        <button
-                          key={style.id}
-                          onClick={() => setTileStyle(active ? null : style.id as TileStyle)}
-                          className={cn(
-                            "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none",
-                            active
-                              ? "ring-2 ring-terracotta ring-offset-2 shadow-warm scale-[1.04]"
-                              : "ring-1 ring-sand-200 hover:ring-terracotta/40 hover:shadow-warm-sm hover:scale-[1.02]",
-                          )}
-                        >
-                          {/* Texture thumbnail */}
-                          <TileTexture
-                            tileId={style.id}
-                            size={80}
-                            className="absolute inset-0 w-full h-full"
-                            style={{ width: "100%", height: "100%" }}
-                          />
-                          {/* Selected badge */}
-                          {active && (
-                            <div className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-terracotta flex items-center justify-center shadow-warm-sm">
-                              <CheckCircle2 size={11} className="text-white" strokeWidth={3} />
-                            </div>
-                          )}
-                          {/* Label */}
-                          <div className="absolute bottom-0 inset-x-0 px-1.5 py-1.5 rounded-b-2xl bg-gradient-to-t from-black/65 to-transparent">
-                            <p className="text-[9px] font-bold text-white text-center drop-shadow truncate leading-tight">
-                              {style.label}
-                            </p>
-                            <p className="text-[8px] text-white/60 text-center leading-none mt-0.5">{style.tag}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {tileStyle && (
-                    <p className="text-[11px] text-charcoal/45 text-center">
-                      {TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.promptPhrase}
-                    </p>
-                  )}
-                </SidebarSection>
-
-                {/* 5. Vanity */}
-                <SidebarSection icon={Layers} title="Vanity Style">
-                <KeepExistingToggle room="bathroom" thing="vanity" active={isKept(keepExisting, "vanity")} onToggle={(on) => setBathroomKeep("vanity", on)} />
-                  <div className="grid grid-cols-2 gap-3">
-                    {VANITY_OPTIONS.map((opt) => (
-                      <button key={opt.id} onClick={() => setVanity(opt.id as VanityType)}
-                        className={cn(
-                          "flex flex-col gap-2 p-4 rounded-2xl text-left border-2 transition-all duration-200 outline-none",
-                          vanity === opt.id ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                        )}>
-                        <div className={cn("w-9 h-5 rounded-md", vanity === opt.id ? "bg-terracotta/20" : "bg-sand-200", opt.id === "floating" && "mt-3")} />
-                        <p className={cn("text-sm font-bold", vanity === opt.id ? "text-terracotta" : "text-charcoal")}>{opt.label}</p>
-                        <p className="text-[11px] text-charcoal/50 leading-snug">{opt.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                </SidebarSection>
-
-                {/* 6. Tapware */}
-                <SidebarSection icon={Droplets} title="Tapware Finish">
-                <KeepExistingToggle room="bathroom" thing="tapware" active={isKept(keepExisting, "tapware")} onToggle={(on) => setBathroomKeep("tapware", on)} />
-                  <div className="grid grid-cols-3 gap-3">
-                    {TAPWARE_OPTIONS.map((opt) => (
-                      <button key={opt.id} onClick={() => setTapware(opt.id as TapwareFinish)}
-                        className={cn(
-                          "flex flex-col items-center gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 outline-none",
-                          tapware === opt.id ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                        )}>
-                        <div className="w-10 h-10 rounded-full shadow-warm-sm ring-1 ring-black/10" style={{ background: opt.swatchBg }} />
-                        <p className={cn("text-[11px] font-bold", tapware === opt.id ? "text-terracotta" : "text-charcoal/70")}>{opt.label}</p>
-                        {opt.premium && (
-                          <span className="text-[9px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full -mt-1">{opt.premium}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </SidebarSection>
-                {/* 8. Lighting & Electrical */}
-                <SidebarSection icon={Lightbulb} title="Lighting & Electrical">
-                  <div className="flex flex-col gap-2">
-                    {LIGHTING_OPTIONS.map((opt) => {
-                      const active = lightingOption === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => setLightingOption(opt.id as LightingOption)}
-                          className={cn(
-                            "flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200",
-                            active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                          )}
-                        >
-                          <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
-                            active ? "bg-terracotta/15" : "bg-sand-100")}>
-                            <Lightbulb size={15} className={active ? "text-terracotta" : "text-charcoal/40"} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={cn("text-sm font-semibold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
-                            <p className="text-[11px] text-charcoal/45 mt-0.5 leading-snug">{opt.sub}</p>
-                          </div>
-                          {opt.cost > 0 && (
-                            <p className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/40")}>
-                              +${opt.cost.toLocaleString()}
-                            </p>
-                          )}
-                        </button>
-                      );
-                    })}
-                    <p className="text-[10px] text-charcoal/35 leading-snug">
-                      Prices include supply + estimated electrician labour. Marvel 3-in-1 from BDW Quote #235561.
-                    </p>
-                  </div>
-                </SidebarSection>
-
-                {/* 9. Custom Design Note */}
-                <SidebarSection icon={MessageSquare} title="Custom Design Note">
-                  <textarea
-                    value={customNote}
-                    onChange={(e) => setCustomNote(e.target.value)}
-                    placeholder="Add specific requests (e.g. add a handrail, change shower screen type, add under-vanity lighting)…"
-                    maxLength={300}
-                    rows={3}
-                    className={cn(
-                      "w-full resize-none rounded-xl px-4 py-3 text-sm",
-                      "border-2 border-sand-200 bg-white/50",
-                      "focus:outline-none focus:border-terracotta/60 focus:bg-white",
-                      "text-charcoal/80 placeholder:text-charcoal/30 transition-colors duration-200",
-                    )}
-                  />
-                  <p className="text-[11px] text-charcoal/35 text-right -mt-1">
-                    {customNote.length}/300 · Sent directly to the AI
-                  </p>
-                </SidebarSection>
-              </>)}
-              {roomType === "kitchen" && (
-                <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
-              )}
-              {roomType === "bedroom" && (
-                <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
-              )}
+        {/* ══ STEP 1 · UPLOAD ═══════════════════════════════════════ */}
+        {stage === "upload" && (
+          <div className="mx-auto w-full max-w-2xl">
+            <StepCard step={1}>
+              <PhotoStart room={roomType} onFile={handleFile} onSample={handleSample} busy={photoBusy} error={photoError} />
             </StepCard>
+          </div>
+        )}
 
-            {/* ── Step 2: room layout ── */}
-            <StepCard step={2} done={step2Done}>
-              {roomType === "bathroom" && (<>
-                {/* 0. Bathroom Size */}
-                <SidebarSection icon={SlidersHorizontal} title="Bathroom Size">
-                  <div className="grid grid-cols-2 gap-2">
-                    {BATHROOM_SIZE_OPTIONS.map((opt) => {
-                      const active = bathroomSize === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => {
-                            const next = bathroomSize === opt.id ? null : opt.id as BathroomSize;
-                            setBathroomSize(next);
-                            setUseCustomDimensions(next === "custom");
-                          }}
+        {/* ══ STEP 2 · CHOOSE STYLE (on their photo) ════════════════ */}
+        {stage === "design" && (
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_400px] gap-5 sm:gap-6 items-start pb-28 lg:pb-0">
+            {/* Their room — on top on phones, pinned beside the options on desktop */}
+            <aside className="lg:order-2 flex flex-col gap-4 min-w-0 lg:sticky lg:top-28">
+              <div className="rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm p-3">
+                <div className="flex items-center justify-between gap-3 px-1 pb-2.5">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/50">Your space</p>
+                  <button
+                    type="button"
+                    onClick={() => setRoomPhotoUrl(null)}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold text-terracotta hover:bg-terracotta/10 transition-colors"
+                  >
+                    <RotateCcw size={12} /> Change photo
+                  </button>
+                </div>
+                {roomPhotoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={roomPhotoUrl} alt={`Your ${roomName.toLowerCase()}`}
+                    className="w-full max-h-56 sm:max-h-80 lg:max-h-[46vh] rounded-2xl object-contain bg-charcoal/5" />
+                )}
+              </div>
+              <div className="hidden lg:flex flex-col gap-3 rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm p-5">
+                <div className="flex items-end justify-between gap-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/50">Estimate so far</p>
+                  <p className="text-xl font-bold text-charcoal tabular-nums">{liveEstimate}</p>
+                </div>
+                {freeCounter}
+                {generateButton}
+              </div>
+            </aside>
+
+            <div className="lg:order-1 flex flex-col gap-5 min-w-0">
+              <StepCard step={2}>
+                {roomType === "bathroom" && (<>
+                  <StyleLibrary activePresetId={activeStylePreset} onSelect={handleStylePreset} />
+                  {/* 2. Floor Tiles */}
+                  <SidebarSection icon={Layers} title="Floor Tiles (Colour)">
+                  <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
+                    <div className="grid grid-cols-4 gap-2">
+                      {FLOOR_TILES.map((tile) => (
+                        <TileCard key={tile.id} tile={tile}
+                          selected={floorTile?.id === tile.id}
+                          onSelect={() => setFloorTile(floorTile?.id === tile.id ? null : tile)}
+                          onInfo={() => setModalTile(tile)} />
+                      ))}
+                      {/* Custom hex swatch */}
+                      <CustomHexSwatch
+                        value={customFloorColor}
+                        onChange={setCustomFloorColor}
+                        label="Custom Floor Colour"
+                      />
+                    </div>
+                    {floorTile && (
+                      <p className="text-[11px] text-charcoal/50 text-center">
+                        <span className="font-semibold text-charcoal/70">{floorTile.name}</span>
+                        {customFloorColor && <span className="text-terracotta font-semibold"> · {customFloorColor}</span>}
+                        {" — "}{floorTile.description.split(".")[0]}.
+                      </p>
+                    )}
+                    {!floorTile && customFloorColor && (
+                      <p className="text-[11px] text-charcoal/50 text-center">
+                        Custom colour <span className="font-semibold text-terracotta">{customFloorColor}</span> will be applied to the floor.
+                      </p>
+                    )}
+                  </SidebarSection>
+
+                  {/* 3. Wall Tiles */}
+                  <SidebarSection icon={Layers} title="Wall Tiles (Colour)">
+                  <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
+                    <div className="grid grid-cols-4 gap-2">
+                      {WALL_TILES.map((tile) => (
+                        <TileCard key={tile.id} tile={tile}
+                          selected={wallTile?.id === tile.id}
+                          onSelect={() => setWallTile(wallTile?.id === tile.id ? null : tile)}
+                          onInfo={() => setModalTile(tile)} />
+                      ))}
+                      {/* Custom hex swatch */}
+                      <CustomHexSwatch
+                        value={customWallColor}
+                        onChange={setCustomWallColor}
+                        label="Custom Wall Colour"
+                      />
+                    </div>
+                    {wallTile && (
+                      <p className="text-[11px] text-charcoal/50 text-center">
+                        <span className="font-semibold text-charcoal/70">{wallTile.name}</span>
+                        {customWallColor && <span className="text-terracotta font-semibold"> · {customWallColor}</span>}
+                        {" — "}{wallTile.description.split(".")[0]}.
+                      </p>
+                    )}
+                    {!wallTile && customWallColor && (
+                      <p className="text-[11px] text-charcoal/50 text-center">
+                        Custom colour <span className="font-semibold text-terracotta">{customWallColor}</span> will be applied to the walls.
+                      </p>
+                    )}
+                  </SidebarSection>
+
+                  {/* 4. Tile Layout & Texture */}
+                  <SidebarSection icon={Layers} title="Tile Layout & Texture">
+                    <div className="grid grid-cols-4 gap-2">
+                      {TILE_STYLE_OPTIONS.map((style) => {
+                        const active = tileStyle === style.id;
+                        return (
+                          <button
+                            key={style.id}
+                            onClick={() => setTileStyle(active ? null : style.id as TileStyle)}
+                            className={cn(
+                              "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none",
+                              active
+                                ? "ring-2 ring-terracotta ring-offset-2 shadow-warm scale-[1.04]"
+                                : "ring-1 ring-sand-200 hover:ring-terracotta/40 hover:shadow-warm-sm hover:scale-[1.02]",
+                            )}
+                          >
+                            {/* Texture thumbnail */}
+                            <TileTexture
+                              tileId={style.id}
+                              size={80}
+                              className="absolute inset-0 w-full h-full"
+                              style={{ width: "100%", height: "100%" }}
+                            />
+                            {/* Selected badge */}
+                            {active && (
+                              <div className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-terracotta flex items-center justify-center shadow-warm-sm">
+                                <CheckCircle2 size={11} className="text-white" strokeWidth={3} />
+                              </div>
+                            )}
+                            {/* Label */}
+                            <div className="absolute bottom-0 inset-x-0 px-1.5 py-1.5 rounded-b-2xl bg-gradient-to-t from-black/65 to-transparent">
+                              <p className="text-[9px] font-bold text-white text-center drop-shadow truncate leading-tight">
+                                {style.label}
+                              </p>
+                              <p className="text-[8px] text-white/60 text-center leading-none mt-0.5">{style.tag}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {tileStyle && (
+                      <p className="text-[11px] text-charcoal/45 text-center">
+                        {TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.promptPhrase}
+                      </p>
+                    )}
+                  </SidebarSection>
+
+                  {/* 5. Vanity */}
+                  <SidebarSection icon={Layers} title="Vanity Style">
+                  <KeepExistingToggle room="bathroom" thing="vanity" active={isKept(keepExisting, "vanity")} onToggle={(on) => setBathroomKeep("vanity", on)} />
+                    <div className="grid grid-cols-2 gap-3">
+                      {VANITY_OPTIONS.map((opt) => (
+                        <button key={opt.id} onClick={() => setVanity(opt.id as VanityType)}
                           className={cn(
-                            "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200 outline-none",
-                            active
-                              ? "border-terracotta bg-terracotta/5 shadow-warm-sm"
-                              : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                          )}
-                        >
-                          <p className={cn("text-sm font-bold", active ? "text-terracotta" : "text-charcoal/80")}>
-                            {opt.label}
-                          </p>
-                          <p className="text-[10px] text-charcoal/45">{opt.sub}</p>
-                          {opt.baseCost && (
-                            <p className={cn("text-[10px] font-semibold mt-0.5", active ? "text-terracotta/70" : "text-charcoal/35")}>
-                              ~${(opt.baseCost / 1000).toFixed(0)}k base
-                            </p>
+                            "flex flex-col gap-2 p-4 rounded-2xl text-left border-2 transition-all duration-200 outline-none",
+                            vanity === opt.id ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                          )}>
+                          <div className={cn("w-9 h-5 rounded-md", vanity === opt.id ? "bg-terracotta/20" : "bg-sand-200", opt.id === "floating" && "mt-3")} />
+                          <p className={cn("text-sm font-bold", vanity === opt.id ? "text-terracotta" : "text-charcoal")}>{opt.label}</p>
+                          <p className="text-[11px] text-charcoal/50 leading-snug">{opt.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </SidebarSection>
+
+                  {/* 6. Tapware */}
+                  <SidebarSection icon={Droplets} title="Tapware Finish">
+                  <KeepExistingToggle room="bathroom" thing="tapware" active={isKept(keepExisting, "tapware")} onToggle={(on) => setBathroomKeep("tapware", on)} />
+                    <div className="grid grid-cols-3 gap-3">
+                      {TAPWARE_OPTIONS.map((opt) => (
+                        <button key={opt.id} onClick={() => setTapware(opt.id as TapwareFinish)}
+                          className={cn(
+                            "flex flex-col items-center gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 outline-none",
+                            tapware === opt.id ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                          )}>
+                          <div className="w-10 h-10 rounded-full shadow-warm-sm ring-1 ring-black/10" style={{ background: opt.swatchBg }} />
+                          <p className={cn("text-[11px] font-bold", tapware === opt.id ? "text-terracotta" : "text-charcoal/70")}>{opt.label}</p>
+                          {opt.premium && (
+                            <span className="text-[9px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full -mt-1">{opt.premium}</span>
                           )}
                         </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Custom dimension inputs */}
-                  {bathroomSize === "custom" && (
-                    <div className="flex flex-col gap-2 mt-1">
-                      <p className="text-[11px] text-charcoal/50 font-medium">Enter dimensions (metres):</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Length</label>
-                          <input
-                            type="number" min={0.5} max={20} step={0.1}
-                            value={customLength || ""}
-                            onChange={(e) => setCustomLength(Number(e.target.value))}
-                            placeholder="e.g. 2.4"
+                      ))}
+                    </div>
+                  </SidebarSection>
+                  {/* 8. Lighting & Electrical */}
+                  <SidebarSection icon={Lightbulb} title="Lighting & Electrical">
+                    <div className="flex flex-col gap-2">
+                      {LIGHTING_OPTIONS.map((opt) => {
+                        const active = lightingOption === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => setLightingOption(opt.id as LightingOption)}
                             className={cn(
-                              "w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200",
-                              "focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80",
+                              "flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200",
+                              active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
                             )}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Width</label>
-                          <input
-                            type="number" min={0.5} max={20} step={0.1}
-                            value={customWidth || ""}
-                            onChange={(e) => setCustomWidth(Number(e.target.value))}
-                            placeholder="e.g. 1.8"
-                            className={cn(
-                              "w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200",
-                              "focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80",
+                          >
+                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                              active ? "bg-terracotta/15" : "bg-sand-100")}>
+                              <Lightbulb size={15} className={active ? "text-terracotta" : "text-charcoal/40"} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-semibold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
+                              <p className="text-[11px] text-charcoal/45 mt-0.5 leading-snug">{opt.sub}</p>
+                            </div>
+                            {opt.cost > 0 && (
+                              <p className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/40")}>
+                                +${opt.cost.toLocaleString()}
+                              </p>
                             )}
-                          />
-                        </div>
-                      </div>
-                      {customLength > 0 && customWidth > 0 && (
-                        <p className="text-[11px] text-terracotta font-semibold">
-                          {(customLength * customWidth).toFixed(1)} m² · ~${((customLength * customWidth * 5_500) / 1000).toFixed(0)}k base estimate
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </SidebarSection>
-              </>)}
-              {roomType === "kitchen" && (
-                <KitchenSidebar part="layout" selections={kitchenSelections} onChange={setKitchenSelections} />
-              )}
-              {roomType === "bedroom" && (
-                <BedroomSidebar part="layout" selections={bedroomSelections} onChange={setBedroomSelections} />
-              )}
-
-              {/* Inline Project Brief */}
-              <InlineBriefPanel
-                projectBrief={projectBrief}
-                onSave={setProjectBrief}
-                onClear={() => setProjectBrief(null)}
-                roomType={roomType}
-              />
-
-              {/* Structural Needs — room-aware */}
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2.5">
-                  <Wrench size={14} className="text-charcoal/50" />
-                  <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Structural &amp; Services</p>
-                </div>
-
-                {/* ── Kitchen structural controls ── */}
-                {roomType === "kitchen" && (<>
-
-                  {/* Appliance Rough-ins */}
-                  <button
-                    onClick={() => setKitchenSelections({ hasApplianceRoughin: !kitchenSelections.hasApplianceRoughin })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      kitchenSelections.hasApplianceRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", kitchenSelections.hasApplianceRoughin ? "text-amber-800" : "text-charcoal/70")}>New Appliance Rough-ins</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">New gas point or 15-amp circuit for induction</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {kitchenSelections.hasApplianceRoughin && <span className="text-[10px] font-bold text-amber-600">+$1,800</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasApplianceRoughin ? "bg-amber-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasApplianceRoughin ? "left-[18px]" : "left-0.5")} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Sink Rough-in */}
-                  <button
-                    onClick={() => setKitchenSelections({ hasSinkRoughin: !kitchenSelections.hasSinkRoughin })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      kitchenSelections.hasSinkRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", kitchenSelections.hasSinkRoughin ? "text-amber-800" : "text-charcoal/70")}>New Sink Rough-in</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Moving existing drain &amp; water supply to new position</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {kitchenSelections.hasSinkRoughin && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasSinkRoughin ? "bg-amber-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasSinkRoughin ? "left-[18px]" : "left-0.5")} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Wall Change */}
-                  <button
-                    onClick={() => setKitchenSelections({ hasWallChange: !kitchenSelections.hasWallChange })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      kitchenSelections.hasWallChange ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", kitchenSelections.hasWallChange ? "text-amber-800" : "text-charcoal/70")}>Wall Removal / Open-Plan</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Structural engineer, demolition, lintel, patch &amp; paint</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {kitchenSelections.hasWallChange && <span className="text-[10px] font-bold text-amber-600">+$6,500</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasWallChange ? "bg-amber-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasWallChange ? "left-[18px]" : "left-0.5")} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Butler's Pantry */}
-                  <button
-                    onClick={() => setKitchenSelections({ hasButlersPantry: !kitchenSelections.hasButlersPantry })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      kitchenSelections.hasButlersPantry ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", kitchenSelections.hasButlersPantry ? "text-blue-800" : "text-charcoal/70")}>Butler&apos;s Pantry</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Separate prep space with cabinetry, sink &amp; storage</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {kitchenSelections.hasButlersPantry && <span className="text-[10px] font-bold text-blue-600">+$8,000</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasButlersPantry ? "bg-blue-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasButlersPantry ? "left-[18px]" : "left-0.5")} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Hidden cost pro-tip */}
-                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                    <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-amber-800 leading-snug">
-                      <span className="font-bold">Pro-Tip:</span> Standard kitchen appliance rough-ins and simple cabinet modification can still result in hidden costs up to <span className="font-bold">$5,000+</span> once walls are opened.
-                    </p>
-                  </div>
-                </>)}
-
-                {/* ── Bathroom structural controls ── */}
-                {roomType === "bathroom" && (<>
-
-                  {activeStructuralCount >= 2 && (
-                    <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
-                      <Zap size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-[10px] text-amber-700 leading-snug">
-                        Multiple structural changes — generation may take up to 60 s. One at a time gives better results.
+                          </button>
+                        );
+                      })}
+                      <p className="text-[10px] text-charcoal/35 leading-snug">
+                        Prices include supply + estimated electrician labour. Marvel 3-in-1 from BDW Quote #235561.
                       </p>
                     </div>
-                  )}
+                  </SidebarSection>
 
-                  {/* Shower Niche */}
-                  <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
-                    structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
-                    <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/70")}>
-                      Shower Niche · {structuralChanges.showerNiche === "single" ? "+$600" : structuralChanges.showerNiche === "double" ? "+$1,000" : "No niche"}
+                  {/* 9. Custom Design Note */}
+                  <SidebarSection icon={MessageSquare} title="Custom Design Note">
+                    <textarea
+                      value={customNote}
+                      onChange={(e) => setCustomNote(e.target.value)}
+                      placeholder="Add specific requests (e.g. add a handrail, change shower screen type, add under-vanity lighting)…"
+                      maxLength={300}
+                      rows={3}
+                      className={cn(
+                        "w-full resize-none rounded-xl px-4 py-3 text-sm",
+                        "border-2 border-sand-200 bg-white/50",
+                        "focus:outline-none focus:border-terracotta/60 focus:bg-white",
+                        "text-charcoal/80 placeholder:text-charcoal/30 transition-colors duration-200",
+                      )}
+                    />
+                    <p className="text-[11px] text-charcoal/35 text-right -mt-1">
+                      {customNote.length}/300 · Sent directly to the AI
                     </p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {(["none", "single", "double"] as ShowerNiche[]).map((v) => (
-                        <button key={v} onClick={() => setStructuralChanges({ showerNiche: v })}
-                          className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
-                            structuralChanges.showerNiche === v ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
-                          {v === "none" ? "None" : v === "single" ? "Single" : "Double"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  </SidebarSection>
+                </>)}
+                {roomType === "kitchen" && (
+                  <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
+                )}
+                {roomType === "bedroom" && (
+                  <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
+                )}
+              </StepCard>
 
-                  {/* Shower Fixtures */}
-                  <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
-                    structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
-                    <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/70")}>
-                      Shower Fixtures · {structuralChanges.showerFixtures === "dual" ? "+$1,200 · Rain + Handheld" : "Single head"}
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {([{ value: "single", label: "Single" }, { value: "dual", label: "Dual" }] as { value: ShowerFixtures; label: string }[]).map(({ value, label }) => (
-                        <button key={value} onClick={() => setStructuralChanges({ showerFixtures: value })}
-                          className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
-                            structuralChanges.showerFixtures === value ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
-                          {label}
-                        </button>
-                      ))}
+              <Panel title={`${roomName} size & budget`}>
+                {roomType === "bathroom" && (<>
+                  {/* 0. Bathroom Size */}
+                  <SidebarSection icon={SlidersHorizontal} title="Bathroom Size">
+                    <div className="grid grid-cols-2 gap-2">
+                      {BATHROOM_SIZE_OPTIONS.map((opt) => {
+                        const active = bathroomSize === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => {
+                              const next = bathroomSize === opt.id ? null : opt.id as BathroomSize;
+                              setBathroomSize(next);
+                              setUseCustomDimensions(next === "custom");
+                            }}
+                            className={cn(
+                              "flex flex-col items-start gap-0.5 p-3 rounded-xl border-2 text-left transition-all duration-200 outline-none",
+                              active
+                                ? "border-terracotta bg-terracotta/5 shadow-warm-sm"
+                                : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                            )}
+                          >
+                            <p className={cn("text-sm font-bold", active ? "text-terracotta" : "text-charcoal/80")}>
+                              {opt.label}
+                            </p>
+                            <p className="text-[10px] text-charcoal/45">{opt.sub}</p>
+                            {opt.baseCost && (
+                              <p className={cn("text-[10px] font-semibold mt-0.5", active ? "text-terracotta/70" : "text-charcoal/35")}>
+                                ~${(opt.baseCost / 1000).toFixed(0)}k base
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
 
-                  {/* Boolean toggles */}
-                  {booleanToggles.map(({ key, label, sub }) => {
-                    const checked = structuralChanges[key] as boolean;
-                    return (
-                      <label key={key} className={cn(
-                        "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-200",
-                        checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40")}>
-                        <div>
-                          <p className={cn("text-xs font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
-                          <p className="text-[10px] text-charcoal/40">{sub}</p>
-                        </div>
-                        <div className="relative flex-shrink-0">
-                          <input type="checkbox" className="sr-only" checked={checked}
-                                 onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
-                          <div className={cn("w-9 h-5 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
-                            <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
-                              checked ? "translate-x-4" : "translate-x-0.5")} />
+                    {/* Custom dimension inputs */}
+                    {bathroomSize === "custom" && (
+                      <div className="flex flex-col gap-2 mt-1">
+                        <p className="text-[11px] text-charcoal/50 font-medium">Enter dimensions (metres):</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Length</label>
+                            <input
+                              type="number" min={0.5} max={20} step={0.1}
+                              value={customLength || ""}
+                              onChange={(e) => setCustomLength(Number(e.target.value))}
+                              placeholder="e.g. 2.4"
+                              className={cn(
+                                "w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200",
+                                "focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80",
+                              )}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-charcoal/40 font-bold uppercase tracking-wide">Width</label>
+                            <input
+                              type="number" min={0.5} max={20} step={0.1}
+                              value={customWidth || ""}
+                              onChange={(e) => setCustomWidth(Number(e.target.value))}
+                              placeholder="e.g. 1.8"
+                              className={cn(
+                                "w-full mt-1 px-3 py-2 rounded-xl text-sm border-2 border-sand-200",
+                                "focus:outline-none focus:border-terracotta/60 bg-white/70 text-charcoal/80",
+                              )}
+                            />
                           </div>
                         </div>
-                      </label>
-                    );
-                  })}
+                        {customLength > 0 && customWidth > 0 && (
+                          <p className="text-[11px] text-terracotta font-semibold">
+                            {(customLength * customWidth).toFixed(1)} m² · ~${((customLength * customWidth * 5_500) / 1000).toFixed(0)}k base estimate
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </SidebarSection>
                 </>)}
+                {roomType === "kitchen" && (
+                  <KitchenSidebar part="layout" selections={kitchenSelections} onChange={setKitchenSelections} />
+                )}
+                {roomType === "bedroom" && (
+                  <BedroomSidebar part="layout" selections={bedroomSelections} onChange={setBedroomSelections} />
+                )}
 
-                {/* ── Bedroom structural toggles ── */}
-                {roomType === "bedroom" && (<>
+                {/* Inline Project Brief */}
+                <InlineBriefPanel
+                  projectBrief={projectBrief}
+                  onSave={setProjectBrief}
+                  onClear={() => setProjectBrief(null)}
+                  roomType={roomType}
+                />
 
-                  {/* VJ Feature Wall */}
-                  <button
-                    onClick={() => setBedroomSelections({ hasVJWall: !bedroomSelections.hasVJWall })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      bedroomSelections.hasVJWall ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", bedroomSelections.hasVJWall ? "text-amber-800" : "text-charcoal/70")}>VJ Feature Wall</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Vertical-join panelling on one feature wall</p>
+                {/* Structural Needs — room-aware */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-2.5">
+                    <Wrench size={14} className="text-charcoal/50" />
+                    <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Structural &amp; Services</p>
+                  </div>
+
+                  {/* ── Kitchen structural controls ── */}
+                  {roomType === "kitchen" && (<>
+
+                    {/* Appliance Rough-ins */}
+                    <button
+                      onClick={() => setKitchenSelections({ hasApplianceRoughin: !kitchenSelections.hasApplianceRoughin })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        kitchenSelections.hasApplianceRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", kitchenSelections.hasApplianceRoughin ? "text-amber-800" : "text-charcoal/70")}>New Appliance Rough-ins</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">New gas point or 15-amp circuit for induction</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {kitchenSelections.hasApplianceRoughin && <span className="text-[10px] font-bold text-amber-600">+$1,800</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasApplianceRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasApplianceRoughin ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Sink Rough-in */}
+                    <button
+                      onClick={() => setKitchenSelections({ hasSinkRoughin: !kitchenSelections.hasSinkRoughin })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        kitchenSelections.hasSinkRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", kitchenSelections.hasSinkRoughin ? "text-amber-800" : "text-charcoal/70")}>New Sink Rough-in</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Moving existing drain &amp; water supply to new position</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {kitchenSelections.hasSinkRoughin && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasSinkRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasSinkRoughin ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Wall Change */}
+                    <button
+                      onClick={() => setKitchenSelections({ hasWallChange: !kitchenSelections.hasWallChange })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        kitchenSelections.hasWallChange ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", kitchenSelections.hasWallChange ? "text-amber-800" : "text-charcoal/70")}>Wall Removal / Open-Plan</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Structural engineer, demolition, lintel, patch &amp; paint</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {kitchenSelections.hasWallChange && <span className="text-[10px] font-bold text-amber-600">+$6,500</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasWallChange ? "bg-amber-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasWallChange ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Butler's Pantry */}
+                    <button
+                      onClick={() => setKitchenSelections({ hasButlersPantry: !kitchenSelections.hasButlersPantry })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        kitchenSelections.hasButlersPantry ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", kitchenSelections.hasButlersPantry ? "text-blue-800" : "text-charcoal/70")}>Butler&apos;s Pantry</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Separate prep space with cabinetry, sink &amp; storage</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {kitchenSelections.hasButlersPantry && <span className="text-[10px] font-bold text-blue-600">+$8,000</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", kitchenSelections.hasButlersPantry ? "bg-blue-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", kitchenSelections.hasButlersPantry ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Hidden cost pro-tip */}
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                      <TriangleAlert size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-amber-800 leading-snug">
+                        <span className="font-bold">Pro-Tip:</span> Standard kitchen appliance rough-ins and simple cabinet modification can still result in hidden costs up to <span className="font-bold">$5,000+</span> once walls are opened.
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {bedroomSelections.hasVJWall && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasVJWall ? "bg-amber-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasVJWall ? "left-[18px]" : "left-0.5")} />
+                  </>)}
+
+                  {/* ── Bathroom structural controls ── */}
+                  {roomType === "bathroom" && (<>
+
+                    {activeStructuralCount >= 2 && (
+                      <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+                        <Zap size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-[10px] text-amber-700 leading-snug">
+                          Multiple structural changes — generation may take up to 60 s. One at a time gives better results.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Shower Niche */}
+                    <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                      structuralChanges.showerNiche !== "none" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                      <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerNiche !== "none" ? "text-terracotta" : "text-charcoal/70")}>
+                        Shower Niche · {structuralChanges.showerNiche === "single" ? "+$600" : structuralChanges.showerNiche === "double" ? "+$1,000" : "No niche"}
+                      </p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(["none", "single", "double"] as ShowerNiche[]).map((v) => (
+                          <button key={v} onClick={() => setStructuralChanges({ showerNiche: v })}
+                            className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                              structuralChanges.showerNiche === v ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                            {v === "none" ? "None" : v === "single" ? "Single" : "Double"}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </button>
 
-                  {/* Built-in Media Joinery */}
-                  <button
-                    onClick={() => setBedroomSelections({ hasMediaJoinery: !bedroomSelections.hasMediaJoinery })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      bedroomSelections.hasMediaJoinery ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", bedroomSelections.hasMediaJoinery ? "text-blue-800" : "text-charcoal/70")}>Built-in Media Joinery</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Custom TV unit with shelving &amp; cable management</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {bedroomSelections.hasMediaJoinery && <span className="text-[10px] font-bold text-blue-600">+$4,500</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasMediaJoinery ? "bg-blue-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasMediaJoinery ? "left-[18px]" : "left-0.5")} />
+                    {/* Shower Fixtures */}
+                    <div className={cn("p-3 rounded-xl border-2 transition-all duration-200",
+                      structuralChanges.showerFixtures === "dual" ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50")}>
+                      <p className={cn("text-xs font-semibold mb-2", structuralChanges.showerFixtures === "dual" ? "text-terracotta" : "text-charcoal/70")}>
+                        Shower Fixtures · {structuralChanges.showerFixtures === "dual" ? "+$1,200 · Rain + Handheld" : "Single head"}
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {([{ value: "single", label: "Single" }, { value: "dual", label: "Dual" }] as { value: ShowerFixtures; label: string }[]).map(({ value, label }) => (
+                          <button key={value} onClick={() => setStructuralChanges({ showerFixtures: value })}
+                            className={cn("py-1.5 rounded-lg text-[11px] font-bold transition-all",
+                              structuralChanges.showerFixtures === value ? "bg-terracotta text-white" : "bg-sand-100 text-charcoal/60 hover:bg-sand-200")}>
+                            {label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  </button>
 
-                  {/* Bedside Pendant Rough-ins */}
-                  <button
-                    onClick={() => setBedroomSelections({ hasPendantRoughin: !bedroomSelections.hasPendantRoughin })}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
-                      bedroomSelections.hasPendantRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className={cn("text-xs font-bold", bedroomSelections.hasPendantRoughin ? "text-amber-800" : "text-charcoal/70")}>Bedside Pendant Rough-ins</p>
-                      <p className="text-[10px] text-charcoal/40 mt-0.5">Electrician rough-in for two bedside pendants</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {bedroomSelections.hasPendantRoughin && <span className="text-[10px] font-bold text-amber-600">+$850</span>}
-                      <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasPendantRoughin ? "bg-amber-500" : "bg-sand-300")}>
-                        <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasPendantRoughin ? "left-[18px]" : "left-0.5")} />
+                    {/* Boolean toggles */}
+                    {booleanToggles.map(({ key, label, sub }) => {
+                      const checked = structuralChanges[key] as boolean;
+                      return (
+                        <label key={key} className={cn(
+                          "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer border-2 transition-all duration-200",
+                          checked ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40")}>
+                          <div>
+                            <p className={cn("text-xs font-semibold", checked ? "text-terracotta" : "text-charcoal/80")}>{label}</p>
+                            <p className="text-[10px] text-charcoal/40">{sub}</p>
+                          </div>
+                          <div className="relative flex-shrink-0">
+                            <input type="checkbox" className="sr-only" checked={checked}
+                                   onChange={(e) => setStructuralChanges({ [key]: e.target.checked })} />
+                            <div className={cn("w-9 h-5 rounded-full transition-colors duration-200", checked ? "bg-terracotta" : "bg-sand-300")}>
+                              <div className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-warm-sm transition-transform duration-200",
+                                checked ? "translate-x-4" : "translate-x-0.5")} />
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </>)}
+
+                  {/* ── Bedroom structural toggles ── */}
+                  {roomType === "bedroom" && (<>
+
+                    {/* VJ Feature Wall */}
+                    <button
+                      onClick={() => setBedroomSelections({ hasVJWall: !bedroomSelections.hasVJWall })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        bedroomSelections.hasVJWall ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", bedroomSelections.hasVJWall ? "text-amber-800" : "text-charcoal/70")}>VJ Feature Wall</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Vertical-join panelling on one feature wall</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {bedroomSelections.hasVJWall && <span className="text-[10px] font-bold text-amber-600">+$2,200</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasVJWall ? "bg-amber-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasVJWall ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Built-in Media Joinery */}
+                    <button
+                      onClick={() => setBedroomSelections({ hasMediaJoinery: !bedroomSelections.hasMediaJoinery })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        bedroomSelections.hasMediaJoinery ? "border-blue-400 bg-blue-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", bedroomSelections.hasMediaJoinery ? "text-blue-800" : "text-charcoal/70")}>Built-in Media Joinery</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Custom TV unit with shelving &amp; cable management</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {bedroomSelections.hasMediaJoinery && <span className="text-[10px] font-bold text-blue-600">+$4,500</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasMediaJoinery ? "bg-blue-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasMediaJoinery ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Bedside Pendant Rough-ins */}
+                    <button
+                      onClick={() => setBedroomSelections({ hasPendantRoughin: !bedroomSelections.hasPendantRoughin })}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 text-left",
+                        bedroomSelections.hasPendantRoughin ? "border-amber-400 bg-amber-50" : "border-sand-200 bg-white/50 hover:border-sand-300",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className={cn("text-xs font-bold", bedroomSelections.hasPendantRoughin ? "text-amber-800" : "text-charcoal/70")}>Bedside Pendant Rough-ins</p>
+                        <p className="text-[10px] text-charcoal/40 mt-0.5">Electrician rough-in for two bedside pendants</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {bedroomSelections.hasPendantRoughin && <span className="text-[10px] font-bold text-amber-600">+$850</span>}
+                        <div className={cn("w-9 h-5 rounded-full transition-all duration-200 relative", bedroomSelections.hasPendantRoughin ? "bg-amber-500" : "bg-sand-300")}>
+                          <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200", bedroomSelections.hasPendantRoughin ? "left-[18px]" : "left-0.5")} />
+                        </div>
+                      </div>
+                    </button>
+
+                  </>)}
+                </div>
+
+                {roomType === "kitchen" && (
+                  <KitchenSidebar part="budget" selections={kitchenSelections} onChange={setKitchenSelections} />
+                )}
+                {roomType === "bedroom" && (
+                  <BedroomSidebar part="budget" selections={bedroomSelections} onChange={setBedroomSelections} />
+                )}
+                {roomType === "bathroom" && (<>
+                  {/* 7. Budget */}
+                  <SidebarSection icon={SlidersHorizontal} title="Your Budget">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-end justify-between">
+                        <p className="text-3xl font-bold text-charcoal">{formatAUD(budget)}</p>
+                        <p className="text-xs text-charcoal/40 pb-1">AUD target</p>
+                      </div>
+                      <input type="range" min={BUDGET_MIN} max={BUDGET_MAX} step={BUDGET_STEP}
+                        value={budget} onChange={(e) => setBudget(Number(e.target.value))}
+                        className="range-terracotta w-full"
+                        style={{ "--range-pct": `${budgetPct}%` } as React.CSSProperties} />
+                      <div className="flex justify-between text-xs text-charcoal/40 font-medium">
+                        <span>{formatAUD(BUDGET_MIN)}</span>
+                        <span>{formatAUD(BUDGET_MAX)}</span>
                       </div>
                     </div>
-                  </button>
-
+                  </SidebarSection>
                 </>)}
+              </Panel>
+
+              <div className="hidden lg:block">{generateButton}</div>
+            </div>
+
+            {/* Phones: the generate button is always one thumb away */}
+            <div className="lg:hidden fixed inset-x-0 bottom-0 z-[60] border-t border-sand-200 bg-white/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(44,62,80,0.10)]">
+              <div className="flex items-center justify-between gap-3 pb-2 text-xs">
+                <span className="font-semibold text-charcoal/55">Estimate <span className="font-bold text-charcoal tabular-nums">{liveEstimate}</span></span>
+                {freeLeftLabel && <span className="font-semibold text-charcoal/45">{freeLeftLabel}</span>}
               </div>
-
-              {roomType === "kitchen" && (
-                <KitchenSidebar part="budget" selections={kitchenSelections} onChange={setKitchenSelections} />
-              )}
-              {roomType === "bedroom" && (
-                <BedroomSidebar part="budget" selections={bedroomSelections} onChange={setBedroomSelections} />
-              )}
-              {roomType === "bathroom" && (<>
-                {/* 7. Budget */}
-                <SidebarSection icon={SlidersHorizontal} title="Your Budget">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-end justify-between">
-                      <p className="text-3xl font-bold text-charcoal">{formatAUD(budget)}</p>
-                      <p className="text-xs text-charcoal/40 pb-1">AUD target</p>
-                    </div>
-                    <input type="range" min={BUDGET_MIN} max={BUDGET_MAX} step={BUDGET_STEP}
-                      value={budget} onChange={(e) => setBudget(Number(e.target.value))}
-                      className="range-terracotta w-full"
-                      style={{ "--range-pct": `${budgetPct}%` } as React.CSSProperties} />
-                    <div className="flex justify-between text-xs text-charcoal/40 font-medium">
-                      <span>{formatAUD(BUDGET_MIN)}</span>
-                      <span>{formatAUD(BUDGET_MAX)}</span>
-                    </div>
-                  </div>
-                </SidebarSection>
-              </>)}
-            </StepCard>
-
-            {/* ── Step 3: photo or sample layout ── */}
-            <StepCard step={3} done={step3Done}>
-              {roomPhotoUrl ? (
-                <div className="relative rounded-2xl overflow-hidden aspect-video">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={roomPhotoUrl} alt="Your room" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setRoomPhotoUrl(null)}
-                    aria-label="Remove photo"
-                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-charcoal/60 hover:bg-charcoal flex items-center justify-center transition-colors"
-                  >
-                    <X size={13} className="text-white" />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  ref={photoDropzoneRef}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
-                  onClick={() => fileRef.current?.click()}
-                  className={cn(
-                    "flex flex-col items-center gap-3 p-7 rounded-2xl border-2 border-dashed cursor-pointer transition-all duration-500",
-                    pulseUpload  ? "border-terracotta bg-terracotta/8 shadow-[0_0_0_4px_rgba(210,125,94,0.25)] scale-[1.01]"
-                    : isDragging ? "border-terracotta bg-terracotta/5"
-                    : "border-sand-300 hover:border-terracotta/50 hover:bg-terracotta/3",
-                  )}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-sand-100 flex items-center justify-center">
-                    <ImagePlus size={18} className="text-charcoal/40" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-charcoal/70">Upload a photo of your room</p>
-                    <p className="text-xs text-charcoal/40 mt-0.5">Drop a file or <span className="text-terracotta font-semibold">browse</span> · JPG, PNG, WEBP</p>
-                  </div>
-                </div>
-              )}
-              <LayoutTemplatePicker room={roomType} value={layoutTemplate} onChange={setLayoutTemplate} />
-            </StepCard>
-
-            {/* ── Generate ── */}
-            <div className="rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm p-5 sm:p-6 flex flex-col gap-3">
-              {/* Free generation counter (hide for admin / premium) */}
-              {!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium && (() => {
-                const effectiveCount = userStatus.generationCount + localGenerationBump;
-                const remaining      = Math.max(0, userStatus.freeLimit - effectiveCount);
-                const isExhausted    = effectiveCount >= userStatus.freeLimit;
-                return (
-                  <button
-                    onClick={() => setShowPaywallModal(true)}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold",
-                      "transition-all duration-300",
-                      isExhausted
-                        ? "bg-terracotta/10 text-terracotta border border-terracotta/20 hover:bg-terracotta/15"
-                        : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30 cursor-default",
-                    )}
-                  >
-                    <span>
-                      {isExhausted
-                        ? "Free previews used — tap to upgrade"
-                        : `${remaining} free ${remaining === 1 ? "preview" : "previews"} remaining`}
-                    </span>
-                    {isExhausted && (
-                      <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">
-                        Upgrade
-                      </span>
-                    )}
-                  </button>
-                );
-              })()}
-              <Button variant="primary" size="lg" fullWidth onClick={handleGenerate} disabled={isGenerating} className="group">
-                {isGenerating
-                  ? <><Loader2 size={18} className="mr-2 animate-spin" />Generating…</>
-                  : <><Sparkles size={18} className="mr-2" />Generate 3D Visual Preview</>}
-              </Button>
-              <p className="text-xs text-charcoal/50 text-center leading-relaxed">
-                Review your selections above to create your custom 3D concept and builder-ready project scope.
-              </p>
+              {generateButton}
             </div>
           </div>
+        )}
 
-          {/* ══ CANVAS: Viewport + Refinement + Cost — stays in view while working through the steps ══ */}
-          <div ref={canvasRef} className="flex flex-col gap-4 sm:gap-6 min-w-0 scroll-mt-28 [&>*]:shrink-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pb-2">
-            <ArchitectViewport
-              onGenerate={handleGenerate}
-              onRegionClick={(region) => setSelectedRegion(region)}
-              onZoneClick={handleZoneClick}
-              activeZone={activeZone}
-              isGenerating={isGenerating}
-              viewportState={viewportState}
-              generateDescription={generateDescription}
-              generateError={generateError}
-              refinementMode={refinementMode}
-              historyLength={genHistory.length}
-              historyIdx={historyIdx}
-              onNavigateHistory={navigateHistory}
-            />
+        {/* ══ STEP 3 · PREVIEW + ESTIMATE ═══════════════════════════ */}
+        {stage === "estimate" && (
+          <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
+            <div ref={canvasRef} className="flex flex-col gap-4 min-w-0 scroll-mt-28">
+              <ArchitectViewport
+                onGenerate={handleGenerate}
+                onRegionClick={(region) => setSelectedRegion(region)}
+                onZoneClick={handleZoneClick}
+                activeZone={activeZone}
+                isGenerating={isGenerating}
+                viewportState={viewportState}
+                generateDescription={generateDescription}
+                generateError={generateError}
+                refinementMode={refinementMode}
+                historyLength={genHistory.length}
+                historyIdx={historyIdx}
+                onNavigateHistory={navigateHistory}
+              />
 
-            {/* ── Secondary Generate CTA — prominent button below viewport when idle ── */}
-            {viewportState === "idle" && !isGenerating && (
-              <button
-                onClick={handleGenerate}
-                className={cn(
-                  "flex items-center justify-center gap-3 w-full py-5 rounded-2xl",
-                  "bg-terracotta text-white text-base font-bold",
-                  "shadow-warm-lg hover:bg-terracotta/90 hover:scale-[1.01] active:scale-100",
-                  "transition-all duration-200",
-                )}
-              >
-                <Sparkles size={20} />
-                Generate 3D Visual Preview
-                <ArrowRight size={18} className="ml-1" />
-              </button>
-            )}
-
-          {/* ── Post-generation action area ── */}
             {viewportState === "ready" && !isGenerating && (
               <>
                 {!refinementMode ? (
@@ -2655,33 +2665,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
               </>
             )}
 
-            {/* ── Hidden Cost Advisor — room-specific trade cost alerts ── */}
-            <HiddenCostAdvisor
-              roomType={roomType}
-              hasIsland={kitchenSelections.hasIsland}
-              hasElectrical={bedroomSelections.hasElectricalWork}
-            />
+            </div>
 
-            {/* ── Add Another Room — appears after generation completes ── */}
-            {viewportState === "ready" && !isGenerating && (
-              <button
-                onClick={() => {
-                  saveCurrentRoom();
-                  setViewportState("idle");
-                  setShowRoomRouter(true);
-                }}
-                className={cn(
-                  "flex items-center justify-center gap-2 w-full py-3 rounded-2xl",
-                  "border-2 border-sand-200 bg-white/60 text-charcoal/60 text-sm font-bold",
-                  "hover:border-terracotta/40 hover:text-terracotta hover:bg-terracotta/5",
-                  "transition-all duration-200",
-                )}
-              >
-                Add Another Room to My Project
-              </button>
-            )}
-
-            {/* ── Cost Summary — room-aware ── */}
+            <div className="flex flex-col gap-4 min-w-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pb-2 [&>*]:shrink-0">
             {roomType === "kitchen" ? (
               <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Kitchen Cost Estimate</p>
@@ -2765,9 +2751,54 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             ) : (
               <CostSummary onOpenBrief={() => setShowBriefModal(true)} />
             )}
-          </div>
 
-        </div>
+              {viewportState === "ready" && !isGenerating && (
+                <button
+                  onClick={() => router.push("/connect")}
+                  className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-charcoal text-white text-base font-bold shadow-warm-lg hover:bg-charcoal/90 transition-all duration-200"
+                >
+                  <MessageSquare size={18} />
+                  Send my brief to a builder
+                  <ArrowRight size={16} />
+                </button>
+              )}
+
+              <button
+                onClick={() => goTo("design")}
+                disabled={isGenerating}
+                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl border-2 border-sand-200 bg-white/60 text-charcoal/70 text-sm font-bold hover:border-terracotta/40 hover:text-terracotta transition-all duration-200 disabled:opacity-40"
+              >
+                <ArrowLeft size={15} />
+                Edit my design
+              </button>
+
+            <HiddenCostAdvisor
+              roomType={roomType}
+              hasIsland={kitchenSelections.hasIsland}
+              hasElectrical={bedroomSelections.hasElectricalWork}
+            />
+
+            {viewportState === "ready" && !isGenerating && (
+              <button
+                onClick={() => {
+                  saveCurrentRoom();
+                  setViewportState("idle");
+                  setShowRoomRouter(true);
+                }}
+                className={cn(
+                  "flex items-center justify-center gap-2 w-full py-3 rounded-2xl",
+                  "border-2 border-sand-200 bg-white/60 text-charcoal/60 text-sm font-bold",
+                  "hover:border-terracotta/40 hover:text-terracotta hover:bg-terracotta/5",
+                  "transition-all duration-200",
+                )}
+              >
+                Add Another Room to My Project
+              </button>
+            )}
+
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment success banner */}
@@ -2830,48 +2861,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       {/* Tile detail modal */}
       {modalTile && <TileModal tile={modalTile} onClose={() => setModalTile(null)} />}
 
-      {/* ── No-photo warning modal ── */}
-      {showNoPhotoWarning && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-warm-xl max-w-md w-full p-8 flex flex-col gap-6">
-            <div className="flex flex-col gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
-                <ImagePlus size={22} className="text-amber-600" />
-              </div>
-              <h2 className="text-xl font-bold text-charcoal">Add your space first?</h2>
-              <p className="text-sm text-charcoal/60 leading-relaxed">
-                Step 3 isn&apos;t complete yet. Upload a photo of your room so the design is applied to your actual space,
-                or pick a sample layout so the preview follows a realistic floor plan.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => {
-                  setShowNoPhotoWarning(false);
-                  // Scroll to Step 3 and pulse the upload area
-                  setTimeout(() => {
-                    document.getElementById("step-3")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    setPulseUpload(true);
-                    setTimeout(() => setPulseUpload(false), 3000);
-                  }, 100);
-                }}
-                className="w-full py-3 rounded-2xl bg-terracotta text-white text-sm font-bold hover:bg-terracotta/90 transition-all"
-              >
-                Go to Step 3: Add Your Space
-              </button>
-              <button
-                onClick={() => {
-                  setShowNoPhotoWarning(false);
-                  executeGenerate();
-                }}
-                className="w-full py-3 rounded-2xl border-2 border-sand-200 bg-sand-50 text-charcoal/70 text-sm font-semibold hover:border-charcoal/20 hover:text-charcoal transition-all"
-              >
-                Generate Without a Layout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

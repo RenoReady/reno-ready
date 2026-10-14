@@ -26,13 +26,14 @@ import {
 import PaywallModal from "@/components/ui/PaywallModal";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
-import StyleLibrary, { STYLE_PRESETS, type StylePreset } from "@/components/ui/StyleLibrary";
+import StyleLibrary from "@/components/ui/StyleLibrary";
+import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES, withoutKept, clearPatch } from "@/lib/stylePresets";
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import DesignNote from "@/components/builder/DesignNote";
-import { isKept } from "@/lib/keepExisting";
+import { isKept, KITCHEN_KEEP_FIELDS, BEDROOM_KEEP_FIELDS } from "@/lib/keepExisting";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
@@ -1543,29 +1544,44 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     if (!roomPhotoUrl && stage !== "upload" && !isGeneratingRef.current) setStage("upload");
   }, [roomPhotoUrl, stage]);
 
-  // Apply a style library preset to all tile/vanity/tapware selections
-  // Clicking the already-active preset deselects everything
-  const handleStylePreset = useCallback((preset: StylePreset) => {
-    if (activeStylePreset === preset.id) {
-      // Deselect — clear all preset-driven selections
-      setFloorTile(null);
-      setWallTile(null);
+  // "Start from a style": applies the room's preset, skipping anything the user
+  // is keeping as it is. Tapping the active style again clears what it set.
+  const handleStyle = useCallback((id: string) => {
+    const st = useBuilderStore.getState();
+    const again = activeStylePreset === id;
+    setActiveStylePreset(again ? null : id);
+
+    if (st.roomType === "kitchen") {
+      const preset = KITCHEN_STYLES.find((p) => p.id === id);
+      if (!preset) return;
+      const patch = again ? clearPatch(preset.patch) : preset.patch;
+      setKitchenSelections(withoutKept(patch, KITCHEN_KEEP_FIELDS, st.kitchenSelections.keepExisting));
+      return;
+    }
+    if (st.roomType === "bedroom") {
+      const preset = BEDROOM_STYLES.find((p) => p.id === id);
+      if (!preset) return;
+      const patch = again ? clearPatch(preset.patch) : preset.patch;
+      setBedroomSelections(withoutKept(patch, BEDROOM_KEEP_FIELDS, st.bedroomSelections.keepExisting));
+      return;
+    }
+
+    const preset = BATHROOM_STYLES.find((p) => p.id === id);
+    if (!preset) return;
+    const keepFloor = isKept(st.keepExisting, "floor"), keepWalls = isKept(st.keepExisting, "walls");
+    if (again) {
+      if (!keepFloor) setFloorTile(null);
+      if (!keepWalls) setWallTile(null);
       setVanity(null);
       setTapware(null);
       setTileStyle(null);
-      setActiveStylePreset(null);
       return;
     }
-    const floor = FLOOR_TILES.find((t) => t.id === preset.floorTileId) ?? null;
-    const wall  = WALL_TILES.find((t)  => t.id === preset.wallTileId)  ?? null;
-    if (floor) setFloorTile(floor);
-    if (wall)  setWallTile(wall);
+    if (!keepFloor) { setFloorTile(FLOOR_TILES.find((t) => t.id === preset.floorTileId) ?? null); setCustomFloorColor(null); }
+    if (!keepWalls) { setWallTile(WALL_TILES.find((t) => t.id === preset.wallTileId) ?? null);   setCustomWallColor(null); }
     setVanity(preset.vanity);
     setTapware(preset.tapware);
     setTileStyle(preset.tileStyle);
-    setCustomFloorColor(null);
-    setCustomWallColor(null);
-    setActiveStylePreset(preset.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStylePreset]);
 
@@ -1947,7 +1963,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <div className="lg:order-1 flex flex-col gap-5 min-w-0">
               <StepCard step={2}>
                 {roomType === "bathroom" && (<>
-                  <StyleLibrary activePresetId={activeStylePreset} onSelect={handleStylePreset} />
+                  <StyleLibrary looks={BATHROOM_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
                   {/* 2. Floor Tiles */}
                   <SidebarSection icon={Layers} title="Floor Tiles (Colour)">
                   <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
@@ -2129,12 +2145,14 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   </SidebarSection>
 
                 </>)}
-                {roomType === "kitchen" && (
+                {roomType === "kitchen" && (<>
+                  <StyleLibrary looks={KITCHEN_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
                   <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
-                )}
-                {roomType === "bedroom" && (
+                </>)}
+                {roomType === "bedroom" && (<>
+                  <StyleLibrary looks={BEDROOM_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
                   <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
-                )}
+                </>)}
               </StepCard>
 
               <Panel title={`${roomName} size & budget`}>

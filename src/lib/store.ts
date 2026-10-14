@@ -107,7 +107,9 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.lightingOption !== undefined) store.setLightingOption(saved.lightingOption as LightingOption | null);
     if (saved.roomPhotoUrl  !== undefined) store.setRoomPhotoUrl(saved.roomPhotoUrl as string | null);
     if (saved.layoutTemplate)             store.setLayoutTemplate(saved.layoutTemplate as string);
-    if (Array.isArray(saved.keepExisting)) useBuilderStore.setState({ keepExisting: saved.keepExisting as BathroomKeepKey[] });
+    if (Array.isArray(saved.keepExisting)) useBuilderStore.setState({
+      keepExisting: (saved.keepExisting as string[]).filter((k): k is BathroomKeepKey => k === "floor" || k === "walls"),
+    });
     if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
     if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
     if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType | null);
@@ -379,8 +381,8 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
   setRoomPhotoUrl:        (url)   => set(url ? { roomPhotoUrl: url, layoutTemplate: null } : { roomPhotoUrl: null }),
   setFloorTile:           (tile)  => set((st) => ({ floorTile: tile, ...releaseKeep(st, "floor", tile) })),
   setWallTile:            (tile)  => set((st) => ({ wallTile: tile, ...releaseKeep(st, "walls", tile) })),
-  setVanity:              (v)     => set((st) => ({ vanity: v, ...releaseKeep(st, "vanity", v) })),
-  setTapware:             (t)     => set((st) => ({ tapware: t, ...releaseKeep(st, "tapware", t) })),
+  setVanity:              (v)     => set({ vanity: v }),
+  setTapware:             (t)     => set({ tapware: t }),
   setBathroomKeep:        (key, on) => set((st) => keepPatch(BATHROOM_KEEP_FIELDS, st.keepExisting, key, on) as Partial<BuilderStore>),
   setBudget:              (n)     => set({ budget: n }),
   setCustomNote:          (note)  => set({ customNote: note }),

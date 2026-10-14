@@ -181,8 +181,8 @@ function buildMatRows(
   }
 
   // Bathroom
-  const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : selectionText(null, isKept(sel.keepExisting, "vanity"));
-  const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : selectionText(null, isKept(sel.keepExisting, "tapware"));
+  const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : "Not selected";
+  const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : "Not selected";
   const rows: MatRow[] = [
     { label: "Floor Tile",    value: selectionText(sel.floorTile?.name, isKept(sel.keepExisting, "floor")) },
     { label: "Wall Tile",     value: selectionText(sel.wallTile?.name,  isKept(sel.keepExisting, "walls")) },

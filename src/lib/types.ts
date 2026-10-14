@@ -9,7 +9,7 @@ export interface TileOption {
 }
 
 export type VanityType    = "floating" | "freestanding";
-export type TapwareFinish = "chrome"   | "matte-black" | "brushed-gold";
+export type TapwareFinish = "chrome"   | "white" | "matte-black" | "brushed-gold";
 
 // ── Tile style / layout ───────────────────────────────────────────
 
@@ -298,6 +298,12 @@ export const TAPWARE_OPTIONS: {
     swatchBg: "linear-gradient(135deg,#e8e8e8,#c0c0c0,#a8a8a8)",
   },
   {
+    id:       "white",
+    label:    "Plain White",
+    swatchBg: "linear-gradient(135deg,#ffffff,#f1f0ec,#d9d8d3)",
+    premium:  "+5%",
+  },
+  {
     id:       "matte-black",
     label:    "Matte Black",
     swatchBg: "linear-gradient(135deg,#3a3a3a,#1a1a1a,#111111)",
@@ -360,6 +366,7 @@ export const VANITY_MULTIPLIER: Record<VanityType, number> = {
 
 export const TAPWARE_MULTIPLIER: Record<TapwareFinish, number> = {
   "chrome":       1.00,
+  "white":        1.05,
   "matte-black":  1.06,
   "brushed-gold": 1.14,
 };
@@ -450,7 +457,7 @@ export const WALL_TILE_COSTS: Record<string, number> = {
   "marble-blanc":    3_200,
 };
 export const BATHROOM_VANITY_COSTS: Record<string, number>  = { floating: 2_200, freestanding: 1_800 };
-export const BATHROOM_TAPWARE_COSTS: Record<string, number> = { chrome: 850, "matte-black": 1_300, "brushed-gold": 1_700 };
+export const BATHROOM_TAPWARE_COSTS: Record<string, number> = { chrome: 850, white: 1_250, "matte-black": 1_300, "brushed-gold": 1_700 };
 export const BATHROOM_LIGHTING_COSTS: Record<string, number> = { none: 0, standard: 650, premium: 1_600 };
 /** Scale tile costs up/down based on bathroom size vs medium baseline */
 export const BATHROOM_SIZE_TILE_SCALE: Record<string, number> = {
@@ -573,6 +580,7 @@ export function buildItemisedCosts(
   }
   if (tapware) {
     const tapwareLabel =
+      tapware === "white"        ? "Plain White Tapware" :
       tapware === "matte-black"  ? "Matte Black Tapware" :
       tapware === "brushed-gold" ? "Brushed Gold Tapware" :
                                    "Chrome Tapware";

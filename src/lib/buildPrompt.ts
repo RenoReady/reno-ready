@@ -26,6 +26,7 @@ import {
   type BedroomSelections,
   buildKitchenPrompt,
   buildBedroomPrompt,
+  clientRequestSection,
 } from "./roomTypes";
 import { findTemplate } from "./layoutTemplates";
 
@@ -90,6 +91,7 @@ function buildRoomPrompt(req: PromptInput): string {
   const floorName  = selections.floorTile?.name  ?? "neutral stone tile";
   const wallName   = selections.wallTile?.name   ?? "white subway tile";
   const tapwareFmt =
+    selections.tapware === "white"        ? "plain matte white" :
     selections.tapware === "matte-black"  ? "matte black" :
     selections.tapware === "brushed-gold" ? "brushed gold" :
     "chrome";
@@ -156,8 +158,8 @@ function buildRoomPrompt(req: PromptInput): string {
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
     keep("floor")   ? keepLine("Floor surface", "floor tiles")  : `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")    : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
-    keep("tapware") ? keepLine("Tapware finish", "tapware")     : `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
-    keep("vanity")  ? keepLine("Vanity style", "vanity")        : `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
+    `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
+    `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
     "",
     "Remove all personal clutter, towels, and toiletries. The result should look like a",
     "professional architectural photography shot — clean, staged, Australian styling.",
@@ -187,8 +189,8 @@ function buildRoomPrompt(req: PromptInput): string {
     // ── Materials ─────────────────────────────────────────────────────────────
     keep("floor")   ? keepLine("Floor surface", "floor tiles") : `Floor surface: ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")   : `Wall surface: ${wallDesc}.`,
-    keep("tapware") ? keepLine("Tapware", "tapware")           : `Tapware: ${tapwareFmt} finish throughout.`,
-    keep("vanity")  ? keepLine("Vanity", "vanity")             : `Vanity: ${vanityStyle}.`,
+    `Tapware: ${tapwareFmt} finish throughout.`,
+    `Vanity: ${vanityStyle}.`,
     "Style: High-end architectural photography, natural Australian daylight, clean staging.",
     "Output: 2K image, no text labels, no watermarks, no annotations on any surface.",
     "",
@@ -231,9 +233,7 @@ function buildRoomPrompt(req: PromptInput): string {
     : "";
 
   // ── Custom design note ────────────────────────────────────────
-  const customNoteSection = selections.customNote?.trim()
-    ? `\n\nAdditional client request: "${selections.customNote.trim()}"`
-    : "";
+  const customNoteSection = clientRequestSection(selections.customNote, isPhotoMode);
 
   // ── Lighting & Electrical ─────────────────────────────────────
   const lightingId   = selections.lightingOption ?? "none";

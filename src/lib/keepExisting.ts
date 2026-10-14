@@ -6,7 +6,8 @@
  * told to leave that surface exactly as it is.
  */
 
-export type BathroomKeepKey = "floor" | "walls" | "vanity" | "tapware";
+/** Vanity and tapware are always chosen, so only the tiled surfaces can be kept */
+export type BathroomKeepKey = "floor" | "walls";
 export type KitchenKeepKey  = "cabinetry" | "benchtop" | "mixer" | "splashback" | "floor" | "walls" | "appliances" | "ceiling";
 export type BedroomKeepKey  = "flooring" | "walls" | "ceiling" | "lighting" | "storage" | "windows";
 
@@ -14,8 +15,6 @@ export type BedroomKeepKey  = "flooring" | "walls" | "ceiling" | "lighting" | "s
 export const BATHROOM_KEEP_FIELDS: Record<BathroomKeepKey, string[]> = {
   floor:   ["floorTile", "customFloorColor"],
   walls:   ["wallTile", "customWallColor"],
-  vanity:  ["vanity"],
-  tapware: ["tapware"],
 };
 
 export const KITCHEN_KEEP_FIELDS: Record<KitchenKeepKey, string[]> = {

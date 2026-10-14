@@ -31,6 +31,7 @@ import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
+import DesignNote from "@/components/builder/DesignNote";
 import { isKept } from "@/lib/keepExisting";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
@@ -70,6 +71,8 @@ function getDesignTips(
     tips.push("Terracotta brings a timeless warmth. Pair it with warm white walls to let the floor be the hero of the space.");
   if (tapware === "matte-black")
     tips.push("Matte black fixtures add a modern architectural edge. Ensure generous lighting — these fixtures absorb light rather than reflect it.");
+  if (tapware === "white")
+    tips.push("Plain white tapware disappears into pale tiles for a soft, seamless look. A matte finish hides water spots better than gloss.");
   if (tapware === "brushed-gold")
     tips.push("Brushed gold tapware adds understated luxury. Pair with travertine or marble to let the warmth of the metal really sing.");
   if (floorTile?.id === "zellige-ivory" || wallTile?.id === "zellige-white")
@@ -629,6 +632,7 @@ function CSSBathroomScene({ floorTile, wallTile, vanity, tapware }: {
   vanity: VanityType | null; tapware: TapwareFinish | null;
 }) {
   const tapwareBg =
+    tapware === "white" ? "linear-gradient(180deg,#ffffff,#ecebe7,#d6d5d0)" :
     tapware === "matte-black" ? "linear-gradient(180deg,#3a3a3a,#1a1a1a)" :
     tapware === "brushed-gold" ? "linear-gradient(180deg,#e8c97e,#c9a84c,#b8962c)" :
                                 "linear-gradient(180deg,#e8e8e8,#c0c0c0,#a8a8a8)";
@@ -2055,7 +2059,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                   {/* 5. Vanity */}
                   <SidebarSection icon={Layers} title="Vanity Style">
-                  <KeepExistingToggle room="bathroom" thing="vanity" active={isKept(keepExisting, "vanity")} onToggle={(on) => setBathroomKeep("vanity", on)} />
                     <div className="grid grid-cols-2 gap-3">
                       {VANITY_OPTIONS.map((opt) => (
                         <button key={opt.id} onClick={() => setVanity(opt.id as VanityType)}
@@ -2073,8 +2076,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                   {/* 6. Tapware */}
                   <SidebarSection icon={Droplets} title="Tapware Finish">
-                  <KeepExistingToggle room="bathroom" thing="tapware" active={isKept(keepExisting, "tapware")} onToggle={(on) => setBathroomKeep("tapware", on)} />
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {TAPWARE_OPTIONS.map((opt) => (
                         <button key={opt.id} onClick={() => setTapware(opt.id as TapwareFinish)}
                           className={cn(
@@ -2126,25 +2128,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     </div>
                   </SidebarSection>
 
-                  {/* 9. Custom Design Note */}
-                  <SidebarSection icon={MessageSquare} title="Custom Design Note">
-                    <textarea
-                      value={customNote}
-                      onChange={(e) => setCustomNote(e.target.value)}
-                      placeholder="Add specific requests (e.g. add a handrail, change shower screen type, add under-vanity lighting)…"
-                      maxLength={300}
-                      rows={3}
-                      className={cn(
-                        "w-full resize-none rounded-xl px-4 py-3 text-sm",
-                        "border-2 border-sand-200 bg-white/50",
-                        "focus:outline-none focus:border-terracotta/60 focus:bg-white",
-                        "text-charcoal/80 placeholder:text-charcoal/30 transition-colors duration-200",
-                      )}
-                    />
-                    <p className="text-[11px] text-charcoal/35 text-right -mt-1">
-                      {customNote.length}/300 · Sent directly to the AI
-                    </p>
-                  </SidebarSection>
                 </>)}
                 {roomType === "kitchen" && (
                   <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
@@ -2507,6 +2490,15 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   </SidebarSection>
                 </>)}
               </Panel>
+
+              <DesignNote
+                room={roomType}
+                value={roomType === "kitchen" ? kitchenSelections.customNote : roomType === "bedroom" ? bedroomSelections.customNote : customNote}
+                onChange={(note) =>
+                  roomType === "kitchen" ? setKitchenSelections({ customNote: note })
+                  : roomType === "bedroom" ? setBedroomSelections({ customNote: note })
+                  : setCustomNote(note)}
+              />
 
               <div className="hidden lg:block">{generateButton}</div>
             </div>

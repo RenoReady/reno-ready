@@ -463,8 +463,8 @@ export default function PreviewPage() {
                   ] : [
                     { label: "Floor",   value: selectionText(floorTile?.name, isKept(keepExisting, "floor")) },
                     { label: "Wall",    value: selectionText(wallTile?.name,  isKept(keepExisting, "walls")) },
-                    { label: "Vanity",  value: selectionText(vanity ? vanityLabel : null,   isKept(keepExisting, "vanity")) },
-                    { label: "Tapware", value: selectionText(tapware ? tapwareLabel : null, isKept(keepExisting, "tapware")) },
+                    { label: "Vanity",  value: vanity  ? vanityLabel  : "Not selected" },
+                    { label: "Tapware", value: tapware ? tapwareLabel : "Not selected" },
                   ]
                 ).map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-sand-50 border border-sand-200 px-3 py-2.5">

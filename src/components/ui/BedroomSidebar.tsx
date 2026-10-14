@@ -294,17 +294,6 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
         </div>
       </div>
 
-      {/* Additional Request */}
-      <div>
-        <SectionLabel>Additional Request</SectionLabel>
-        <textarea
-          value={selections.customNote}
-          onChange={(e) => onChange({ customNote: e.target.value })}
-          placeholder="e.g. I want dark walls with limewash texture and a reading nook..."
-          rows={2}
-          className="w-full px-3 py-2.5 rounded-xl border-2 border-sand-200 bg-white/60 text-xs text-charcoal focus:outline-none focus:border-terracotta/50 resize-none transition-all"
-        />
-      </div>
     </div>
   );
 }

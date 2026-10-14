@@ -43,7 +43,7 @@ export const CEILING_OPTIONS: { id: CeilingStyle; label: string; sub: string; co
 export type KitchenRoomSize  = "galley" | "standard" | "large" | "custom";
 export type CabinetryStyle   = "shaker" | "shaker-sage" | "matte-black" | "flat-panel" | "flat-panel-beige" | "natural-timber";
 export type BenchtopMaterial = "engineered-stone" | "porcelain-slab" | "timber";
-export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome";
+export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome" | "white";
 export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab" | "mirrored" | "vj-panel" | "slab-match";
 export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
@@ -171,6 +171,7 @@ export const MIXER_OPTIONS: { id: MixerFinish; label: string; sub: string }[] = 
   { id: "brushed-brass", label: "Brushed Brass",  sub: "Warm gold — pairs beautifully with timber or white cabinetry" },
   { id: "matte-black",   label: "Matte Black",    sub: "Bold, architectural — works with every cabinet colour"        },
   { id: "chrome",        label: "Chrome",          sub: "Classic, easy-to-clean and universally compatible"           },
+  { id: "white",         label: "Plain White",     sub: "Soft matte white — blends into pale benchtops and splashbacks" },
 ];
 
 export const SPLASHBACK_OPTIONS: { id: SplashbackStyle; label: string; sub: string; costAdj: number }[] = [
@@ -768,9 +769,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
     if (sel.hasIsland)       lines.push("\nIsland bench: Include a freestanding kitchen island with matching benchtop and waterfall edges.");
     if (sel.hasWallChange)   lines.push("Open-plan connection: Show an open-plan kitchen-living space.");
     if (sel.hasButlersPantry) lines.push("Include a butler's pantry scullery adjacent to the main kitchen with matching cabinetry.");
-    if (sel.customNote?.trim()) lines.push(`\nAdditional request: "${sel.customNote.trim()}"`);
-
-    return lines.join("\n");
+    return lines.join("\n") + clientRequestSection(sel.customNote, false);
   }
 
   // ── Photo mode: surface retexturing only ─────────────────────────────────
@@ -802,11 +801,19 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
     ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
-  const noteSection = sel.customNote?.trim()
-    ? `\n\nAdditional client request: "${sel.customNote.trim()}"`
-    : "";
+  return spatialLock + materials + islandNote + structuralSection + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
+}
 
-  return spatialLock + materials + islandNote + structuralSection + noteSection + SPATIAL_REMINDER;
+/**
+ * The client's own words from the design note. It must show in the image: it
+ * outranks the default material choices, but never the structural lock in photo mode.
+ */
+export function clientRequestSection(note: string | undefined | null, hasPhoto: boolean): string {
+  const text = note?.trim();
+  if (!text) return "";
+  return hasPhoto
+    ? `\n\nCLIENT'S OWN REQUEST — make this clearly visible in the image: "${text}"\nThis takes priority over the default material choices above. It may change or add finishes, colours, fittings and decor (for example a mirror, a basin colour or a light), but it must NOT move, add or remove walls, doorways or windows.`
+    : `\n\nCLIENT'S OWN REQUEST — make this clearly visible in the image: "${text}"\nThis takes priority over the default choices above.`;
 }
 
 export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): string {
@@ -853,9 +860,7 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     if (sel.hasVJWall)       lines.push("Add a floor-to-ceiling VJ paneled feature wall behind the bedhead.");
     if (sel.hasMediaJoinery) lines.push("Include a custom built-in media unit with TV recess, flanking shelves and integrated storage.");
     if (sel.hasPendantRoughin) lines.push("Show bedside wall-hung pendant sconces on each side of the bedhead.");
-    if (sel.customNote?.trim()) lines.push(`\nAdditional request: "${sel.customNote.trim()}"`);
-
-    return lines.join("\n");
+    return lines.join("\n") + clientRequestSection(sel.customNote, false);
   }
 
   // ── Photo mode: surface retexturing only ─────────────────────────────────
@@ -882,9 +887,5 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
-  const noteSection = sel.customNote?.trim()
-    ? `\n\nAdditional client request: "${sel.customNote.trim()}"`
-    : "";
-
-  return spatialLock + materials + structuralSection + noteSection + SPATIAL_REMINDER;
+  return spatialLock + materials + structuralSection + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
 }

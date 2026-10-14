@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reno Ready — tile swatch renderer</title>
+<style>
+  body{margin:0;padding:24px;background:#eee;font:13px system-ui;display:flex;flex-wrap:wrap;gap:16px}
+  figure{margin:0;text-align:center} canvas{display:block;width:200px;height:200px;border-radius:12px}
+</style>
+</head>
+<body>
+<script>
+/*
+ * Procedural, photo-style tile swatches. Every material is rendered per pixel:
+ * value-noise textures (veins, glaze, pits, grain), per-tile colour variation,
+ * grout, cushion-edge bevels and soft studio lighting. tiles.mjs screenshots each
+ * canvas to public/tiles/<id>.webp.
+ */
+const S = 400;
+
+// ── noise ───────────────────────────────────────────────────────
+function mulberry(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function makeNoise(seed) {
+  const R = mulberry(seed), g = new Float32Array(65536);
+  for (let i = 0; i < g.length; i++) g[i] = R();
+  const at = (x, y) => g[((y & 255) << 8) | (x & 255)];
+  const n = (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = at(xi, yi), b = at(xi + 1, yi), c = at(xi, yi + 1), d = at(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+  const fbm = (x, y, o = 5) => { let s = 0, a = .5, f = 1, t = 0; for (let i = 0; i < o; i++) { s += a * n(x * f + i * 17.3, y * f + i * 9.1); t += a; a *= .5; f *= 2; } return s / t; };
+  const ridged = (x, y, o = 5) => { let s = 0, a = .5, f = 1, t = 0; for (let i = 0; i < o; i++) { s += a * (1 - Math.abs(2 * n(x * f + i * 7.7, y * f + i * 3.3) - 1)); t += a; a *= .5; f *= 2; } return s / t; };
+  return { n, fbm, ridged, R };
+}
+const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+const smooth = (e0, e1, x) => { const t = clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
+
+/**
+ * Lays tiles over the canvas and shades every pixel.
+ *  surface(x, y, t) → [r,g,b] for the tile face; t = { id, lx, ly, tw, th, rnd }
+ */
+function tiled(ctx, o, surface) {
+  const { tw, th, gap = 3, grout = [214, 208, 198], offset = false, bevel = 5, bevelK = .22,
+          gloss = 0, sheen = 0, irregular = 0, noise } = o;
+  const N = noise, img = ctx.createImageData(S, S), d = img.data;
+  const cache = new Map();
+  const tileRnd = (id) => { if (!cache.has(id)) { const r = mulberry(id * 9301 + 49297); cache.set(id, [r(), r(), r(), r(), r()]); } return cache.get(id); };
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const row = Math.floor(y / th), ox = offset && row % 2 ? tw / 2 : 0;
+    const col = Math.floor((x + ox) / tw);
+    const lx = x + ox - col * tw, ly = y - row * th, id = row * 131 + col + 7;
+    const rnd = tileRnd(id);
+    // edge distances, wobbled for handmade tiles
+    const w = irregular ? (N.n(x * .09, y * .09) - .5) * irregular : 0;
+    const dT = ly - gap / 2 + w, dL = lx - gap / 2 - w, dB = th - ly - gap / 2 - w, dR = tw - lx - gap / 2 + w;
+    let c;
+    if (dT < 0 || dL < 0 || dB < 0 || dR < 0) {
+      const gn = (N.n(x * .6, y * .6) - .5) * 10;
+      c = [grout[0] + gn, grout[1] + gn, grout[2] + gn];
+      // grout sits slightly in shadow
+      c = c.map((v) => v * .92);
+    } else {
+      c = surface(x, y, { id, lx, ly, tw, th, rnd, dT, dL, dB, dR });
+      // cushion bevel: lit top/left, shaded bottom/right
+      if (bevel > 0) {
+        const lit = (1 - smooth(0, bevel, dT)) * bevelK + (1 - smooth(0, bevel, dL)) * bevelK * .7;
+        const shd = (1 - smooth(0, bevel, dB)) * bevelK * 1.2 + (1 - smooth(0, bevel, dR)) * bevelK * .9;
+        const k = 1 + lit - shd;
+        c = [c[0] * k + lit * 40, c[1] * k + lit * 40, c[2] * k + lit * 40];
+      }
+      // soft specular per tile (glazed / polished)
+      if (gloss > 0) {
+        const cx = tw * (.22 + rnd[1] * .2), cy = th * (.18 + rnd[2] * .18), sg = Math.max(tw, th) * .32;
+        const sp = Math.exp(-((lx - cx) ** 2 + (ly - cy) ** 2) / (2 * sg * sg)) * gloss;
+        c = c.map((v) => v + sp * 255 * .55);
+      }
+    }
+    // a window reflection running diagonally across glossy surfaces
+    if (sheen > 0) {
+      const band = Math.exp(-((x * .8 - y + 70) ** 2) / (2 * 55 * 55)) * sheen;
+      c = c.map((v) => v + band * 255 * .35);
+    }
+    const i = (y * S + x) * 4;
+    d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/** Soft studio light: brighter top-left, gentle fall-off to the bottom-right */
+function studio(ctx, k = 1) {
+  const g = ctx.createLinearGradient(0, 0, S, S);
+  g.addColorStop(0, `rgba(255,255,255,${.10 * k})`);
+  g.addColorStop(.5, "rgba(255,255,255,0)");
+  g.addColorStop(1, `rgba(0,0,0,${.16 * k})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  const v = ctx.createRadialGradient(S * .45, S * .4, S * .3, S * .5, S * .5, S * .8);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, `rgba(0,0,0,${.12 * k})`);
+  ctx.fillStyle = v; ctx.fillRect(0, 0, S, S);
+}
+
+// ── material surfaces ───────────────────────────────────────────
+function stoneFace(N, base, { band = 0, bandAmp = 0, mottle = 10, fine = 6, warmth = [1, .96, .88] } = {}) {
+  return (x, y, t) => {
+    const tone = (t.rnd[0] - .5) * 14;
+    let v = (N.fbm(x * .006 + t.id, y * .006) - .5) * mottle * 2 + (N.n(x * .5, y * .5) - .5) * fine * 2 + tone;
+    if (band) v += (N.fbm(x * .0035 + N.fbm(x * .01, y * .01) * 1.5, y * band) - .5) * bandAmp * 2;
+    return [base[0] + v * warmth[0], base[1] + v * warmth[1], base[2] + v * warmth[2]];
+  };
+}
+function marbleFace(N, base, vein, { scale = 1, strength = 1, tone = 6 } = {}) {
+  return (x, y, t) => {
+    const X = x / scale + t.rnd[0] * 300, Y = y / scale;
+    // main vein field: diagonal flow, gently warped
+    const flow = X * .0024 + Y * .0015 + N.fbm(X * .0024, Y * .0024, 5) * 2.4 + N.fbm(X * .009, Y * .009, 3) * .25;
+    const m1 = Math.abs(Math.sin(flow * Math.PI * 1.15));
+    const width = .55 + N.fbm(X * .006 + 40, Y * .006, 3) * .9;            // veins thicken and fade along their length
+    const main = Math.pow(1 - m1, 24 / width) * (.3 + N.fbm(X * .004, Y * .004 + 20, 3) * .8);
+    const halo = Math.pow(1 - m1, 5) * .12;
+    // fine secondary threads crossing the main veins
+    const f2 = X * .0016 - Y * .0058 + N.fbm(X * .004 + 9, Y * .004, 4) * 1.4;
+    const m2 = Math.abs(Math.sin(f2 * Math.PI * 3.3));
+    const thread = Math.pow(1 - m2, 70) * .5 * N.fbm(X * .008, Y * .008 + 5, 3);
+    const v = clamp01((main + halo + thread) * strength);
+    const cloud = (N.fbm(X * .006, Y * .006 + 9, 4) - .5) * tone * 2;
+    const c = mix(base, vein, v);
+    return [c[0] + cloud, c[1] + cloud, c[2] + cloud * .95];
+  };
+}
+function glazeFace(N, base, { jitter = 10, wave = 16, pool = 34, spec = .55, hueShift = [0, 0, 0] } = {}) {
+  return (x, y, t) => {
+    const j = (t.rnd[0] - .5) * jitter * 2, h = (t.rnd[3] - .5);
+    let c = [base[0] + j + h * hueShift[0], base[1] + j + h * hueShift[1], base[2] + j + h * hueShift[2]];
+    // undulating hand-glazed surface
+    const wv = (N.fbm(x * .028 + t.id * 3.1, y * .028, 4) - .5) * wave * 2;
+    c = c.map((v) => v + wv);
+    // glaze pools darker toward the tile edges
+    const de = Math.min(t.dT, t.dL, t.dB, t.dR);
+    const p = (1 - smooth(0, 13, de)) * pool * (.7 + N.n(x * .2, y * .2) * .6);
+    c = c.map((v) => v - p);
+    // broken specular glints where the glaze crests
+    const crest = N.fbm(x * .07 + t.id, y * .07 + 3, 3);
+    const s = Math.pow(clamp01((crest - .6) * 3.6), 4) * spec * 255;
+    return c.map((v) => v + s);
+  };
+}
+function chipsLayer(ctx, N, seed, palette, { count = 240, min = 2.5, max = 11, specks = 900 } = {}) {
+  const R = mulberry(seed);
+  for (let i = 0; i < specks; i++) {
+    ctx.fillStyle = palette[Math.floor(R() * palette.length)] + "88";
+    ctx.beginPath(); ctx.arc(R() * S, R() * S, .5 + R() * 1.2, 0, 7); ctx.fill();
+  }
+  for (let i = 0; i < count; i++) {
+    const cx = R() * S, cy = R() * S, r = min + Math.pow(R(), 2.2) * (max - min), k = 5 + Math.floor(R() * 3), a0 = R() * 7;
+    const col = palette[Math.floor(R() * palette.length)];
+    ctx.beginPath();
+    for (let j = 0; j < k; j++) { const a = a0 + (j / k) * Math.PI * 2, rr = r * (.55 + R() * .6); j ? ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr) : ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+    ctx.closePath();
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    g.addColorStop(0, col); g.addColorStop(1, shade(col, -.18));
+    ctx.fillStyle = g; ctx.fill();
+  }
+}
+function shade(h, k) { const c = hex(h).map((v) => Math.max(0, Math.min(255, Math.round(v * (1 + k))))); return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`; }
+function groutLines(ctx, { cols, rows, gap = 3, color = "rgba(205,198,186,1)" }) {
+  ctx.fillStyle = color;
+  for (let i = 1; i < cols; i++) ctx.fillRect(i * S / cols - gap / 2, 0, gap, S);
+  for (let i = 1; i < rows; i++) ctx.fillRect(0, i * S / rows - gap / 2, S, gap);
+}
+function pits(ctx, seed, count, col) {
+  const R = mulberry(seed);
+  for (let i = 0; i < count; i++) {
+    const x = R() * S, y = R() * S, rx = 1.2 + Math.pow(R(), 2.4) * 8, ry = rx * (.16 + R() * .22);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+    g.addColorStop(0, `rgba(${col},.55)`); g.addColorStop(.7, `rgba(${col},.3)`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, (R() - .5) * .3, 0, 7); ctx.fill();
+  }
+}
+function polish(ctx, k = .18) {
+  const g = ctx.createLinearGradient(0, 0, S, S * .9);
+  g.addColorStop(.18, "rgba(255,255,255,0)"); g.addColorStop(.32, `rgba(255,255,255,${k})`); g.addColorStop(.46, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+}
+
+// timber plank texture into an offscreen canvas
+function plank(N, w, h, seed, base = [204, 160, 110], dark = [150, 104, 64]) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d"), img = ctx.createImageData(w, h), d = img.data;
+  const R = mulberry(seed), off = R() * 100, tone = (R() - .5) * 26;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const gx = x + off * 13, gy = y + off;
+    const warp = N.fbm(gx * .004, gy * .05, 4) * 28;
+    const freq = .32 + (seed % 7) * .03;
+    const ring = Math.pow(Math.sin((gy * 1.2 + warp * 2.2 + N.fbm(gx * .02, gy * .02, 2) * 9) * freq) * .5 + .5, 6) * .3;
+    const fibre = (N.n(gx * .02, gy * 1.4) - .5) * 12;
+    const knot = Math.pow(clamp01(1 - Math.hypot((x - w * (.3 + (seed % 5) * .1)) / 9, (y - h * .5) / 5) / 2.4), 2) * .6;
+    const t = clamp01(ring + (N.fbm(gx * .005, gy * .03, 5) - .5) * .9 + .2 + knot * .7);
+    const col = mix(base, dark, t);
+    const i = (y * w + x) * 4;
+    d[i] = col[0] + fibre + tone; d[i + 1] = col[1] + fibre * .8 + tone * .8; d[i + 2] = col[2] + fibre * .6 + tone * .6; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  // eased edges between boards
+  const e = ctx.createLinearGradient(0, 0, 0, h);
+  e.addColorStop(0, "rgba(255,240,220,.22)"); e.addColorStop(.08, "rgba(255,240,220,0)"); e.addColorStop(.9, "rgba(0,0,0,0)"); e.addColorStop(1, "rgba(40,20,5,.35)");
+  ctx.fillStyle = e; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(55,35,18,.32)"; ctx.lineWidth = 1.2; ctx.strokeRect(.7, .7, w - 1.4, h - 1.4);
+  return c;
+}
+
+// ── materials ───────────────────────────────────────────────────
+const M = {
+  /* ── floor tiles ── */
+  "travertine"(ctx) {
+    const N = makeNoise(11), base = hex("#E5D6BE");
+    tiled(ctx, { tw: 200, th: 200, gap: 3, grout: hex("#D9CDB9"), bevel: 3, bevelK: .12, noise: N },
+      stoneFace(N, base, { band: .05, bandAmp: 22, mottle: 9, fine: 5 }));
+    pits(ctx, 21, 46, "176,146,108"); studio(ctx, .8);
+  },
+  "desert-stone"(ctx) {
+    const N = makeNoise(12), base = hex("#C79E6C");
+    tiled(ctx, { tw: 200, th: 200, gap: 3, grout: hex("#CDBFA6"), bevel: 3, bevelK: .14, noise: N },
+      (x, y, t) => {
+        const strata = (N.fbm(x * .004 + N.fbm(x * .02, y * .02) * 2, y * .022) - .5) * 52;
+        const sp = (N.n(x * .7, y * .7) - .5) * 26 + (t.rnd[0] - .5) * 18;
+        const iron = Math.pow(N.ridged(x * .008 + 4, y * .02, 4), 6) * 40;
+        return [base[0] + strata + sp - iron * .2, base[1] + strata * .85 + sp - iron * .6, base[2] + strata * .6 + sp - iron];
+      });
+    studio(ctx, .9);
+  },
+  "charcoal-slate"(ctx) {
+    const N = makeNoise(13), base = hex("#3E4146");
+    const hgt = (x, y) => N.fbm(x * .012, y * .035, 6) * .6 + N.ridged(x * .02, y * .05, 4) * .4;
+    tiled(ctx, { tw: 200, th: 200, gap: 4, grout: hex("#222428"), bevel: 3, bevelK: .1, noise: N },
+      (x, y, t) => {
+        const h0 = hgt(x, y), relief = (hgt(x - 1, y - 1) - hgt(x + 1, y + 1)) * 260;
+        const v = (h0 - .5) * 34 + relief + (t.rnd[0] - .5) * 10 + (N.n(x * .8, y * .8) - .5) * 8;
+        const rust = Math.pow(clamp01(N.fbm(x * .006 + 30, y * .01, 4) - .55) * 2.4, 2) * 22;
+        return [base[0] + v + rust, base[1] + v + rust * .5, base[2] + v * 1.05];
+      });
+    studio(ctx, .7);
+  },
+  "zellige-ivory"(ctx) {
+    const N = makeNoise(14);
+    tiled(ctx, { tw: 80, th: 80, gap: 2.5, grout: hex("#E2D9C8"), bevel: 3, bevelK: .1, irregular: 2.2, gloss: .12, sheen: .18, noise: N },
+      glazeFace(N, hex("#E9DBC1"), { jitter: 9, wave: 9, pool: 24, spec: .45, hueShift: [10, 4, -8] }));
+    studio(ctx, .8);
+  },
+  "terrazzo-blanc"(ctx) {
+    const N = makeNoise(15), base = hex("#F1EEE8");
+    tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, noise: N }, stoneFace(N, base, { mottle: 4, fine: 4 }));
+    chipsLayer(ctx, N, 51, ["#8D9196", "#B7BABD", "#C7957F", "#9FB29E", "#2F3033", "#D8CBB6", "#6F7378"], { count: 260 });
+    groutLines(ctx, { cols: 2, rows: 2, gap: 2.5, color: "#DCD7CE" });
+    polish(ctx, .16); studio(ctx, .8);
+  },
+  "honed-limestone"(ctx) {
+    const N = makeNoise(16), base = hex("#E8DFCB");
+    tiled(ctx, { tw: 200, th: 200, gap: 3, grout: hex("#D8CFBD"), bevel: 3, bevelK: .1, noise: N },
+      stoneFace(N, base, { mottle: 8, fine: 4 }));
+    const R = mulberry(61);
+    for (let i = 0; i < 180; i++) { ctx.fillStyle = `rgba(165,145,112,${.18 + R() * .25})`; ctx.beginPath(); ctx.arc(R() * S, R() * S, .4 + R() * 1.1, 0, 7); ctx.fill(); }
+    studio(ctx, .75);
+  },
+  "natural-oak"(ctx) {
+    const N = makeNoise(17), R = mulberry(71), h = 80;
+    for (let row = 0; row < S / h; row++) {
+      let x = -R() * 160;
+      while (x < S) { const w = 190 + R() * 140; ctx.drawImage(plank(N, Math.round(w), h, row * 50 + Math.round(x)), x, row * h); x += w; }
+    }
+    polish(ctx, .08); studio(ctx, .9);
+  },
+  "matte-slate-lg"(ctx) {
+    const N = makeNoise(18), base = hex("#69737D");
+    tiled(ctx, { tw: 400, th: 200, gap: 3, grout: hex("#4E555C"), bevel: 3, bevelK: .08, noise: N },
+      (x, y, t) => {
+        const v = (N.fbm(x * .006, y * .006 + t.id) - .5) * 20 + (N.n(x * .6, y * .6) - .5) * 9 + (N.fbm(x * .05, y * .05, 3) - .5) * 8;
+        return [base[0] + v, base[1] + v, base[2] + v * 1.05];
+      });
+    studio(ctx, .8);
+  },
+
+  /* ── wall tiles ── */
+  "marble-blanc"(ctx) {
+    const N = makeNoise(21);
+    tiled(ctx, { tw: 400, th: 200, gap: 2.5, grout: hex("#E3E2DE"), bevel: 3, bevelK: .1, gloss: .1, noise: N },
+      marbleFace(N, hex("#F3F2EF"), hex("#878B91"), { strength: 1 }));
+    polish(ctx, .2); studio(ctx, .7);
+  },
+  "sage-subway"(ctx) {
+    const N = makeNoise(22);
+    tiled(ctx, { tw: 100, th: 50, gap: 3, grout: hex("#EEEBE4"), offset: true, bevel: 6, bevelK: .24, gloss: .32, sheen: .3, noise: N },
+      (x, y, t) => {
+        const j = (t.rnd[0] - .5) * 16, g = (N.fbm(x * .03 + t.id, y * .05, 3) - .5) * 14;
+        return [148 + j + g, 170 + j + g, 147 + j * .9 + g];
+      });
+    studio(ctx, .8);
+  },
+  "terracotta-feature"(ctx) {
+    const N = makeNoise(23);
+    tiled(ctx, { tw: 100, th: 100, gap: 3, grout: hex("#D8CDBF"), bevel: 4, bevelK: .12, irregular: 1.6, noise: N },
+      (x, y, t) => {
+        const j = (t.rnd[0] - .5) * 30, h = (t.rnd[1] - .5) * 16;
+        const m = (N.fbm(x * .02 + t.id, y * .02, 5) - .5) * 30 + (N.n(x * .7, y * .7) - .5) * 12;
+        const burn = Math.pow(1 - smooth(0, 22, Math.min(t.dT, t.dL, t.dB, t.dR)), 2) * 18;
+        return [196 + j + m - burn, 104 + j * .6 + h + m * .7 - burn, 64 + j * .4 + m * .5 - burn];
+      });
+    studio(ctx, .85);
+  },
+  "zellige-white"(ctx) {
+    const N = makeNoise(24);
+    tiled(ctx, { tw: 80, th: 80, gap: 2.5, grout: hex("#E6E2DA"), bevel: 3, bevelK: .1, irregular: 2.2, gloss: .12, sheen: .2, noise: N },
+      glazeFace(N, hex("#EFEDE7"), { jitter: 6, wave: 8, pool: 20, spec: .45, hueShift: [4, 4, 8] }));
+    studio(ctx, .8);
+  },
+  "zellige-sage"(ctx) {
+    const N = makeNoise(25);
+    tiled(ctx, { tw: 80, th: 80, gap: 2.5, grout: hex("#DDE0D6"), bevel: 3, bevelK: .1, irregular: 2.2, gloss: .12, sheen: .18, noise: N },
+      glazeFace(N, hex("#93AD95"), { jitter: 14, wave: 12, pool: 34, spec: .4, hueShift: [-8, 6, 14] }));
+    studio(ctx, .8);
+  },
+  "fluted-white"(ctx) {
+    const N = makeNoise(26), f = 26, img = ctx.createImageData(S, S), d = img.data;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const ph = (x % f) / f, nx = -Math.cos(ph * Math.PI), nz = Math.sin(ph * Math.PI);
+      const diff = clamp01(-nx * .55 + nz * .8 + .15);
+      const spec = Math.pow(clamp01(-nx * .5 + nz * .86), 40) * .5;
+      const groove = 1 - (1 - smooth(0, .06, Math.min(ph, 1 - ph))) * .5;
+      const seam = Math.abs((y % 200) - 1.5) < 1.5 ? .8 : 1;
+      const tone = (N.n(x * .3, y * .3) - .5) * 5;
+      const v = (150 + 105 * diff) * groove * seam + spec * 255 + tone;
+      const i = (y * S + x) * 4; d[i] = v; d[i + 1] = v - 1; d[i + 2] = v - 4; d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0); studio(ctx, .6);
+  },
+  "coastal-terrazzo"(ctx) {
+    const N = makeNoise(27), base = hex("#E2D2BA");
+    tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, noise: N }, stoneFace(N, base, { mottle: 6, fine: 5 }));
+    chipsLayer(ctx, N, 57, ["#B4825D", "#ECE3D4", "#8B7B67", "#C9A87E", "#6D6963", "#D7B48E"], { count: 230 });
+    polish(ctx, .14); studio(ctx, .8);
+  },
+  "smoked-concrete"(ctx) {
+    const N = makeNoise(28), base = hex("#8D8984");
+    tiled(ctx, { tw: 400, th: 200, gap: 3, grout: hex("#6E6A66"), bevel: 3, bevelK: .08, noise: N },
+      (x, y, t) => {
+        const v = (N.fbm(x * .005, y * .005 + t.id) - .5) * 30 + (N.fbm(x * .03, y * .03, 4) - .5) * 14 + (N.n(x * .9, y * .9) - .5) * 10;
+        return [base[0] + v, base[1] + v * .98, base[2] + v * .95];
+      });
+    const R = mulberry(81);
+    for (let i = 0; i < 160; i++) { const x = R() * S, y = R() * S, r = .6 + R() * 1.4; ctx.fillStyle = "rgba(60,56,52,.55)"; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.beginPath(); ctx.arc(x + r * .5, y + r * .5, r * .5, 0, 7); ctx.fill(); }
+    studio(ctx, .8);
+  },
+
+  /* ── tile layouts ── */
+  "vertical-stack"(ctx) {
+    const N = makeNoise(31);
+    tiled(ctx, { tw: 67, th: 200, gap: 3, grout: hex("#D6D2CA"), bevel: 5, bevelK: .2, gloss: .25, sheen: .28, noise: N },
+      (x, y, t) => { const j = (t.rnd[0] - .5) * 10, g = (N.fbm(x * .02 + t.id, y * .02, 3) - .5) * 8; return [238 + j + g, 236 + j + g, 230 + j + g]; });
+    studio(ctx, .8);
+  },
+  "herringbone"(ctx) {
+    const N = makeNoise(32), W = 34, L = 68;
+    ctx.fillStyle = "#3a2615"; ctx.fillRect(0, 0, S, S);
+    ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(Math.PI / 4); ctx.translate(-S, -S);
+    let seed = 1;
+    for (let s = -6; s < 12; s++) for (let n = -4; n < 30; n++) {
+      const x0 = s * 4 * W + n * W, y0 = n * W;
+      ctx.drawImage(plank(N, L, W, seed++), x0, y0);                         // horizontal
+      ctx.save(); ctx.translate(x0 + W, y0 + W); ctx.rotate(Math.PI / 2);    // vertical, rotated board
+      ctx.drawImage(plank(N, L, W, seed++), 0, 0); ctx.restore();
+    }
+    ctx.restore(); polish(ctx, .08); studio(ctx, .9);
+  },
+  "terrazzo"(ctx) { M["terrazzo-blanc"](ctx); },
+  "zellige"(ctx) { M["zellige-white"](ctx); },
+  "large-format"(ctx) {
+    const N = makeNoise(35), base = hex("#DCD6CC");
+    tiled(ctx, { tw: 400, th: 200, gap: 2, grout: hex("#C9C2B6"), bevel: 2, bevelK: .08, noise: N },
+      stoneFace(N, base, { mottle: 9, fine: 4, warmth: [1, .99, .96] }));
+    polish(ctx, .1); studio(ctx, .8);
+  },
+  "penny-rounds"(ctx) {
+    const N = makeNoise(36), R = mulberry(91), r = 15, dx = r * 2 + 3, dy = dx * .866;
+    ctx.fillStyle = "#CFCAC1"; ctx.fillRect(0, 0, S, S);
+    for (let row = -1; row * dy < S + r; row++) for (let col = -1; col * dx < S + r; col++) {
+      const cx = col * dx + (row % 2 ? dx / 2 : 0), cy = row * dy, t = R();
+      const c = t < .12 ? [176, 182, 178] : [240 - t * 10, 238 - t * 10, 232 - t * 12];
+      const g = ctx.createRadialGradient(cx - r * .35, cy - r * .4, r * .1, cx, cy, r);
+      g.addColorStop(0, `rgb(${c.map((v) => Math.min(255, v + 18)).join(",")})`);
+      g.addColorStop(.7, `rgb(${c.join(",")})`);
+      g.addColorStop(1, `rgb(${c.map((v) => v - 34).join(",")})`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.beginPath(); ctx.ellipse(cx - r * .38, cy - r * .42, r * .28, r * .14, -.6, 0, 7); ctx.fill();
+    }
+    studio(ctx, .8);
+  },
+  "checkerboard"(ctx) {
+    const N = makeNoise(37);
+    const white = marbleFace(N, hex("#F1F0EC"), hex("#8E9196"), { strength: .9 });
+    const black = marbleFace(N, hex("#26272A"), hex("#D9D9D6"), { strength: .7, tone: 4 });
+    tiled(ctx, { tw: 100, th: 100, gap: 2, grout: hex("#BDB8B0"), bevel: 3, bevelK: .1, gloss: .08, noise: N },
+      (x, y, t) => ((Math.floor(x / 100) + Math.floor(y / 100)) % 2 ? black : white)(x, y, t));
+    polish(ctx, .16); studio(ctx, .8);
+  },
+  "honed-travertine"(ctx) { M["travertine"](ctx); },
+};
+
+window.TILE_IDS = Object.keys(M);
+window.render = (id) => {
+  const c = document.createElement("canvas"); c.width = c.height = S;
+  M[id](c.getContext("2d"));
+  return c;
+};
+for (const id of window.TILE_IDS) {
+  const fig = document.createElement("figure");
+  fig.appendChild(window.render(id));
+  fig.insertAdjacentHTML("beforeend", `<figcaption>${id}</figcaption>`);
+  document.body.appendChild(fig);
+}
+window.__ready = true;
+</script>
+</body>
+</html>

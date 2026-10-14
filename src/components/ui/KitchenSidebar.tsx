@@ -133,12 +133,13 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
       <div>
         <SectionLabel>Mixer &amp; Sink Finish</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="sink and mixer tap" className="mb-2" active={isKept(selections.keepExisting, "mixer")} onToggle={(on) => keep("mixer", on)} />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {MIXER_OPTIONS.map((opt) => {
             const active = selections.mixer === opt.id;
             const swatch =
               opt.id === "brushed-brass" ? "#C8A45A" :
-              opt.id === "matte-black"   ? "#2C2C2C" : "#B8C0C8";
+              opt.id === "matte-black"   ? "#2C2C2C" :
+              opt.id === "white"         ? "linear-gradient(135deg,#ffffff,#e4e3df)" : "#B8C0C8";
             return (
               <button
                 key={opt.id}
@@ -148,9 +149,9 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
                   active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
                 )}
               >
-                <div className="w-8 h-8 rounded-full border-2 border-white/50 shadow-warm-sm" style={{ background: swatch }} />
+                <div className="w-8 h-8 rounded-full border-2 border-white/50 shadow-warm-sm ring-1 ring-black/10" style={{ background: swatch }} />
                 <p className={cn("text-[10px] font-bold leading-tight", active ? "text-charcoal" : "text-charcoal/60")}>
-                  {opt.id === "brushed-brass" ? "Brushed Brass" : opt.id === "matte-black" ? "Matte Black" : "Chrome"}
+                  {opt.label}
                 </p>
               </button>
             );
@@ -366,17 +367,6 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
         </div>
       </div>
 
-      {/* Custom note */}
-      <div>
-        <SectionLabel>Additional Request</SectionLabel>
-        <textarea
-          value={selections.customNote}
-          onChange={(e) => onChange({ customNote: e.target.value })}
-          placeholder="e.g. I want a butler's pantry behind the main kitchen..."
-          rows={2}
-          className="w-full px-3 py-2.5 rounded-xl border-2 border-sand-200 bg-white/60 text-xs text-charcoal focus:outline-none focus:border-terracotta/50 resize-none transition-all"
-        />
-      </div>
     </div>
   );
 }

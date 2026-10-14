@@ -3,64 +3,73 @@
 /**
  * StyleLibrary
  *
- * A "Reference Gallery" of 3 curated bathroom style presets.
- * Clicking a preset auto-applies the floor tile, wall tile, vanity,
- * and tapware to the builder store — priming the AI generation.
+ * Four curated bathroom looks homeowners recognise straight away. Picking one
+ * applies its floor tile, wall tile, vanity, tapware and tile layout to the
+ * builder store; every choice can still be changed afterwards.
  */
 
-import { Sparkles } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { VanityType, TapwareFinish, TileOption, TileStyle } from "@/lib/types";
+import TileTexture from "@/components/ui/TileTexture";
+import type { VanityType, TapwareFinish, TileStyle } from "@/lib/types";
 
 export interface StylePreset {
   id:          string;
   name:        string;
-  tag:         string;    // e.g. "Minimalist"
   description: string;
-  palette:     string[];  // CSS colours for the swatch row
   floorTileId: string;
   wallTileId:  string;
   vanity:      VanityType;
   tapware:     TapwareFinish;
   tileStyle:   TileStyle | null;
+  /** Tapware swatch shown on the card */
+  tapSwatch:   string;
 }
 
 export const STYLE_PRESETS: StylePreset[] = [
   {
-    id:          "minimalist",
-    name:        "Minimalist",
-    tag:         "Minimalist",
-    description: "Crisp whites, floating vanity, chrome — effortless and timeless.",
-    palette:     ["#F5F0E8", "#E8E0D5", "#C0B8B0", "#B8BCC0"],
-    floorTileId: "travertine",
-    wallTileId:  "white-subway",
-    vanity:      "floating",
-    tapware:     "chrome",
-    tileStyle:   "large-format",
-  },
-  {
-    id:          "industrial",
-    name:        "Industrial",
-    tag:         "Industrial",
-    description: "Raw slate floors, concrete walls, matte black hardware — bold and edgy.",
-    palette:     ["#4A4A4A", "#6B6B6B", "#2C2C2C", "#1A1A1A"],
-    floorTileId: "charcoal-slate",
-    wallTileId:  "concrete-look",
+    id:          "modern-contemporary",
+    name:        "Modern Contemporary",
+    description: "Large-format slate, concrete walls, matte black tapware.",
+    floorTileId: "matte-slate-lg",
+    wallTileId:  "smoked-concrete",
     vanity:      "floating",
     tapware:     "matte-black",
-    tileStyle:   "vertical-stack",
+    tileStyle:   "large-format",
+    tapSwatch:   "linear-gradient(135deg,#3a3a3a,#111111)",
   },
   {
-    id:          "coastal",
-    name:        "Coastal",
-    tag:         "Coastal",
-    description: "Warm sage green, travertine floors, brushed gold — relaxed Australian luxury.",
-    palette:     ["#B8CCBC", "#D4C4A8", "#C8B898", "#D4A57C"],
+    id:          "warm-minimalist",
+    name:        "Warm Minimalist",
+    description: "Nude travertine, fluted white walls, soft white fixtures.",
     floorTileId: "travertine",
-    wallTileId:  "sage-subway",
+    wallTileId:  "fluted-white",
     vanity:      "floating",
-    tapware:     "brushed-gold",
+    tapware:     "white",
+    tileStyle:   "large-format",
+    tapSwatch:   "linear-gradient(135deg,#ffffff,#e4e3df)",
+  },
+  {
+    id:          "coastal-hamptons",
+    name:        "Coastal Hamptons",
+    description: "Honed limestone, white zellige, classic vanity, chrome.",
+    floorTileId: "honed-limestone",
+    wallTileId:  "zellige-white",
+    vanity:      "freestanding",
+    tapware:     "chrome",
     tileStyle:   "herringbone",
+    tapSwatch:   "linear-gradient(135deg,#ededed,#a8a8a8)",
+  },
+  {
+    id:          "luxurious-traditional",
+    name:        "Luxurious Traditional",
+    description: "Marble walls, checkerboard floor, brushed gold tapware.",
+    floorTileId: "charcoal-slate",
+    wallTileId:  "marble-blanc",
+    vanity:      "freestanding",
+    tapware:     "brushed-gold",
+    tileStyle:   "checkerboard",
+    tapSwatch:   "linear-gradient(135deg,#e8c97e,#b8962c)",
   },
 ];
 
@@ -73,58 +82,49 @@ export default function StyleLibrary({ activePresetId, onSelect }: StyleLibraryP
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <Sparkles size={13} className="text-terracotta" />
-        <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Style Library</p>
-        <span className="ml-auto text-[10px] text-charcoal/30">Click to apply</span>
+        <Sparkles size={14} className="text-terracotta" />
+        <p className="text-sm font-bold text-charcoal">Start from a style</p>
+        <span className="ml-auto text-xs text-charcoal/40">Tap to apply · change anything after</span>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-3">
         {STYLE_PRESETS.map((preset) => {
           const active = activePresetId === preset.id;
           return (
             <button
               key={preset.id}
+              type="button"
               onClick={() => onSelect(preset)}
+              aria-pressed={active}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
+                "group relative flex flex-col overflow-hidden rounded-2xl border-2 text-left transition-all duration-200",
                 active
-                  ? "border-terracotta bg-terracotta/5 shadow-warm-sm"
-                  : "border-sand-200 bg-white/50 hover:border-terracotta/30 hover:bg-white/80",
+                  ? "border-terracotta shadow-warm"
+                  : "border-sand-200 bg-white/70 hover:border-terracotta/40 hover:shadow-warm-sm",
               )}
             >
-              {/* Palette swatches */}
-              <div className="flex rounded-xl overflow-hidden flex-shrink-0 w-10 h-10">
-                <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
-                  {preset.palette.slice(0, 4).map((col, i) => (
-                    <div key={i} style={{ background: col }} />
-                  ))}
-                </div>
+              {/* The look itself: wall tile over floor tile, with the tapware finish */}
+              <div className="relative h-20 sm:h-24">
+                <TileTexture tileId={preset.wallTileId}  className="absolute inset-x-0 top-0 h-[62%] w-full" style={{ width: "100%" }} />
+                <TileTexture tileId={preset.floorTileId} className="absolute inset-x-0 bottom-0 h-[38%] w-full" style={{ width: "100%" }} />
+                <span
+                  className="absolute bottom-2 right-2 h-6 w-6 rounded-full ring-2 ring-white shadow-warm-sm"
+                  style={{ background: preset.tapSwatch }}
+                />
+                {active && (
+                  <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-terracotta text-white shadow-warm-sm">
+                    <Check size={13} strokeWidth={3} />
+                  </span>
+                )}
               </div>
-
-              <div className="flex-1 min-w-0">
-                <p className={cn("text-xs font-bold leading-tight", active ? "text-charcoal" : "text-charcoal/70")}>
-                  {preset.name}
-                </p>
-                <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug truncate">
-                  {preset.description}
-                </p>
+              <div className={cn("flex-1 px-3 py-2.5", active ? "bg-terracotta/5" : "")}>
+                <p className={cn("text-sm font-bold leading-tight", active ? "text-terracotta" : "text-charcoal")}>{preset.name}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-charcoal/50">{preset.description}</p>
               </div>
-
-              {active && (
-                <div className="w-4 h-4 rounded-full bg-terracotta flex-shrink-0 flex items-center justify-center">
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                    <path d="M1.5 4L3.5 6L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
             </button>
           );
         })}
       </div>
-
-      <p className="text-[10px] text-charcoal/30 text-center">
-        Presets apply tiles, vanity & tapware — you can customise any selection afterwards
-      </p>
     </div>
   );
 }

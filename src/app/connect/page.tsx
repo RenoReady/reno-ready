@@ -109,8 +109,8 @@ export default function ConnectPage() {
 
   const hasGeneratedImage = !!generatedImageUrl;
 
-  const vanityLabel  = vanity  ? (VANITY_OPTIONS.find((v)  => v.id === vanity)?.label  ?? vanity)  : selectionText(null, isKept(keepExisting, "vanity"));
-  const tapwareLabel = tapware ? (TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware) : selectionText(null, isKept(keepExisting, "tapware"));
+  const vanityLabel  = vanity  ? (VANITY_OPTIONS.find((v)  => v.id === vanity)?.label  ?? vanity)  : "Not selected";
+  const tapwareLabel = tapware ? (TAPWARE_OPTIONS.find((t) => t.id === tapware)?.label ?? tapware) : "Not selected";
   const tileStyleLabel = tileStyle
     ? TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.label ?? tileStyle
     : null;

@@ -166,7 +166,10 @@ export default function AuthModal({ onSuccess, onClose }: AuthModalProps) {
         {/* Trust */}
         <div className="flex items-center justify-center gap-2 text-xs text-charcoal/40">
           <ShieldCheck size={13} className="text-terracotta/60" />
-          <span>Your data is never shared. Unsubscribe anytime.</span>
+          <span>
+            We never sell your data.{" "}
+            <a href="/privacy" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-charcoal/70">Privacy Policy</a>
+          </span>
         </div>
 
         <p className="text-center text-xs text-charcoal/40">

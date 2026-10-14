@@ -6,12 +6,29 @@
  */
 
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type { RoomType } from "@/lib/roomTypes";
 
 export const GENERATIONS_BUCKET = "generations";
 
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
+
+/**
+ * Re-encodes the render as WebP before storing it. Gemini returns ~1–2 MB
+ * PNGs; quality 82 is visually identical at this size and roughly 5–10×
+ * smaller, so the bucket holds far more designs. Falls back to the
+ * original bytes if encoding fails.
+ */
+async function compress(buf: Buffer, mimeType: string): Promise<{ data: Buffer; mimeType: string }> {
+  try {
+    const data = await sharp(buf).webp({ quality: 82, effort: 4 }).toBuffer();
+    return data.length < buf.length ? { data, mimeType: "image/webp" } : { data: buf, mimeType };
+  } catch (err: unknown) {
+    console.warn("[generations] compression failed, storing original:", err instanceof Error ? err.message : err);
+    return { data: buf, mimeType };
+  }
+}
 
 /**
  * Uploads a generated image (a base-64 data URL) and records it against the
@@ -27,13 +44,13 @@ export async function saveGeneration(opts: {
   try {
     const match = opts.dataUrl.match(/^data:(image\/[a-z+]+);base64,(.+)$/);
     if (!match) return;
-    const [, mimeType, base64] = match;
-    const path = `${opts.userId}/${Date.now()}-${randomUUID().slice(0, 8)}.${EXT[mimeType] ?? "png"}`;
+    const image = await compress(Buffer.from(match[2], "base64"), match[1]);
+    const path  = `${opts.userId}/${Date.now()}-${randomUUID().slice(0, 8)}.${EXT[image.mimeType] ?? "png"}`;
 
     const svc = createSupabaseServiceRoleClient();
     const { error: uploadError } = await svc.storage
       .from(GENERATIONS_BUCKET)
-      .upload(path, Buffer.from(base64, "base64"), { contentType: mimeType, upsert: false });
+      .upload(path, image.data, { contentType: image.mimeType, upsert: false });
     if (uploadError) {
       console.warn("[generations] upload failed:", uploadError.message);
       return;

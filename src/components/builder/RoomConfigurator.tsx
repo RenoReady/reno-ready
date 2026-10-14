@@ -1822,7 +1822,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <div>
               <h1 className="text-2xl sm:text-4xl font-bold text-charcoal">Design Your Dream {roomName}</h1>
               <p className="mt-1.5 text-sm sm:text-base text-charcoal/55">
-                Follow 3 simple steps below to visualize your renovated space and build a project summary.
+                Follow 3 simple steps below to visualise your renovated space and build a project summary.
               </p>
             </div>
           )}

@@ -43,7 +43,7 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
     eyebrow:  "The Sanctuary",
     title:    "Design Your Dream Bathroom",
     exploreLabel: "Explore Bathrooms",
-    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
+    intro:    "Follow 3 simple steps below to visualise your renovated space and build a project summary.",
     features: [
       "Nude Travertine & Zellige tile library",
       "Walk-in showers, niches & structural changes",
@@ -60,7 +60,7 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
     eyebrow:  "The Heart",
     title:    "Design Your Dream Kitchen",
     exploreLabel: "Explore Kitchens",
-    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
+    intro:    "Follow 3 simple steps below to visualise your renovated space and build a project summary.",
     features: [
       "Cabinetry, benchtop & splashback combos",
       "Island bench design with cost advisor",
@@ -81,7 +81,7 @@ export const ROOM_PAGES: Record<RoomType, RoomPage> = {
     eyebrow:  "The Retreat",
     title:    "Design Your Dream Bedroom",
     exploreLabel: "Explore Bedrooms",
-    intro:    "Follow 3 simple steps below to visualize your renovated space and build a project summary.",
+    intro:    "Follow 3 simple steps below to visualise your renovated space and build a project summary.",
     features: [
       "Flooring: oak herringbone to polished concrete",
       "Wall treatments: VJ, limewash, feature paint",

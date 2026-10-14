@@ -27,7 +27,7 @@ const DEFAULT: UserStatus = {
   isAdmin:         false,
   isPremium:       false,
   generationCount: 0,
-  freeLimit:       5,
+  freeLimit:       3,
   loading:         true,
 };
 

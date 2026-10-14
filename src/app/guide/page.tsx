@@ -257,6 +257,7 @@ export default function GuidePage() {
           <Link href="/hidden-costs" className="hover:text-charcoal/70 transition-colors">Hidden Renovation Costs</Link>
           <Link href="/gallery"      className="hover:text-charcoal/70 transition-colors">Design Gallery</Link>
           <Link href="/builder"      className="hover:text-charcoal/70 transition-colors">Design Tool</Link>
+          <Link href="/privacy"      className="hover:text-charcoal/70 transition-colors">Privacy</Link>
         </div>
       </div>
 

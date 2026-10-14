@@ -282,6 +282,7 @@ export default function GalleryPage() {
           <Link href="/guide"        className="hover:text-charcoal/70 transition-colors">Renovation Guide</Link>
           <Link href="/hidden-costs" className="hover:text-charcoal/70 transition-colors">Hidden Costs</Link>
           <Link href="/builder"      className="hover:text-charcoal/70 transition-colors">Design Tool</Link>
+          <Link href="/privacy"      className="hover:text-charcoal/70 transition-colors">Privacy</Link>
         </div>
       </div>
 

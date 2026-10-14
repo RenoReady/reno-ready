@@ -475,7 +475,8 @@ export default function ConnectPage() {
               <div className="flex items-start gap-3 p-4 rounded-2xl bg-terracotta/5 border border-terracotta/15">
                 <ShieldCheck size={16} className="text-terracotta mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-charcoal/60 leading-relaxed">
-                  Your information is only shared with builders you approve. We never sell your data or add you to marketing lists. You can request removal at any time.
+                  Your details and design brief come to Reno Ready, and we only pass them to the builders we connect you with. We never sell your data or add you to marketing lists. You can request removal at any time.{" "}
+                  <a href="/privacy" target="_blank" rel="noopener" className="font-semibold text-terracotta hover:underline">Privacy Policy</a>
                 </p>
               </div>
 

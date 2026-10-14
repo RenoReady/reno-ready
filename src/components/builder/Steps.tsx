@@ -17,7 +17,7 @@ export const STEP_COPY = [
     id:     "step-1",
     short:  "Finishes & Style",
     title:  "Step 1: Choose Your Finishes & Style",
-    helper: "Select your preferred tiles, cabinetry, tapware, or color palette to set the design direction.",
+    helper: "Select your preferred tiles, cabinetry, tapware, or colour palette to set the design direction.",
   },
   {
     id:     "step-2",

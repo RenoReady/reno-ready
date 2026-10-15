@@ -15,7 +15,7 @@ import type { BuilderSelections } from "./types";
 import type { ProjectBrief } from "./projectBrief";
 import type { RoomType, KitchenSelections, BedroomSelections } from "./roomTypes";
 import { calcBriefCostItems, needsAsbestosCheck, calcBriefTotal } from "./projectBrief";
-import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel } from "./types";
+import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel, paintLabel } from "./types";
 import { DESIGN_STYLES, isDesignStyle } from "./designStyles";
 import {
   calcKitchenCost, calcBedroomCost,
@@ -191,6 +191,7 @@ function buildMatRows(
   const rows: MatRow[] = [
     { label: "Floor",         value: selectionText(surfaceLabel(FLOOR_FORMATS.find((f) => f.id === sel.floorFormat), sel.floorTile, sel.customFloorColor), isKept(sel.keepExisting, "floor")) },
     { label: "Walls",         value: selectionText(surfaceLabel(WALL_FORMATS.find((f) => f.id === sel.wallFormat),   sel.wallTile,  sel.customWallColor),  isKept(sel.keepExisting, "walls")) },
+    { label: "Wall Colour",   value: paintLabel(sel.wallPaintFinish, sel.wallPaintColor) ?? "Not selected" },
     { label: "Vanity Type",   value: vanityLabel },
     { label: "Tapware Finish",value: tapwareLabel },
     ...styleRows(sel.designStyle),
@@ -224,7 +225,7 @@ function buildCostItems(
   }
   // Bathroom
   return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity, sel.tapware, sel.structuralChanges, 0, sel.bathroomSize, sel.customLength, sel.customWidth, sel.lightingOption,
-    { floorFormat: sel.floorFormat, wallFormat: sel.wallFormat, designStyle: sel.designStyle });
+    { floorFormat: sel.floorFormat, wallFormat: sel.wallFormat, wallPaintFinish: sel.wallPaintFinish, wallPaintColor: sel.wallPaintColor, designStyle: sel.designStyle });
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

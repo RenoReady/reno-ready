@@ -17,7 +17,6 @@ import {
   KITCHEN_SIZE_OPTIONS,
   KITCHEN_FLOOR_FORMATS,
   KITCHEN_WALL_FINISHES,
-  KITCHEN_WALL_OPTIONS,
   CABINETRY_OPTIONS,
   BENCHTOP_OPTIONS,
   MIXER_OPTIONS,
@@ -30,8 +29,8 @@ import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } 
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, KITCHEN_KEEP_FIELDS, type KitchenKeepKey } from "@/lib/keepExisting";
-import { FLOOR_TILES, tonesFor, type FloorFormat } from "@/lib/types";
-import { StepLabel, FormatGrid, ToneGrid, CeilingPicker } from "@/components/builder/SurfacePicker";
+import { SURFACE_TONES, surfaceSwatch, paintSwatch, findPaintFinish, paintToneFor, type FloorFormat } from "@/lib/types";
+import { StylePicker, CeilingPicker } from "@/components/builder/SurfacePicker";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -195,60 +194,50 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
         </div>
       </div>
 
-      {/* Kitchen Floor — format, then tone */}
+      {/* Kitchen Floor — style first, tone second */}
       <div>
         <SectionLabel>Kitchen Floor</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="kitchen floor" className="mb-3" active={isKept(selections.keepExisting, "floor")} onToggle={(on) => keep("floor", on)} />
-        <StepLabel n={1}>Choose a format</StepLabel>
-        <FormatGrid
-          options={KITCHEN_FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+        <StylePicker
+          styles={KITCHEN_FLOOR_FORMATS}
           value={selections.floorFormat}
-          onChange={(id) => {
-            const fmt = KITCHEN_FLOOR_FORMATS.find((f) => f.id === id);
-            onChange({ floorFormat: id as FloorFormat | null, floorTone: fmt?.tones.includes(selections.floorTone ?? "") ? selections.floorTone : null });
+          tone={selections.floorTone}
+          toneLabel={SURFACE_TONES.find((t) => t.id === selections.floorTone)?.name ?? (selections.floorColor ? `Custom ${selections.floorColor}` : null)}
+          tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+          thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : KITCHEN_FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+          moreLabel="View More Floor Styles"
+          drawerTitle="Kitchen floor"
+          onPick={(id, tone) => onChange({ floorFormat: id as FloorFormat, floorTone: tone, floorColor: null })}
+          onClear={() => onChange({ floorFormat: null, floorTone: null, floorColor: null })}
+          custom={{
+            label:    "Custom floor colour",
+            value:    selections.floorColor,
+            onChange: (id, hex) => onChange({ floorFormat: id as FloorFormat, floorColor: hex, floorTone: hex ? null : selections.floorTone }),
           }}
         />
-        {selections.floorFormat && (
-          <div className="mt-4">
-            <StepLabel n={2}>Choose a colour or tone</StepLabel>
-            <ToneGrid
-              tones={tonesFor(FLOOR_TILES, KITCHEN_FLOOR_FORMATS.find((f) => f.id === selections.floorFormat)).map((t) => ({ id: t.id, label: t.name, swatch: t.id }))}
-              value={selections.floorColor ? null : selections.floorTone}
-              onChange={(id) => onChange({ floorTone: id, floorColor: null })}
-            >
-              <ColourPickerSwatch
-                label="Custom Floor Colour"
-                value={selections.floorColor ?? null}
-                onChange={(c) => onChange({ floorColor: c, floorTone: c ? null : selections.floorTone })}
-                variant="square"
-              />
-            </ToneGrid>
-          </div>
-        )}
       </div>
 
-      {/* Kitchen Walls — finish, then colour */}
+      {/* Wall Colour — finish first, colour second */}
       <div>
-        <SectionLabel>Kitchen Walls</SectionLabel>
+        <SectionLabel>Wall Colour</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="wall finish" className="mb-3" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
-        <StepLabel n={1}>Choose a finish</StepLabel>
-        <FormatGrid
-          options={KITCHEN_WALL_FINISHES.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, css: selections.wallColor ?? "#F3F0EA", cost: f.cost }))}
+        <StylePicker
+          styles={KITCHEN_WALL_FINISHES}
           value={selections.wallFinish}
-          onChange={(id) => onChange({ wallFinish: id as KitchenWallFinish | null })}
+          tone={paintToneFor(findPaintFinish(selections.wallFinish), selections.wallColor)?.id ?? null}
+          toneLabel={paintToneFor(findPaintFinish(selections.wallFinish), selections.wallColor)?.name ?? (selections.wallColor ? `Custom ${selections.wallColor}` : null)}
+          tonesFor={(id) => (findPaintFinish(id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: paintSwatch(id, t.id) }))}
+          thumbFor={(id, tone) => paintSwatch(id, tone ?? findPaintFinish(id)?.defaultTone ?? "")}
+          moreLabel="View More Paint & Wall Finishes"
+          drawerTitle="Wall colour"
+          onPick={(id, tone) => onChange({ wallFinish: id as KitchenWallFinish, wallColor: findPaintFinish(id)?.tones.find((t) => t.id === tone)?.color ?? null })}
+          onClear={() => onChange({ wallFinish: null, wallColor: null })}
+          custom={{
+            label:    "Custom paint colour",
+            value:    selections.wallColor && !paintToneFor(findPaintFinish(selections.wallFinish), selections.wallColor) ? selections.wallColor : null,
+            onChange: (id, hex) => onChange({ wallFinish: id as KitchenWallFinish, wallColor: hex }),
+          }}
         />
-        {selections.wallFinish && (
-          <div className="mt-4">
-            <StepLabel n={2}>Choose a colour</StepLabel>
-            <ToneGrid
-              tones={KITCHEN_WALL_OPTIONS.map((o) => ({ id: o.color, label: o.label, color: o.color }))}
-              value={selections.wallColor}
-              onChange={(c) => onChange({ wallColor: c })}
-            >
-              <ColourPickerSwatch label="Custom Wall Colour" value={selections.wallColor ?? null} onChange={(c) => onChange({ wallColor: c })} variant="square" />
-            </ToneGrid>
-          </div>
-        )}
       </div>
 
       {/* Appliance Integration */}

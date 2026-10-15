@@ -500,6 +500,218 @@ const M = {
   "carpet-charcoal"(ctx)   { carpet(ctx, 57, "#5E5E61"); },
 };
 
+/* ── style-first pickers: every style rendered in every tone ──────────
+ * Floor and wall tile styles × the five shared tones  → <style>--<tone>
+ * Paint finishes × their palette colours             → paint-<finish>--<tone>
+ * Keep these lists in step with FLOOR_FORMATS / WALL_FORMATS / PAINT_FINISHES in src/lib/types.ts.
+ */
+const TONE_HEX = { "warm-white": "#ECE5D8", "light-grey": "#C7C8C6", charcoal: "#3C3D40", sand: "#CDB48F", sage: "#9DAC95" };
+const isDark = (rgb) => rgb[0] * .3 + rgb[1] * .59 + rgb[2] * .11 < 110;
+const scale = (rgb, k) => rgb.map((v) => Math.max(0, Math.min(255, v * k)));
+const toHex = (rgb) => `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+const groutFor = (rgb) => isDark(rgb) ? mix(rgb, [150, 146, 140], .55) : mix(rgb, [150, 144, 134], .28);
+let seedN = 900;
+const nextSeed = () => ++seedN;
+
+// a glazed rectangle drawn into an offscreen canvas, for rotated layouts
+function glazedRect(N, w, h, rgb, seed) {
+  w = Math.round(w); h = Math.round(h);   // ImageData rows must be whole pixels
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d"), img = ctx.createImageData(w, h), d = img.data, R = mulberry(seed), j = (R() - .5) * 16;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const wv = (N.fbm(x * .03 + seed, y * .03, 3) - .5) * 14;
+    const edge = Math.min(x, y, w - 1 - x, h - 1 - y), bev = edge < 3 ? (x < 3 || y < 3 ? 22 : -26) * (1 - edge / 3) : 0;
+    const sp = Math.exp(-(((x - w * .3) ** 2) / (2 * (w * .3) ** 2) + ((y - h * .3) ** 2) / (2 * (h * .5) ** 2))) * 40;
+    const i = (y * w + x) * 4;
+    d[i] = rgb[0] + j + wv + bev + sp; d[i + 1] = rgb[1] + j + wv + bev + sp; d[i + 2] = rgb[2] + j * .9 + wv + bev + sp; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+const FLOOR_STYLE_PAINTERS = {
+  "marble-stone"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    const vein = isDark(rgb) ? [214, 211, 205] : mix(rgb, [98, 94, 90], .62);
+    tiled(ctx, { tw: 400, th: 200, gap: 2, grout: groutFor(rgb), bevel: 3, bevelK: .08, gloss: .08, noise: N },
+      marbleFace(N, rgb, vein, { scale: 1.5, strength: isDark(rgb) ? .6 : .75, tone: 5 }));
+    polish(ctx, .18); studio(ctx, .7);
+  },
+  "terrazzo"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, noise: N }, stoneFace(N, rgb, { mottle: 4, fine: 4 }));
+    const chips = isDark(rgb)
+      ? ["#9A9C9F", "#D9D6D0", "#6E7074", "#B9A58A", "#F0EDE6", "#585A5E"]
+      : [toHex(scale(rgb, .62)), toHex(scale(rgb, .8)), toHex(mix(rgb, [255, 255, 255], .5)), "#8D9196", "#D8CBB6", "#3A3B3E"];
+    chipsLayer(ctx, N, seed + 3, chips, { count: 250 });
+    groutLines(ctx, { cols: 2, rows: 2, gap: 2.5, color: toHex(groutFor(rgb)) });
+    polish(ctx, .14); studio(ctx, .8);
+  },
+  "concrete-slate"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    const hgt = (x, y) => N.fbm(x * .012, y * .03, 5) * .7 + N.ridged(x * .02, y * .05, 3) * .3;
+    tiled(ctx, { tw: 400, th: 200, gap: 3, grout: groutFor(rgb), bevel: 3, bevelK: .08, noise: N },
+      (x, y, t) => {
+        const relief = (hgt(x - 1, y - 1) - hgt(x + 1, y + 1)) * 140;
+        const v = (N.fbm(x * .005, y * .005 + t.id) - .5) * 26 + (N.n(x * .9, y * .9) - .5) * 9 + relief + (t.rnd[0] - .5) * 8;
+        return [rgb[0] + v, rgb[1] + v * .99, rgb[2] + v * .97];
+      });
+    const R = mulberry(seed + 5);
+    for (let i = 0; i < 110; i++) { const x = R() * S, y = R() * S, r = .5 + R() * 1.2; ctx.fillStyle = "rgba(40,38,36,.35)"; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+    studio(ctx, .8);
+  },
+  "large-format-plain"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 400, th: 200, gap: 2, grout: groutFor(rgb), bevel: 2, bevelK: .08, gloss: .12, noise: N },
+      stoneFace(N, rgb, { mottle: 4, fine: 3, warmth: [1, 1, 1] }));
+    polish(ctx, .16); studio(ctx, .75);
+  },
+  "timber-plank"(ctx, rgb, seed) {
+    const base = isDark(rgb) ? [96, 84, 72] : mix(rgb, [196, 156, 108], rgb[1] > rgb[0] ? .25 : .45);
+    oakFloor(ctx, seed, base, scale(base, .72));
+  },
+  "encaustic"(ctx, rgb, seed) {
+    const N = makeNoise(seed), T = 100;
+    const dark = isDark(rgb);
+    const bg = dark ? rgb : [241, 236, 226];
+    const motif = dark ? [236, 230, 218] : (rgb[0] > 220 && rgb[1] > 215 ? [176, 160, 132] : scale(rgb, .82));
+    ctx.fillStyle = toHex(bg); ctx.fillRect(0, 0, S, S);
+    ctx.fillStyle = toHex(motif);
+    for (let ty = 0; ty < S; ty += T) for (let tx = 0; tx < S; tx += T) {
+      const cx = tx + T / 2, cy = ty + T / 2;
+      for (const [qx, qy] of [[tx, ty], [tx + T, ty], [tx, ty + T], [tx + T, ty + T]]) { ctx.beginPath(); ctx.arc(qx, qy, T * .3, 0, 7); ctx.fill(); }
+      ctx.beginPath();                                                   // four-point star
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, r = k % 2 ? T * .12 : T * .34; ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+      ctx.closePath(); ctx.fill();
+      ctx.save(); ctx.fillStyle = toHex(bg); ctx.beginPath(); ctx.arc(cx, cy, T * .07, 0, 7); ctx.fill(); ctx.restore();
+    }
+    // matte cement texture over the print
+    const img = ctx.getImageData(0, 0, S, S), d = img.data;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const v = (N.fbm(x * .02, y * .02, 4) - .5) * 14 + (N.n(x * .8, y * .8) - .5) * 8, i = (y * S + x) * 4; d[i] += v; d[i + 1] += v; d[i + 2] += v; }
+    ctx.putImageData(img, 0, 0);
+    groutLines(ctx, { cols: 4, rows: 4, gap: 2, color: toHex(groutFor(bg)) });
+    studio(ctx, .8);
+  },
+  "terracotta"(ctx, rgb, seed, tone) {
+    const N = makeNoise(seed);
+    // "sand" reads as natural clay for terracotta; the others are glazed clay in that tone
+    const clay = tone === "sand" ? [196, 140, 98] : rgb;
+    tiled(ctx, { tw: 100, th: 100, gap: 3, grout: groutFor(clay), bevel: 4, bevelK: .12, irregular: 1.6, noise: N },
+      (x, y, t) => {
+        const j = (t.rnd[0] - .5) * 24, h = (t.rnd[1] - .5) * 10;
+        const m = (N.fbm(x * .02 + t.id, y * .02, 5) - .5) * 24 + (N.n(x * .7, y * .7) - .5) * 10;
+        const burn = Math.pow(1 - smooth(0, 22, Math.min(t.dT, t.dL, t.dB, t.dR)), 2) * 16;
+        return [clay[0] + j + m - burn, clay[1] + j * .7 + h + m * .8 - burn, clay[2] + j * .5 + m * .6 - burn];
+      });
+    studio(ctx, .85);
+  },
+  "small-hexagon"(ctx, rgb, seed) {
+    const R = mulberry(seed), r = 17, w = Math.sqrt(3) * r, gap = 2.6;
+    ctx.fillStyle = toHex(groutFor(rgb)); ctx.fillRect(0, 0, S, S);
+    for (let row = -1; row * r * 1.5 < S + r; row++) for (let col = -1; col * w < S + w; col++) {
+      const cx = col * w + (row % 2 ? w / 2 : 0), cy = row * r * 1.5, j = (R() - .5) * 18;
+      const c = rgb.map((v) => v + j), rr = r - gap / 2;
+      const g = ctx.createRadialGradient(cx - rr * .3, cy - rr * .35, rr * .1, cx, cy, rr * 1.05);
+      g.addColorStop(0, toHex(c.map((v) => Math.min(255, v + 16)))); g.addColorStop(.75, toHex(c)); g.addColorStop(1, toHex(c.map((v) => v - 22)));
+      ctx.fillStyle = g; ctx.beginPath();
+      for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+    }
+    polish(ctx, .1); studio(ctx, .8);
+  },
+};
+
+const WALL_STYLE_PAINTERS = {
+  "subway"(ctx, rgb, seed) { subway(ctx, seed, rgb, toHex(groutFor(rgb))); },
+  "kitkat"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 25, th: 100, gap: 2.4, grout: groutFor(rgb), bevel: 4, bevelK: .2, gloss: .22, sheen: .22, irregular: .5, noise: N },
+      glazeFace(N, rgb, { jitter: 9, wave: 7, pool: 16, spec: .08 }));
+    groutLines(ctx, { cols: 1, rows: 4, gap: 3.2, color: toHex(groutFor(rgb)) });
+    studio(ctx, .8);
+  },
+  "zellige"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 80, th: 80, gap: 2.5, grout: groutFor(rgb), bevel: 3, bevelK: .1, irregular: 2.2, gloss: .12, sheen: .18, noise: N },
+      glazeFace(N, rgb, { jitter: isDark(rgb) ? 10 : 8, wave: 9, pool: isDark(rgb) ? 16 : 24, spec: .45, hueShift: [6, 4, -4] }));
+    studio(ctx, .8);
+  },
+  "large-slab"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 267, th: 400, gap: 1.5, grout: scale(rgb, .9), bevel: 1, bevelK: .05, gloss: .05, noise: N },
+      stoneFace(N, rgb, { mottle: 5, fine: 2.5, warmth: [1, 1, 1] }));
+    polish(ctx, .22); studio(ctx, .7);
+  },
+  "terrazzo-wall"(ctx, rgb, seed) {
+    const N = makeNoise(seed);
+    tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, noise: N }, stoneFace(N, rgb, { mottle: 4, fine: 4 }));
+    const chips = isDark(rgb)
+      ? ["#9A9C9F", "#D9D6D0", "#6E7074", "#B9A58A", "#F0EDE6"]
+      : [toHex(scale(rgb, .66)), toHex(scale(rgb, .82)), toHex(mix(rgb, [255, 255, 255], .5)), "#A3A6AA", "#C9B79C"];
+    chipsLayer(ctx, N, seed + 7, chips, { count: 340, min: 1.5, max: 6.5, specks: 1100 });
+    groutLines(ctx, { cols: 3, rows: 3, gap: 2, color: toHex(groutFor(rgb)) });
+    polish(ctx, .14); studio(ctx, .8);
+  },
+  "fluted"(ctx, rgb, seed) { fluted(ctx, seed, isDark(rgb) ? scale(rgb, 1.25) : rgb); },
+  "herringbone-wall"(ctx, rgb, seed) {
+    const N = makeNoise(seed), W = 30, L = 90, gap = 2.5;
+    ctx.fillStyle = toHex(groutFor(rgb)); ctx.fillRect(0, 0, S, S);
+    ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(Math.PI / 4); ctx.translate(-S, -S);
+    let k = 1;
+    // staircase strips of horizontal + vertical tiles, each strip 2L wide (same geometry as the timber herringbone)
+    for (let s = -4; s < 8; s++) for (let n = -6; n < 40; n++) {
+      const x0 = s * 2 * L + n * W, y0 = n * W;
+      ctx.drawImage(glazedRect(N, L - gap, W - gap, rgb, seed + k++), x0 + gap / 2, y0 + gap / 2);
+      ctx.save(); ctx.translate(x0 + W, y0 + W); ctx.rotate(Math.PI / 2);
+      ctx.drawImage(glazedRect(N, L - gap, W - gap, rgb, seed + k++), gap / 2, gap / 2); ctx.restore();
+    }
+    ctx.restore(); studio(ctx, .8);
+  },
+  "geometric"(ctx, rgb, seed) {
+    const R = mulberry(seed), w = 56, h = w * .5;
+    ctx.fillStyle = toHex(groutFor(rgb)); ctx.fillRect(0, 0, S, S);
+    for (let row = -2; row * h < S + w; row++) for (let col = -1; col * w < S + w; col++) {
+      const cx = col * w + (row % 2 ? w / 2 : 0), cy = row * h, j = (R() - .5) * 16, c = rgb.map((v) => v + j), r = w / 2 - 1.3;
+      const g = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+      g.addColorStop(0, toHex(c.map((v) => v - 26))); g.addColorStop(.55, toHex(c)); g.addColorStop(1, toHex(c.map((v) => Math.min(255, v + 18))));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();   // each row overlaps the one above → scales
+      ctx.fillStyle = "rgba(255,255,255,.28)"; ctx.beginPath(); ctx.ellipse(cx - r * .3, cy + r * .45, r * .3, r * .1, -.3, 0, 7); ctx.fill();
+    }
+    studio(ctx, .8);
+  },
+};
+
+const PAINT_TONE_HEX = {
+  "natural-white": "#F1EEE6", "lexicon-quarter": "#EDEFEE", "hog-bristle": "#E0D3B8", "slate-grey": "#7E8489", "sage-green": "#A3B09A", "navy-charcoal": "#2F3A4A",
+  "slate-blue": "#6F8296", "terracotta-clay": "#C07A57", "olive": "#7F7E57", "ochre": "#C49A4E",
+  "sandstone": "#D6C19D", "clay": "#C8A486", "terracotta-blush": "#D4A08A", "olive-stone": "#A8A283", "mushroom": "#B5A898",
+  "charcoal": "#3B3C3E", "forest": "#3E4F43", "deep-teal": "#2F4B4F", "aubergine": "#4A3842", "chocolate": "#4A3B30",
+};
+const MAIN = ["natural-white", "lexicon-quarter", "hog-bristle", "slate-grey", "sage-green", "navy-charcoal"];
+const PAINT_FINISH_TONES = {
+  "crisp-neutral":        MAIN,
+  "venetian-microcement": MAIN,
+  "feature-wall":         ["sage-green", "slate-blue", "terracotta-clay", "olive", "ochre", "navy-charcoal"],
+  "soft-earth":           ["hog-bristle", "sandstone", "clay", "terracotta-blush", "olive-stone", "mushroom"],
+  "limewash":             MAIN,
+  "dark-moody":           ["navy-charcoal", "charcoal", "forest", "deep-teal", "aubergine", "chocolate"],
+  "vj-panelling":         MAIN,
+};
+const PAINT_PAINTERS = {
+  "crisp-neutral":        (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .08, cloud: 3, chalk: 0 }),
+  "venetian-microcement": (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .65, cloud: 16 }),
+  "feature-wall":         (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .06, cloud: 3, chalk: 0 }),
+  "soft-earth":           (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .02, cloud: 4, chalk: .3 }),
+  "limewash":             (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .15, cloud: 24, chalk: 1 }),
+  "dark-moody":           (ctx, hex, seed) => plaster(ctx, seed, hex, { sheen: .04, cloud: 3, chalk: .2 }),
+  "vj-panelling":         (ctx, hex, seed) => vjPanel(ctx, seed, hex),
+};
+
+for (const [style, paint] of [...Object.entries(FLOOR_STYLE_PAINTERS), ...Object.entries(WALL_STYLE_PAINTERS)])
+  for (const [tone, h] of Object.entries(TONE_HEX)) { const seed = nextSeed(); M[`${style}--${tone}`] = (ctx) => paint(ctx, hex(h), seed, tone); }
+for (const [finish, tones] of Object.entries(PAINT_FINISH_TONES))
+  for (const tone of tones) { const seed = nextSeed(); M[`paint-${finish}--${tone}`] = (ctx) => PAINT_PAINTERS[finish](ctx, PAINT_TONE_HEX[tone], seed); }
+
 window.TILE_IDS = Object.keys(M);
 window.render = (id) => {
   const c = document.createElement("canvas"); c.width = c.height = S;

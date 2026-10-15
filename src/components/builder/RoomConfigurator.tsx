@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload, ImagePlus, Sparkles, SlidersHorizontal, Layers, Droplets,
-  CheckCircle2, X, Info, Maximize2, Minimize2, ArrowLeftRight,
+  CheckCircle2, X, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
@@ -12,11 +12,11 @@ import {
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
-import TileTexture from "@/components/ui/TileTexture";
 import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth } from "@/lib/store";
 import {
-  FLOOR_TILES, WALL_TILES, VANITY_OPTIONS, TAPWARE_OPTIONS,
-  FLOOR_FORMATS, WALL_FORMATS, tonesFor, type FloorFormat, type WallFormat,
+  VANITY_OPTIONS, TAPWARE_OPTIONS,
+  FLOOR_FORMATS, WALL_FORMATS, SURFACE_TONES, PAINT_FINISHES, surfaceSwatch, paintSwatch, findPaintFinish, paintToneFor,
+  type FloorFormat, type WallFormat, type WallPaintFinish,
   LIGHTING_OPTIONS,
   COST_BREAKDOWN, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP,
   BATHROOM_SIZE_OPTIONS,
@@ -30,7 +30,7 @@ import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
 import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES } from "@/lib/stylePresets";
 import { isDesignStyle } from "@/lib/designStyles";
-import { StepLabel, FormatGrid } from "@/components/builder/SurfacePicker";
+import { StylePicker } from "@/components/builder/SurfacePicker";
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
@@ -63,15 +63,17 @@ import {
 // ══════════════════════════════════════════════════════════════════
 
 function getDesignTips(
-  floorTile: TileOption | null,
-  wallTile:  TileOption | null,
-  vanity:    VanityType | null,
-  tapware:   TapwareFinish | null,
+  floorTile:   TileOption | null,
+  wallTile:    TileOption | null,
+  vanity:      VanityType | null,
+  tapware:     TapwareFinish | null,
+  floorFormat: FloorFormat | null = null,
+  wallFormat:  WallFormat | null = null,
 ): string[] {
   const tips: string[] = [];
 
   // ── Selection-specific tips ──────────────────────────────────
-  if (floorTile?.id === "terracotta-feature")
+  if (floorFormat === "terracotta")
     tips.push("Terracotta brings a timeless warmth. Pair it with warm white walls to let the floor be the hero of the space.");
   if (tapware === "matte-black")
     tips.push("Matte black fixtures add a modern architectural edge. Ensure generous lighting — these fixtures absorb light rather than reflect it.");
@@ -79,18 +81,20 @@ function getDesignTips(
     tips.push("Plain white tapware disappears into pale tiles for a soft, seamless look. A matte finish hides water spots better than gloss.");
   if (tapware === "brushed-gold")
     tips.push("Brushed gold tapware adds understated luxury. Pair with travertine or marble to let the warmth of the metal really sing.");
-  if (floorTile?.id === "zellige-ivory" || wallTile?.id === "zellige-white")
+  if (wallFormat === "zellige")
     tips.push("Zellige tiles scatter light in ways no factory tile can replicate. A single feature wall behind the vanity is enough to transform the whole space.");
-  if (wallTile?.id === "marble-blanc")
+  if (floorFormat === "marble-stone")
     tips.push("Marble demands restraint from everything around it. Keep fixtures minimal, accessories tonal, and let the natural veining do the talking.");
-  if (floorTile?.id === "charcoal-slate")
-    tips.push("Dark slate floors are bold and grounding. Balance with lighter wall tiles and generous task lighting to keep the space open and airy.");
+  if (floorTile?.id === "charcoal")
+    tips.push("Dark floors are bold and grounding. Balance with lighter wall tiles and generous task lighting to keep the space open and airy.");
   if (vanity === "floating")
     tips.push("A floating vanity opens up the floor plane and creates a sense of more space — it also makes everyday cleaning genuinely effortless.");
-  if (wallTile?.id === "sage-subway")
-    tips.push("Sage subway tile is a rare chameleon — it pairs beautifully with both brushed gold and matte black tapware without missing a beat.");
-  if (floorTile?.id === "travertine")
-    tips.push("Travertine is porous by nature — a quality penetrating sealer applied annually keeps it looking fresh and prevents staining in wet zones.");
+  if (wallTile?.id === "sage")
+    tips.push("Sage tiles are a rare chameleon — it pairs beautifully with both brushed gold and matte black tapware without missing a beat.");
+  if (floorFormat === "marble-stone" || floorFormat === "terrazzo")
+    tips.push("Stone-look porcelain gives you the look of marble or terrazzo without the upkeep — real stone needs a penetrating sealer every year in wet zones.");
+  if (wallFormat === "kitkat")
+    tips.push("KitKat finger tiles come on mesh sheets, so they wrap curves and niches beautifully. A matching grout keeps the look calm and continuous.");
   if (vanity === "freestanding")
     tips.push("A freestanding vanity anchors the room with permanence. Maximise cabinet storage to keep the benchtop surfaces uncluttered.");
   if (tapware === "chrome")
@@ -177,266 +181,6 @@ function DesignConcierge({ tips }: { tips: string[] }) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  TILE MODAL
-// ══════════════════════════════════════════════════════════════════
-function TileModal({ tile, onClose }: { tile: TileOption; onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-3xl p-6 max-w-xs w-full shadow-warm-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Tile texture preview */}
-        <div className="w-full rounded-2xl overflow-hidden mb-4" style={{ aspectRatio: "1/1" }}>
-          <TileTexture tileId={tile.id} size={300} className="w-full h-full" style={{ width: "100%", height: "100%" }} />
-        </div>
-        <h3 className="text-base font-bold text-charcoal text-center">{tile.name}</h3>
-        <p className="text-xs text-charcoal/60 text-center mt-2 leading-relaxed">{tile.description}</p>
-        <button
-          onClick={onClose}
-          className="mt-5 w-full py-2.5 rounded-xl text-sm font-bold bg-sand-100 text-charcoal/70 hover:bg-sand-200 transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  TILE CARD
-// ══════════════════════════════════════════════════════════════════
-function TileCard({ tile, selected, onSelect, onInfo }: {
-  tile: TileOption; selected: boolean; onSelect: () => void; onInfo: () => void;
-}) {
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const startLongPress = () => {
-    longPressTimer.current = setTimeout(() => {
-      longPressTimer.current = null;
-      onInfo();
-    }, 300);
-  };
-
-  const cancelLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-
-  return (
-    // div + role="button" avoids the invalid <button> inside <button> nesting
-    // (the info icon is a <button> so the outer must not be one too)
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onSelect}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
-      onPointerDown={startLongPress}
-      onPointerUp={cancelLongPress}
-      onPointerLeave={cancelLongPress}
-      aria-label={`${tile.name} — ${tile.description}`}
-      aria-pressed={selected}
-      className={cn(
-        "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none cursor-pointer",
-        selected
-          ? "ring-2 ring-terracotta ring-offset-2 shadow-warm scale-[1.04]"
-          : "ring-1 ring-sand-200 hover:ring-terracotta/40 hover:shadow-warm-sm hover:scale-[1.02]",
-      )}
-    >
-      {/* SVG texture thumbnail */}
-      <TileTexture tileId={tile.id} size={80} className="absolute inset-0 w-full h-full" style={{ width: "100%", height: "100%" }} />
-
-      {/* Info icon — proper <button> with no outer button ancestor */}
-      <div className="absolute top-1.5 left-1.5 z-10">
-        <button
-          onClick={(e) => { e.stopPropagation(); onInfo(); }}
-          className="w-5 h-5 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center hover:bg-black/50 transition-colors"
-          title="View details"
-        >
-          <Info size={9} className="text-white" />
-        </button>
-      </div>
-
-      {/* Selected check */}
-      {selected && (
-        <div className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-terracotta flex items-center justify-center shadow-warm-sm">
-          <CheckCircle2 size={11} className="text-white" strokeWidth={3} />
-        </div>
-      )}
-
-      {/* Name label */}
-      <div className="absolute bottom-0 inset-x-0 px-1.5 py-1.5 rounded-b-2xl bg-gradient-to-t from-black/60 to-transparent">
-        <p className="text-[9px] font-bold text-center leading-tight text-white drop-shadow truncate">
-          {tile.name}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  CUSTOM HEX SWATCH  — per-surface color picker
-// ══════════════════════════════════════════════════════════════════
-function CustomHexSwatch({
-  value,
-  onChange,
-  label,
-}: {
-  value: string | null;
-  onChange: (c: string | null) => void;
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [hex,  setHex]  = useState(value ?? "#D2B48C");
-  const [popPos, setPopPos] = useState<{ top: number; left: number } | null>(null);
-  const buttonRef  = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // Position popover to the right of the swatch (with viewport-edge fallback)
-  useEffect(() => {
-    if (!open) return;
-    const POPOVER_W = 224;   // matches w-56
-    const POPOVER_H = 180;   // approx
-    const GAP       = 10;
-
-    const update = () => {
-      if (!buttonRef.current) return;
-      const rect = buttonRef.current.getBoundingClientRect();
-      const vw   = window.innerWidth;
-      const vh   = window.innerHeight;
-
-      // Default: to the right of the button, top-aligned
-      let left = rect.right + GAP;
-      let top  = rect.top;
-
-      // If it would clip the right edge, flip to the left
-      if (left + POPOVER_W > vw - 8) left = rect.left - POPOVER_W - GAP;
-      // If it would clip the bottom, push up
-      if (top + POPOVER_H > vh - 8)  top = Math.max(8, vh - POPOVER_H - 8);
-      // Never go off the top
-      if (top < 8) top = 8;
-
-      setPopPos({ top, left });
-    };
-
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [open]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (buttonRef.current?.contains(target))  return;
-      if (popoverRef.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  return (
-    <div className="relative w-full aspect-square">
-      {/* Swatch button */}
-      <button
-        ref={buttonRef}
-        onClick={() => setOpen((o) => !o)}
-        title={label}
-        className={cn(
-          "absolute inset-0 rounded-2xl overflow-hidden transition-all duration-200 outline-none",
-          value
-            ? "ring-2 ring-terracotta ring-offset-2"
-            : "ring-1 ring-dashed ring-sand-300 hover:ring-terracotta/50",
-        )}
-      >
-        {value ? (
-          <div className="absolute inset-0" style={{ background: value }} />
-        ) : (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{
-              background:
-                "conic-gradient(from 0deg, #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #007aff, #5856d6, #af52de, #ff2d55, #ff3b30)",
-            }}
-          >
-            {/* white inner ring with palette icon */}
-            <div className="absolute inset-[18%] rounded-full bg-white/95 flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
-              <Palette size={14} className="text-charcoal/70" strokeWidth={2.5} />
-            </div>
-          </div>
-        )}
-        <div className="absolute bottom-0 inset-x-0 px-1 py-1 bg-gradient-to-t from-black/60 to-transparent">
-          <p className="text-[9px] font-bold text-white text-center drop-shadow truncate">Custom</p>
-        </div>
-        {value && (
-          <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-terracotta flex items-center justify-center shadow-warm-sm">
-            <CheckCircle2 size={11} className="text-white" strokeWidth={3} />
-          </div>
-        )}
-      </button>
-
-      {/* Popover — fixed-positioned so it escapes the sidebar overflow */}
-      {open && popPos && (
-        <div
-          ref={popoverRef}
-          className="fixed z-[200] w-56 p-3.5 rounded-2xl bg-white border border-sand-200 shadow-warm-xl"
-          style={{ top: popPos.top, left: popPos.left }}
-        >
-          <p className="text-[10px] font-bold text-charcoal/50 uppercase tracking-wider mb-2.5">{label}</p>
-          <div className="flex items-center gap-2.5 mb-3">
-            <input
-              type="color"
-              value={hex}
-              onChange={(e) => { setHex(e.target.value); onChange(e.target.value); }}
-              className="w-10 h-10 rounded-xl cursor-pointer border-2 border-sand-200 bg-transparent p-0.5 flex-shrink-0"
-            />
-            <input
-              type="text"
-              value={hex}
-              maxLength={7}
-              placeholder="#D2B48C"
-              onChange={(e) => {
-                setHex(e.target.value);
-                const normalized = e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`;
-                if (/^#[0-9A-Fa-f]{6}$/.test(normalized)) { onChange(normalized); setHex(normalized); }
-              }}
-              className="flex-1 text-xs font-mono px-2.5 py-2 rounded-lg border-2 border-sand-200 focus:border-terracotta/60 focus:outline-none text-charcoal/80"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { onChange(hex); setOpen(false); }}
-              className="flex-1 text-xs font-bold py-2 rounded-xl bg-terracotta text-white hover:bg-terracotta/90 transition-colors"
-            >
-              Apply
-            </button>
-            {value && (
-              <button
-                onClick={() => { onChange(null); setHex("#D2B48C"); setOpen(false); }}
-                className="px-3 text-xs text-charcoal/45 hover:text-charcoal transition-colors"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════
 //  SMALL REUSABLE PIECES
 // ══════════════════════════════════════════════════════════════════
 
@@ -484,9 +228,9 @@ function EstimateAccuracyBadge() {
 function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
   const { budget, floorTile, wallTile, vanity, tapware, structuralChanges,
           bathroomSize, customLength, customWidth, projectBrief,
-          lightingOption, floorFormat, wallFormat, designStyle } = useBuilderStore();
+          lightingOption, floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle } = useBuilderStore();
 
-  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle });
+  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle });
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
 
@@ -825,7 +569,7 @@ function ArchitectViewport({
   historyIdx:        number;
   onNavigateHistory: (dir: "back" | "forward") => void;
 }) {
-  const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware } = useBuilderStore();
+  const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware, floorFormat, wallFormat } = useBuilderStore();
 
   const viewportRef   = useRef<HTMLDivElement>(null);
   const [isFullscreen,    setIsFullscreen]    = useState(false);
@@ -886,7 +630,7 @@ function ArchitectViewport({
     }
   }, [viewportState, roomPhotoUrl]);
 
-  const designTips = getDesignTips(floorTile, wallTile, vanity, tapware);
+  const designTips = getDesignTips(floorTile, wallTile, vanity, tapware, floorFormat, wallFormat);
 
   const toggleFullscreen = async () => {
     if (!document.fullscreenElement) {
@@ -1414,6 +1158,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     keepExisting,       setBathroomKeep,
     floorFormat,        setFloorFormat,
     wallFormat,         setWallFormat,
+    wallPaintFinish,    wallPaintColor,     setWallPaint,
     designStyle,        setDesignStyle,
     generatedImageUrl,
   } = useBuilderStore();
@@ -1457,7 +1202,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [showBriefModal,     setShowBriefModal]     = useState(false);
   const [showHygieneModal,   setShowHygieneModal]   = useState(false);
   const [activeZone,         setActiveZone]         = useState<ZoneId | null>(null);
-  const [modalTile,          setModalTile]          = useState<TileOption | null>(null);
   const [refinementNote,     setRefinementNote]     = useState("");
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
@@ -1639,6 +1383,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             tileStyle:         store.tileStyle,
             floorFormat:       store.floorFormat,
             wallFormat:        store.wallFormat,
+            wallPaintFinish:   store.wallPaintFinish,
+            wallPaintColor:    store.wallPaintColor,
             designStyle:       store.designStyle,
             lightingOption:    store.lightingOption,
             structuralChanges: store.structuralChanges,
@@ -1809,7 +1555,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const liveEstimate = (() => {
     if (roomType === "kitchen") return formatAUD(Math.round(calcKitchenCost(kitchenSelections).total / 500) * 500);
     if (roomType === "bedroom") return formatAUD(Math.round(calcBedroomCost(bedroomSelections).total / 500) * 500);
-    const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle });
+    const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle });
     if (!est) return formatAUD(0);
     return `${formatAUD(Math.round(est * 0.88 / 500) * 500)}–${formatAUD(Math.round(est * 1.12 / 500) * 500)}`;
   })();
@@ -1941,82 +1687,70 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
               <StepCard step={2}>
                 {roomType === "bathroom" && (<>
                   <StyleLibrary looks={BATHROOM_STYLES} activeId={designStyle} onSelect={handleStyle} />
-                  {/* Floor — format, then tone */}
-                  <SidebarSection icon={Layers} title="Floor">
+                  {/* Floor tiles — style first, tone second */}
+                  <SidebarSection icon={Layers} title="Floor Tiles">
                   <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
-                    <div>
-                      <StepLabel n={1}>Choose a format</StepLabel>
-                      <FormatGrid
-                        options={FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
-                        value={floorFormat}
-                        onChange={(id) => setFloorFormat(id as FloorFormat | null)}
-                      />
-                    </div>
-                    {floorFormat && (
-                      <div>
-                        <StepLabel n={2}>Choose a colour or tone</StepLabel>
-                        <div className="grid grid-cols-4 gap-2">
-                          {tonesFor(FLOOR_TILES, FLOOR_FORMATS.find((f) => f.id === floorFormat)).map((tile) => (
-                            <TileCard key={tile.id} tile={tile}
-                              selected={floorTile?.id === tile.id}
-                              onSelect={() => setFloorTile(floorTile?.id === tile.id ? null : tile)}
-                              onInfo={() => setModalTile(tile)} />
-                          ))}
-                          <CustomHexSwatch value={customFloorColor} onChange={setCustomFloorColor} label="Custom Floor Colour" />
-                        </div>
-                        {floorTile && (
-                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
-                            <span className="font-semibold text-charcoal/70">{floorTile.name}</span>
-                            {customFloorColor && <span className="text-terracotta font-semibold"> · {customFloorColor}</span>}
-                            {" — "}{floorTile.description.split(".")[0]}.
-                          </p>
-                        )}
-                        {!floorTile && customFloorColor && (
-                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
-                            Custom colour <span className="font-semibold text-terracotta">{customFloorColor}</span> will be applied.
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <StylePicker
+                      styles={FLOOR_FORMATS}
+                      value={floorFormat}
+                      tone={floorTile?.id ?? null}
+                      toneLabel={floorTile?.name ?? (customFloorColor ? `Custom ${customFloorColor}` : null)}
+                      tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      moreLabel="View More Floor Styles"
+                      drawerTitle="Floor tiles"
+                      onPick={(id, tone) => { setFloorFormat(id as FloorFormat); setFloorTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomFloorColor(null); }}
+                      onClear={() => { setFloorFormat(null); setFloorTile(null); setCustomFloorColor(null); }}
+                      custom={{
+                        label:    "Custom floor colour",
+                        value:    customFloorColor,
+                        onChange: (id, hex) => { setFloorFormat(id as FloorFormat); if (hex) setFloorTile(null); setCustomFloorColor(hex); },
+                      }}
+                    />
                   </SidebarSection>
 
-                  {/* Walls — format, then tone */}
-                  <SidebarSection icon={Layers} title="Walls">
+                  {/* Wall tiles — style first, tone second (same tones as the floor, so they coordinate) */}
+                  <SidebarSection icon={Layers} title="Wall Tiles">
                   <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
-                    <div>
-                      <StepLabel n={1}>Choose a material or pattern</StepLabel>
-                      <FormatGrid
-                        options={WALL_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
-                        value={wallFormat}
-                        onChange={(id) => setWallFormat(id as WallFormat | null)}
-                      />
-                    </div>
-                    {wallFormat && (
-                      <div>
-                        <StepLabel n={2}>Choose a colour or tone</StepLabel>
-                        <div className="grid grid-cols-4 gap-2">
-                          {tonesFor(WALL_TILES, WALL_FORMATS.find((f) => f.id === wallFormat)).map((tile) => (
-                            <TileCard key={tile.id} tile={tile}
-                              selected={wallTile?.id === tile.id}
-                              onSelect={() => setWallTile(wallTile?.id === tile.id ? null : tile)}
-                              onInfo={() => setModalTile(tile)} />
-                          ))}
-                          <CustomHexSwatch value={customWallColor} onChange={setCustomWallColor} label="Custom Walls Colour" />
-                        </div>
-                        {wallTile && (
-                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
-                            <span className="font-semibold text-charcoal/70">{wallTile.name}</span>
-                            {customWallColor && <span className="text-terracotta font-semibold"> · {customWallColor}</span>}
-                            {" — "}{wallTile.description.split(".")[0]}.
-                          </p>
-                        )}
-                        {!wallTile && customWallColor && (
-                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
-                            Custom colour <span className="font-semibold text-terracotta">{customWallColor}</span> will be applied.
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <StylePicker
+                      styles={WALL_FORMATS}
+                      value={wallFormat}
+                      tone={wallTile?.id ?? null}
+                      toneLabel={wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
+                      tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      moreLabel="View More Wall Styles"
+                      drawerTitle="Wall tiles"
+                      onPick={(id, tone) => { setWallFormat(id as WallFormat); setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomWallColor(null); }}
+                      onClear={() => { setWallFormat(null); setWallTile(null); setCustomWallColor(null); }}
+                      custom={{
+                        label:    "Custom wall tile colour",
+                        value:    customWallColor,
+                        onChange: (id, hex) => { setWallFormat(id as WallFormat); if (hex) setWallTile(null); setCustomWallColor(hex); },
+                      }}
+                    />
+                  </SidebarSection>
+
+                  {/* Wall colour — the painted areas above and around the tiles */}
+                  <SidebarSection icon={Palette} title="Wall Colour">
+                    <p className="-mt-1 text-[11px] leading-snug text-charcoal/50">For the painted walls above and around the tiles.</p>
+                    <StylePicker
+                      styles={PAINT_FINISHES}
+                      value={wallPaintFinish}
+                      tone={paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor)?.id ?? null}
+                      toneLabel={paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)}
+                      tonesFor={(id) => (findPaintFinish(id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: paintSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => paintSwatch(id, tone ?? findPaintFinish(id)?.defaultTone ?? "")}
+                      moreLabel="View More Paint & Wall Finishes"
+                      drawerTitle="Wall colour"
+                      onPick={(id, tone) => setWallPaint(id as WallPaintFinish, findPaintFinish(id)?.tones.find((t) => t.id === tone)?.color ?? null)}
+                      onClear={() => setWallPaint(null, null)}
+                      custom={{
+                        label:    "Custom paint colour",
+                        value:    wallPaintColor && !paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor) ? wallPaintColor : null,
+                        onChange: (id, hex) => setWallPaint(id as WallPaintFinish, hex),
+                      }}
+                    />
                   </SidebarSection>
 
                   {/* 5. Vanity */}
@@ -2815,7 +2549,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       )}
 
       {/* Tile detail modal */}
-      {modalTile && <TileModal tile={modalTile} onClose={() => setModalTile(null)} />}
 
     </div>
   );

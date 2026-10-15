@@ -12,6 +12,7 @@ import {
   TileStyle,
   FloorFormat,
   WallFormat,
+  WallPaintFinish,
   VanityType,
   TapwareFinish,
   LightingOption,
@@ -19,6 +20,8 @@ import {
   BUDGET_MAX,
   FLOOR_FORMATS,
   WALL_FORMATS,
+  SURFACE_TONES,
+  findPaintFinish,
 } from "./types";
 import { type ProjectBrief } from "./projectBrief";
 import { isDesignStyle, type DesignStyleId } from "./designStyles";
@@ -67,6 +70,8 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
     tileStyle:         s.tileStyle,
     floorFormat:       s.floorFormat,
     wallFormat:        s.wallFormat,
+    wallPaintFinish:   s.wallPaintFinish,
+    wallPaintColor:    s.wallPaintColor,
     designStyle:       s.designStyle,
     structuralChanges:    s.structuralChanges,
     bathroomSize:         s.bathroomSize,
@@ -118,8 +123,10 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (Array.isArray(saved.keepExisting)) useBuilderStore.setState({
       keepExisting: (saved.keepExisting as string[]).filter((k): k is BathroomKeepKey => k === "floor" || k === "walls"),
     });
-    if (saved.floorTile     !== undefined) store.setFloorTile(saved.floorTile as TileOption);
-    if (saved.wallTile      !== undefined) store.setWallTile(saved.wallTile as TileOption);
+    // Tones and styles are re-read from the current lists, so a design saved before the
+    // style-first pickers simply comes back without that surface chosen
+    if (saved.floorTile     !== undefined) store.setFloorTile(currentTone(saved.floorTile));
+    if (saved.wallTile      !== undefined) store.setWallTile(currentTone(saved.wallTile));
     if (saved.vanity        !== undefined) store.setVanity(saved.vanity as VanityType | null);
     if (saved.tapware       !== undefined) store.setTapware(saved.tapware as TapwareFinish | null);
     if (saved.budget        !== undefined) store.setBudget(saved.budget as number);
@@ -127,8 +134,10 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.customFloorColor !== undefined) store.setCustomFloorColor(saved.customFloorColor as string | null);
     if (saved.customWallColor  !== undefined) store.setCustomWallColor(saved.customWallColor as string | null);
     if (saved.tileStyle     !== undefined) store.setTileStyle(saved.tileStyle as TileStyle | null);
-    if (saved.floorFormat   !== undefined) store.setFloorFormat(saved.floorFormat as FloorFormat | null);
-    if (saved.wallFormat    !== undefined) store.setWallFormat(saved.wallFormat as WallFormat | null);
+    if (saved.floorFormat   !== undefined) store.setFloorFormat(FLOOR_FORMATS.some((f) => f.id === saved.floorFormat) ? saved.floorFormat as FloorFormat : null);
+    if (saved.wallFormat    !== undefined) store.setWallFormat(WALL_FORMATS.some((f) => f.id === saved.wallFormat) ? saved.wallFormat as WallFormat : null);
+    if (saved.wallPaintFinish !== undefined || saved.wallPaintColor !== undefined)
+      store.setWallPaint(findPaintFinish(saved.wallPaintFinish as string)?.id ?? null, (saved.wallPaintColor as string | null) ?? null);
     store.setDesignStyle(isDesignStyle(saved.designStyle) ? saved.designStyle : null);
     if (saved.structuralChanges !== undefined)
       store.setStructuralChanges(saved.structuralChanges as Partial<StructuralChanges>);
@@ -142,10 +151,30 @@ export function restoreBuilderStateFromAuth(): boolean {
   }
 }
 
-/** Ceiling options were simplified to white or a custom colour; older choices fall back to white */
+/** A saved tone, if it is still one of the current tile tones */
+function currentTone(t: unknown): TileOption | null {
+  const id = (t as { id?: unknown } | null)?.id;
+  return SURFACE_TONES.find((x) => x.id === id) ?? null;
+}
+
+/** Kitchen wall finishes that were renamed when walls became style-first */
+const OLD_WALL_FINISH: Record<string, WallPaintFinish> = { paint: "crisp-neutral", "venetian-plaster": "venetian-microcement" };
+
+/**
+ * Older saved choices that no longer exist are dropped: ceilings fall back to white,
+ * kitchen floors/walls must use a current style and tone.
+ */
 function sanitiseRoom<T extends { ceilingStyle?: unknown; designStyle?: unknown }>(sel: T): T {
   const ceiling = sel.ceilingStyle === "custom-paint" || sel.ceilingStyle === "standard-white" ? sel.ceilingStyle : null;
-  return { ...sel, ceilingStyle: ceiling, designStyle: isDesignStyle(sel.designStyle) ? sel.designStyle : null };
+  const out: Record<string, unknown> = { ...sel, ceilingStyle: ceiling, designStyle: isDesignStyle(sel.designStyle) ? sel.designStyle : null };
+  if ("floorFormat" in out) {
+    if (!FLOOR_FORMATS.some((f) => f.id === out.floorFormat)) out.floorFormat = null;
+    if (!SURFACE_TONES.some((t) => t.id === out.floorTone)) out.floorTone = null;
+  }
+  if ("wallFinish" in out && typeof out.wallFinish === "string") {
+    out.wallFinish = findPaintFinish(OLD_WALL_FINISH[out.wallFinish] ?? out.wallFinish)?.id ?? null;
+  }
+  return out as T;
 }
 
 // ── Default kitchen selections ────────────────────────────────────────────────
@@ -249,6 +278,8 @@ interface BuilderStore extends BuilderSelections {
   /** Floor Step A — changing format clears a tone that doesn't suit it */
   setFloorFormat:         (f: FloorFormat | null)          => void;
   setWallFormat:          (f: WallFormat | null)           => void;
+  /** Wall colour: a paint finish and a colour (hex), set together from the tone drawer */
+  setWallPaint:           (finish: WallPaintFinish | null, color: string | null) => void;
   setDesignStyle:         (id: DesignStyleId | null)       => void;
   setStructuralChanges:   (c: Partial<StructuralChanges>)  => void;
   /** Keep a bathroom category as it is (clears its selection, so it costs nothing) */
@@ -288,6 +319,8 @@ const defaults: BuilderSelections = {
   tileStyle:           null,
   floorFormat:         null,
   wallFormat:          null,
+  wallPaintFinish:     null,
+  wallPaintColor:      null,
   designStyle:         null,
   structuralChanges:   {
     removeBathtub:   false,
@@ -353,6 +386,8 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
       wallTile:          null,
       floorFormat:       null,
       wallFormat:        null,
+      wallPaintFinish:   null,
+      wallPaintColor:    null,
       designStyle:       null,
       customFloorColor:  null,
       customWallColor:   null,
@@ -434,6 +469,7 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
     wallTile:   f && st.wallTile && !WALL_FORMATS.find((x) => x.id === f)?.tones.includes(st.wallTile.id) ? null : st.wallTile,
     ...releaseKeep(st, "walls", f),
   })),
+  setWallPaint:           (finish, color) => set({ wallPaintFinish: finish, wallPaintColor: finish || color ? color : null }),
   setDesignStyle:         (id)    => set({ designStyle: id }),
   setStructuralChanges:   (c)     => set((s) => ({
     structuralChanges: { ...s.structuralChanges, ...c },

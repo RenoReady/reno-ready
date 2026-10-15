@@ -34,6 +34,7 @@ import {
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
+  paintLabel,
 } from "@/lib/types";
 import { DESIGN_STYLES, isDesignStyle } from "@/lib/designStyles";
 import {
@@ -102,6 +103,7 @@ export default function ConnectPage() {
     customFloorColor, customWallColor,
     tileStyle,
     floorFormat, wallFormat, designStyle,
+    wallPaintFinish, wallPaintColor,
     vanity, tapware, budget,
     structuralChanges,
     customNote,
@@ -125,6 +127,7 @@ export default function ConnectPage() {
     : null;
   const floorLabel = surfaceLabel(FLOOR_FORMATS.find((f) => f.id === floorFormat), floorTile, customFloorColor);
   const wallLabel  = surfaceLabel(WALL_FORMATS.find((f) => f.id === wallFormat),   wallTile,  customWallColor);
+  const paintRowLabel = paintLabel(wallPaintFinish, wallPaintColor);
   const roomStyle  = roomType === "kitchen" ? kitchenSelections.designStyle : roomType === "bedroom" ? bedroomSelections.designStyle : designStyle;
   const styleRow   = isDesignStyle(roomStyle) ? [{ label: "Style", value: DESIGN_STYLES[roomStyle].name }] : [];
 
@@ -140,10 +143,10 @@ export default function ConnectPage() {
     }
     // Bathroom
     return {
-      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle }),
-      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle }),
+      estimatedCost: calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle }),
+      itemisedCosts: buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle }),
     };
-  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth, lightingOption, floorFormat, wallFormat, designStyle]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorTile, wallTile, vanity, tapware, structuralChanges, bathroomSize, customLength, customWidth, lightingOption, floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle]);
 
   // Build the raw AI prompt that would be (or was) sent to Gemini
   const aiPrompt = useMemo(() => buildGeminiPrompt({
@@ -158,12 +161,13 @@ export default function ConnectPage() {
       customNote, customFloorColor, customWallColor,
       tileStyle, structuralChanges,
       floorFormat, wallFormat, designStyle,
+      wallPaintFinish, wallPaintColor,
     },
   }), [
     roomPhotoUrl, roomType, kitchenSelections, bedroomSelections,
     floorTile, wallTile, vanity, tapware,
     customNote, customFloorColor, customWallColor, tileStyle, structuralChanges,
-    floorFormat, wallFormat, designStyle,
+    floorFormat, wallFormat, designStyle, wallPaintFinish, wallPaintColor,
   ]);
 
   // ── Room-aware selection rows for "What gets sent" ───────────────────────
@@ -216,12 +220,13 @@ export default function ConnectPage() {
     return [
       { label: "Floor",      value: selectionText(floorLabel, isKept(keepExisting, "floor")), color: customFloorColor },
       { label: "Walls",      value: selectionText(wallLabel,  isKept(keepExisting, "walls")), color: customWallColor  },
+      ...(paintRowLabel ? [{ label: "Wall Colour", value: paintRowLabel, color: wallPaintColor }] : []),
       { label: "Vanity",     value: vanityLabel },
       { label: "Tapware",    value: tapwareLabel },
       ...(tileStyleLabel ? [{ label: "Tile Layout", value: tileStyleLabel }] : []),
       ...styleRow,
     ];
-  }, [roomType, kitchenSelections, bedroomSelections, floorLabel, wallLabel, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel, keepExisting, styleRow]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorLabel, wallLabel, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel, keepExisting, styleRow, paintRowLabel, wallPaintColor]);
 
   // ── Room-aware structural labels ──────────────────────────────────────────
   const structuralLabels = useMemo(() => {
@@ -281,6 +286,7 @@ export default function ConnectPage() {
     return [
       { icon: Layers,     label: "Floor",          value: selectionText(floorLabel, isKept(keepExisting, "floor")), accent: customFloorColor },
       { icon: Layers,     label: "Walls",           value: selectionText(wallLabel,  isKept(keepExisting, "walls")), accent: customWallColor  },
+      ...(paintRowLabel ? [{ icon: Layers, label: "Wall Colour", value: paintRowLabel, accent: wallPaintColor }] : []),
       { icon: Layers,     label: "Vanity",          value: vanityLabel },
       { icon: Droplets,   label: "Tapware",         value: tapwareLabel },
       { icon: DollarSign, label: "Budget Target",   value: formatAUD(budget) },
@@ -327,6 +333,7 @@ export default function ConnectPage() {
           wallTile:         wallLabel  ? { id: wallTile?.id  ?? wallFormat  ?? "custom", name: wallLabel  } : null,
           customFloorColor: customFloorColor ?? null,
           customWallColor:  customWallColor ?? null,
+          wallColour:       paintRowLabel,
           tileStyle:        tileStyle ?? null,
           vanity:           vanity  ?? "Not selected",
           tapware:          tapware ?? "Not selected",

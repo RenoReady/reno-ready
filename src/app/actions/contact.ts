@@ -29,6 +29,8 @@ export interface ConnectSubmission {
     wallTile?:         { id: string; name: string } | null;
     customFloorColor?: string | null;
     customWallColor?:  string | null;
+    /** Painted walls, e.g. "Natural White · Crisp Neutral" */
+    wallColour?:       string | null;
     tileStyle?:        string | null;
     vanity:            string;
     tapware:           string;
@@ -162,6 +164,7 @@ function renderEmailHtml(s: ConnectSubmission): string {
       <table style="width:100%;border-collapse:collapse;margin-bottom:24px;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #EFE9DD;">
         ${tilesRow("Floor Tile",  d.floorTile?.name, d.customFloorColor)}
         ${tilesRow("Wall Tile",   d.wallTile?.name,  d.customWallColor)}
+        ${d.wallColour ? tilesRow("Wall Colour", d.wallColour, null) : ""}
         <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Tile Layout</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.tileStyle ?? "—")}</td></tr>
         <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Vanity</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.vanity)}</td></tr>
         <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Tapware</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.tapware)}</td></tr>

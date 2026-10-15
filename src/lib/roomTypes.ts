@@ -10,7 +10,11 @@
  */
 
 import { isKept, type KitchenKeepKey, type BedroomKeepKey } from "./keepExisting";
-import { FLOOR_TILES, FLOOR_FORMATS, surfaceLabel, type TileOption, type FloorFormat, type SurfaceFormat } from "./types";
+import {
+  FLOOR_TILES, FLOOR_FORMATS, STONE_TIMBER_TONES, PAINT_FINISHES,
+  surfaceLabel, surfacePrompt, paintLabel, paintPrompt,
+  type TileOption, type FloorFormat, type SurfaceFormat, type WallPaintFinish, type PaintFinish,
+} from "./types";
 import { styleSection, styleCostItem, type DesignStyleId } from "./designStyles";
 
 // ── Room type ────────────────────────────────────────────────────────────────
@@ -60,7 +64,8 @@ export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome" | "whi
 export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab" | "mirrored" | "vj-panel" | "slab-match";
 export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
-export type KitchenWallFinish = "paint" | "vj-panelling" | "limewash" | "venetian-plaster";
+/** Kitchen walls use the shared wall colour finishes */
+export type KitchenWallFinish = WallPaintFinish;
 
 export interface KitchenSizeOption {
   id:       KitchenRoomSize;
@@ -94,11 +99,11 @@ export interface KitchenSelections {
   splashback:           SplashbackStyle  | null;
   /** Floor Step A — the format; Step B is floorTone (or a custom floorColor) */
   floorFormat:          FloorFormat | null;
-  floorTone:            string | null;             // tone id (FLOOR_TILES)
+  floorTone:            string | null;             // tone id (SURFACE_TONES)
   floorColor:           string | null;             // custom hex instead of a tone
-  /** Wall Step A — the material; Step B is wallColor */
+  /** Wall colour Step A — the paint finish; Step B is wallColor */
   wallFinish:           KitchenWallFinish | null;
-  wallColor:            string | null;             // wall colour
+  wallColor:            string | null;             // wall colour (hex)
   cooktop:              CooktopType | null;
   dishwasher:           DishwasherType | null;
   ceilingStyle:         CeilingStyle | null;
@@ -205,19 +210,16 @@ export const SPLASHBACK_OPTIONS: { id: SplashbackStyle; label: string; sub: stri
 
 /** Kitchen floors use the shared formats and tones, priced for a typical kitchen */
 const KITCHEN_FLOOR_COST: Record<FloorFormat, number> = {
-  "large-format": 2_800, herringbone: 4_000, "timber-look": 3_200, "polished-concrete": 3_800,
+  "marble-stone": 3_900, terrazzo: 3_600, "concrete-slate": 3_100, "large-format-plain": 2_600,
+  "timber-plank": 3_000, encaustic: 3_700, terracotta: 3_400, "small-hexagon": 3_500,
 };
 export const KITCHEN_FLOOR_FORMATS: SurfaceFormat<FloorFormat>[] =
   FLOOR_FORMATS.map((f) => ({ ...f, cost: KITCHEN_FLOOR_COST[f.id] }));
 
-export const KITCHEN_WALL_FINISHES: { id: KitchenWallFinish; label: string; sub: string; swatch: string | null; cost: number; prompt: string }[] = [
-  { id: "paint",            label: "Paint",            sub: "Low-sheen wash-and-wear",      swatch: null,            cost: 0,     prompt: "low-sheen painted walls" },
-  { id: "vj-panelling",     label: "VJ Panelling",     sub: "Tongue-and-groove, painted",   swatch: "vj-panel",      cost: 2_800, prompt: "vertical VJ (tongue-and-groove) panelling, painted" },
-  { id: "limewash",         label: "Limewash",         sub: "Soft, cloudy mineral finish",  swatch: "limewash",      cost: 1_400, prompt: "a soft, cloudy limewash finish" },
-  { id: "venetian-plaster", label: "Venetian Plaster", sub: "Polished, seamless plaster",   swatch: "plaster-chalk", cost: 3_200, prompt: "polished Venetian plaster with a soft sheen" },
-];
+/** Kitchen wall colour finishes: the shared paint finishes, priced for all the kitchen's painted walls */
+export const KITCHEN_WALL_FINISHES: PaintFinish[] = PAINT_FINISHES.map((f) => ({ ...f, cost: f.kitchenCost }));
 
-/** Paint colours offered for walls (kitchen and bedroom) */
+/** Paint colours offered for bedroom walls */
 export const KITCHEN_WALL_OPTIONS: { id: string; label: string; sub: string; color: string }[] = [
   { id: "wall-warm-white",  label: "Warm White",   sub: "Soft white with warm undertones",        color: "#F8F5F0" },
   { id: "wall-soft-grey",   label: "Soft Grey",    sub: "Cool neutral — pairs with any cabinet",  color: "#D4D8DC" },
@@ -278,7 +280,7 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
     });
   }
   if (wallFin && wallFin.cost > 0) {
-    materialItems.push({ label: `Walls — ${wallFin.label}`, amount: wallFin.cost, detail: wallFin.sub });
+    materialItems.push({ label: `Walls — ${paintLabel(wallFin.id, sel.wallColor)}`, amount: wallFin.cost, detail: wallFin.sub });
   }
   if (sel.mixer && mixerOpt) {
     materialItems.push({
@@ -418,7 +420,7 @@ export const CARPET_TONES: TileOption[] = [
   { id: "carpet-dove",     name: "Dove Grey", bgClass: "bg-smoked-concrete", description: "Cool dove grey loop pile." },
   { id: "carpet-charcoal", name: "Charcoal",  bgClass: "bg-charcoal-slate",  textLight: true, description: "Deep charcoal loop pile — hides wear well." },
 ];
-export const BEDROOM_FLOOR_TONES: TileOption[] = [...FLOOR_TILES, ...CARPET_TONES];
+export const BEDROOM_FLOOR_TONES: TileOption[] = [...STONE_TIMBER_TONES, ...CARPET_TONES];
 
 /** Flooring formats, priced per 16m² and scaled to the room */
 export const BEDROOM_FLOOR_FORMATS: SurfaceFormat<BedroomFloorFormat>[] = [
@@ -568,10 +570,7 @@ export function kitchenFloorLabel(sel: KitchenSelections): string | null {
   return surfaceLabel(KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat), FLOOR_TILES.find((t) => t.id === sel.floorTone), sel.floorColor);
 }
 export function kitchenWallLabel(sel: KitchenSelections): string | null {
-  const fin = KITCHEN_WALL_FINISHES.find((f) => f.id === sel.wallFinish);
-  const colour = KITCHEN_WALL_OPTIONS.find((o) => o.color === sel.wallColor)?.label ?? sel.wallColor;
-  const parts = [colour, fin?.label].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
+  return paintLabel(sel.wallFinish, sel.wallColor);
 }
 export function bedroomFloorLabel(sel: BedroomSelections): string | null {
   return surfaceLabel(BEDROOM_FLOOR_FORMATS.find((f) => f.id === sel.flooringFormat), BEDROOM_FLOOR_TONES.find((t) => t.id === sel.flooringTone), sel.flooringColor);
@@ -759,14 +758,12 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o)     => o.id === sel.splashback)?.label  ?? sel.splashback) : null;
   const floorFmt = KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat);
   const floorTn  = FLOOR_TILES.find((t) => t.id === sel.floorTone);
-  const floor    = floorFmt || floorTn || sel.floorColor
-    ? `${floorTn?.name ?? (sel.floorColor ? "custom-coloured" : "neutral")} ${floorFmt?.prompt ?? "floor tiles"}`
-    : null;
-  const floorColorNote = sel.floorColor ? ` in the exact colour ${sel.floorColor}` : "";
-  const wallFin  = KITCHEN_WALL_FINISHES.find((f) => f.id === sel.wallFinish);
-  const wallColorNote  = wallFin || sel.wallColor
-    ? `Kitchen walls: ${wallFin?.prompt ?? "painted walls"}${sel.wallColor ? ` in the exact colour ${sel.wallColor}` : ""} on all visible walls.`
-    : null;
+  const floor    = floorFmt
+    ? surfacePrompt(floorFmt, floorTn, sel.floorColor)
+    : floorTn || sel.floorColor ? `${floorTn?.name ?? "custom-coloured"} floor tiles` : null;
+  const floorColorNote = sel.floorColor && !floorFmt ? ` in the exact colour ${sel.floorColor}` : "";
+  const wallPaint      = paintPrompt(sel.wallFinish, sel.wallColor);
+  const wallColorNote  = wallPaint ? `Kitchen walls: ${wallPaint} on all visible painted walls.` : null;
   const cooktop  = sel.cooktop ? (sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop") : "cooktop (type not specified)";
   const dw       = sel.dishwasher ? (sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher") : "dishwasher (type not specified)";
   const ceiling  = ceilingPrompt(sel.ceilingStyle, sel.ceilingColor);

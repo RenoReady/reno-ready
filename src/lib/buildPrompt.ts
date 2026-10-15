@@ -16,6 +16,9 @@ import {
   LIGHTING_OPTIONS,
   FLOOR_FORMATS,
   WALL_FORMATS,
+  SURFACE_TONES,
+  surfacePrompt,
+  paintPrompt,
 } from "./types";
 import { styleSection } from "./designStyles";
 import {
@@ -53,6 +56,9 @@ interface PromptInput {
     /** Floor / wall Step A formats */
     floorFormat?:       string | null;
     wallFormat?:        string | null;
+    /** Wall colour for the painted areas: finish id + hex colour */
+    wallPaintFinish?:   string | null;
+    wallPaintColor?:    string | null;
     /** Overall look — guides the AI, never overrides chosen finishes */
     designStyle?:       string | null;
     lightingOption?:    LightingOption | string | null;
@@ -104,16 +110,18 @@ function buildRoomPrompt(req: PromptInput): string {
     selections.tapware === "brushed-gold" ? "brushed gold" :
     "chrome";
 
-  // Format (Step A) + tone (Step B): "Nude Travertine, laid in a classic herringbone pattern"
+  // Style + tone: "light grey terrazzo-look porcelain tiles with fine scattered stone chips"
   const floorFmt = FLOOR_FORMATS.find((f) => f.id === selections.floorFormat);
   const wallFmt  = WALL_FORMATS.find((f)  => f.id === selections.wallFormat);
   const withColour = (name: string, hex?: string | null) => hex ? `${name} in ${hex}` : name;
   const floorDesc = floorFmt
-    ? `${withColour(selections.floorTile?.name ?? (selections.customFloorColor ? "custom-coloured" : "neutral-toned"), selections.customFloorColor)} ${floorFmt.prompt}`
+    ? surfacePrompt(floorFmt, SURFACE_TONES.find((t) => t.id === selections.floorTile?.id), selections.customFloorColor)
     : withColour(floorName, selections.customFloorColor);
   const wallDesc = wallFmt
-    ? `${withColour(selections.wallTile?.name ?? (selections.customWallColor ? "custom-coloured" : "neutral-toned"), selections.customWallColor)} ${wallFmt.prompt}`
+    ? surfacePrompt(wallFmt, SURFACE_TONES.find((t) => t.id === selections.wallTile?.id), selections.customWallColor)
     : withColour(wallName, selections.customWallColor);
+  // Wall colour: the painted areas above and around the tiles
+  const paintDesc = paintPrompt(selections.wallPaintFinish, selections.wallPaintColor);
 
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
@@ -170,6 +178,7 @@ function buildRoomPrompt(req: PromptInput): string {
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
     keep("floor")   ? keepLine("Floor surface", "floor tiles")  : `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")    : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
+    ...(paintDesc ? [`Painted wall areas: any wall area that is not tiled (for example above the tile line) gets ${paintDesc}.`] : []),
     `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
     `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
     "",
@@ -201,6 +210,7 @@ function buildRoomPrompt(req: PromptInput): string {
     // ── Materials ─────────────────────────────────────────────────────────────
     keep("floor")   ? keepLine("Floor surface", "floor tiles") : `Floor surface: ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")   : `Wall surface: ${wallDesc}.`,
+    ...(paintDesc ? [`Painted wall areas: tile the wet zones and paint the remaining wall area above the tiles with ${paintDesc}.`] : []),
     `Tapware: ${tapwareFmt} finish throughout.`,
     `Vanity: ${vanityStyle}.`,
     "Style: High-end architectural photography, natural Australian daylight, clean staging.",
@@ -220,10 +230,10 @@ function buildRoomPrompt(req: PromptInput): string {
     : "";
 
   // ── Custom surface colours ────────────────────────────────────
-  const customFloorColorSection = selections.customFloorColor
+  const customFloorColorSection = selections.customFloorColor && !floorFmt
     ? `\n\nCustom floor colour: Render the floor tiles in the exact colour ${selections.customFloorColor}.`
     : "";
-  const customWallColorSection = selections.customWallColor
+  const customWallColorSection = selections.customWallColor && !wallFmt
     ? `\n\nCustom wall colour: Render the wall tiles in the exact colour ${selections.customWallColor}.`
     : "";
 

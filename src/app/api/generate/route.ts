@@ -63,6 +63,8 @@ interface GenerateRequest {
     tileStyle?:         string | null;
     floorFormat?:       string | null;
     wallFormat?:        string | null;
+    wallPaintFinish?:   string | null;
+    wallPaintColor?:    string | null;
     designStyle?:       string | null;
     keepExisting?:      string[] | null;
     lightingOption?:    string | null;

@@ -28,6 +28,7 @@ import {
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
+  paintLabel,
 } from "@/lib/types";
 import {
   calcBriefCostItems,
@@ -71,11 +72,14 @@ export default function PreviewPage() {
     tileStyle,
     floorFormat,
     wallFormat,
+    wallPaintFinish,
+    wallPaintColor,
     designStyle,
     lightingOption,
     useCustomDimensions,
   } = useBuilderStore();
-  const surfaces = { floorFormat, wallFormat, designStyle };
+  const surfaces = { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle };
+  const paintRowLabel = paintLabel(wallPaintFinish, wallPaintColor);
   const floorLabel = surfaceLabel(FLOOR_FORMATS.find((f) => f.id === floorFormat), floorTile, customFloorColor);
   const wallLabel  = surfaceLabel(WALL_FORMATS.find((f) => f.id === wallFormat),   wallTile,  customWallColor);
 
@@ -149,6 +153,8 @@ export default function PreviewPage() {
           tileStyle,
           floorFormat,
           wallFormat,
+          wallPaintFinish,
+          wallPaintColor,
           designStyle,
           structuralChanges,
           projectBrief,
@@ -261,8 +267,9 @@ export default function PreviewPage() {
                 </div>
                 <div className="absolute bottom-5 left-5 flex flex-wrap gap-2">
                   {roomType === "bathroom" && [
-                    floorTile && `Floor: ${floorTile.name}`,
-                    wallTile  && `Wall: ${wallTile.name}`,
+                    floorLabel    && `Floor: ${floorLabel}`,
+                    wallLabel     && `Wall: ${wallLabel}`,
+                    paintRowLabel && `Paint: ${paintRowLabel}`,
                   ].filter(Boolean).map((label) => (
                     <span
                       key={label as string}
@@ -478,6 +485,7 @@ export default function PreviewPage() {
                   ] : [
                     { label: "Floor",   value: selectionText(floorLabel, isKept(keepExisting, "floor")) },
                     { label: "Wall",    value: selectionText(wallLabel,  isKept(keepExisting, "walls")) },
+                    { label: "Wall Colour", value: paintRowLabel ?? "Not selected" },
                     { label: "Vanity",  value: vanity  ? vanityLabel  : "Not selected" },
                     { label: "Tapware", value: tapware ? tapwareLabel : "Not selected" },
                   ]

@@ -1,4 +1,8 @@
 frames/
 stills/
+vo/
+out/
+.venv/
+node_modules/
 *.wav
 *.mp4

@@ -1,7 +1,9 @@
-import { chromium } from "playwright-core";
+import { chromium } from "playwright";
 import fs from "fs";
 const [,, url, outDir, mode, ...rest] = process.argv;
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+// Use a preinstalled Chromium if one is configured (cloud sessions), otherwise Playwright's own
+const preinstalled = process.env.CHROME_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const browser = await chromium.launch(fs.existsSync(preinstalled) ? { executablePath: preinstalled } : {});
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
 const errs = [];
 page.on("pageerror", (e) => errs.push(e.message));

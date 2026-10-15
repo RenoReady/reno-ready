@@ -13,8 +13,8 @@ export type BedroomKeepKey  = "flooring" | "walls" | "ceiling" | "lighting" | "s
 
 /** Selection fields cleared when a category is kept */
 export const BATHROOM_KEEP_FIELDS: Record<BathroomKeepKey, string[]> = {
-  floor:   ["floorTile", "customFloorColor"],
-  walls:   ["wallTile", "customWallColor"],
+  floor:   ["floorFormat", "floorTile", "customFloorColor"],
+  walls:   ["wallFormat", "wallTile", "customWallColor"],
 };
 
 export const KITCHEN_KEEP_FIELDS: Record<KitchenKeepKey, string[]> = {
@@ -22,14 +22,14 @@ export const KITCHEN_KEEP_FIELDS: Record<KitchenKeepKey, string[]> = {
   benchtop:   ["benchtop"],
   mixer:      ["mixer"],
   splashback: ["splashback"],
-  floor:      ["floorFinish", "floorColor"],
-  walls:      ["wallColor"],
+  floor:      ["floorFormat", "floorTone", "floorColor"],
+  walls:      ["wallFinish", "wallColor"],
   appliances: ["cooktop", "dishwasher"],
-  ceiling:    ["ceilingStyle"],
+  ceiling:    ["ceilingStyle", "ceilingColor"],
 };
 
 export const BEDROOM_KEEP_FIELDS: Record<BedroomKeepKey, string[]> = {
-  flooring: ["flooring", "flooringColor"],
+  flooring: ["flooringFormat", "flooringTone", "flooringColor"],
   walls:    ["wallTreatment", "wallColor"],
   ceiling:  ["ceilingStyle", "ceilingColor"],
   lighting: ["lighting"],

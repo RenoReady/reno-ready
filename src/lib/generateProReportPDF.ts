@@ -15,14 +15,19 @@ import type { BuilderSelections } from "./types";
 import type { ProjectBrief } from "./projectBrief";
 import type { RoomType, KitchenSelections, BedroomSelections } from "./roomTypes";
 import { calcBriefCostItems, needsAsbestosCheck, calcBriefTotal } from "./projectBrief";
-import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS } from "./types";
+import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel } from "./types";
+import { DESIGN_STYLES, isDesignStyle } from "./designStyles";
 import {
   calcKitchenCost, calcBedroomCost,
   CABINETRY_OPTIONS, BENCHTOP_OPTIONS, SPLASHBACK_OPTIONS, MIXER_OPTIONS,
-  CEILING_OPTIONS, KITCHEN_SIZE_OPTIONS, BEDROOM_SIZE_OPTIONS,
-  BEDROOM_FLOORING_OPTIONS, WALL_TREATMENT_OPTIONS, BEDROOM_LIGHTING_OPTIONS,
-  STORAGE_OPTIONS, WINDOW_TREATMENT_OPTIONS,
+  KITCHEN_SIZE_OPTIONS, BEDROOM_SIZE_OPTIONS,
+  BEDROOM_LIGHTING_OPTIONS, STORAGE_OPTIONS, WINDOW_TREATMENT_OPTIONS,
+  kitchenFloorLabel, kitchenWallLabel, bedroomFloorLabel, bedroomWallLabel, ceilingLabel,
 } from "./roomTypes";
+
+/** "Style" row when the design has an overall look */
+const styleRows = (id: string | null | undefined): MatRow[] =>
+  isDesignStyle(id) ? [{ label: "Style", value: DESIGN_STYLES[id].name }] : [];
 import { formatAUD } from "./utils";
 import { isKept, selectionText, KEEP_TEXT } from "./keepExisting";
 
@@ -128,7 +133,6 @@ function buildMatRows(
     const benchtopOpt = kitchen.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchen.benchtop)   : null;
     const splashOpt   = kitchen.splashback ? SPLASHBACK_OPTIONS.find((o) => o.id === kitchen.splashback) : null;
     const mixerOpt    = kitchen.mixer      ? MIXER_OPTIONS.find((o)      => o.id === kitchen.mixer)      : null;
-    const ceilingOpt  = CEILING_OPTIONS.find((o) => o.id === kitchen.ceilingStyle);
     const sizeLabel   = kitchen.roomSize === "custom" && kitchen.customLength > 0 && kitchen.customWidth > 0
       ? `Custom — ${kitchen.customLength}m × ${kitchen.customWidth}m (${(kitchen.customLength * kitchen.customWidth).toFixed(1)}m²)`
       : sizeOpt?.label ?? "Standard";
@@ -141,7 +145,10 @@ function buildMatRows(
       { label: "Mixer & Sink",     value: selectionText(mixerOpt?.label,    isKept(kitchen.keepExisting, "mixer")) },
       { label: "Cooktop",          value: kitchen.cooktop ? (kitchen.cooktop === "induction" ? "Induction" : "Gas") : selectionText(null, isKept(kitchen.keepExisting, "appliances")) },
       { label: "Dishwasher",       value: kitchen.dishwasher ? (kitchen.dishwasher === "integrated" ? "Integrated (panel-match)" : "Freestanding") : selectionText(null, isKept(kitchen.keepExisting, "appliances")) },
-      { label: "Ceiling Treatment",value: ceilingOpt?.label  ?? (isKept(kitchen.keepExisting, "ceiling") ? KEEP_TEXT : "Standard White") },
+      { label: "Floor",            value: selectionText(kitchenFloorLabel(kitchen), isKept(kitchen.keepExisting, "floor")) },
+      { label: "Walls",            value: selectionText(kitchenWallLabel(kitchen),  isKept(kitchen.keepExisting, "walls")) },
+      { label: "Ceiling",          value: isKept(kitchen.keepExisting, "ceiling") ? KEEP_TEXT : ceilingLabel(kitchen.ceilingStyle, kitchen.ceilingColor) },
+      ...styleRows(kitchen.designStyle),
     ];
     if (kitchen.hasIsland)           rows.push({ label: "Island Bench",       value: "Included — plumbing/gas advisory applies", highlight: true });
     if (kitchen.hasApplianceRoughin) rows.push({ label: "Appliance Rough-ins",value: "New gas point or 15A circuit", highlight: true });
@@ -154,24 +161,22 @@ function buildMatRows(
 
   if (roomType === "bedroom" && bedroom) {
     const sizeOpt     = BEDROOM_SIZE_OPTIONS.find((o) => o.id === bedroom.roomSize);
-    const flooringOpt = bedroom.flooring        ? BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === bedroom.flooring)        : null;
-    const wallOpt     = bedroom.wallTreatment   ? WALL_TREATMENT_OPTIONS.find((o)    => o.id === bedroom.wallTreatment)   : null;
     const lightOpt    = bedroom.lighting        ? BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === bedroom.lighting)        : null;
     const storageOpt  = bedroom.storage         ? STORAGE_OPTIONS.find((o)           => o.id === bedroom.storage)         : null;
     const windowOpt   = bedroom.windowTreatment ? WINDOW_TREATMENT_OPTIONS.find((o)  => o.id === bedroom.windowTreatment) : null;
-    const ceilingOpt  = CEILING_OPTIONS.find((o) => o.id === bedroom.ceilingStyle);
     const sizeLabel   = bedroom.roomSize === "custom" && bedroom.customLength > 0 && bedroom.customWidth > 0
       ? `Custom — ${bedroom.customLength}m × ${bedroom.customWidth}m (${(bedroom.customLength * bedroom.customWidth).toFixed(1)}m²)`
       : sizeOpt?.label ?? "Master Bedroom";
 
     const rows: MatRow[] = [
       { label: "Room Size",         value: sizeLabel },
-      { label: "Flooring",          value: selectionText(flooringOpt?.label, isKept(bedroom.keepExisting, "flooring")) },
-      { label: "Wall Treatment",    value: selectionText(wallOpt?.label,     isKept(bedroom.keepExisting, "walls")) },
+      { label: "Flooring",          value: selectionText(bedroomFloorLabel(bedroom), isKept(bedroom.keepExisting, "flooring")) },
+      { label: "Walls",             value: selectionText(bedroomWallLabel(bedroom),  isKept(bedroom.keepExisting, "walls")) },
       { label: "Lighting",          value: selectionText(lightOpt?.label,    isKept(bedroom.keepExisting, "lighting")) },
       { label: "Storage / Joinery", value: selectionText(storageOpt?.label,  isKept(bedroom.keepExisting, "storage")) },
       { label: "Window Treatment",  value: selectionText(windowOpt?.label,   isKept(bedroom.keepExisting, "windows")) },
-      { label: "Ceiling Treatment", value: ceilingOpt?.label  ?? (isKept(bedroom.keepExisting, "ceiling") ? KEEP_TEXT : "Standard White") },
+      { label: "Ceiling",           value: isKept(bedroom.keepExisting, "ceiling") ? KEEP_TEXT : ceilingLabel(bedroom.ceilingStyle, bedroom.ceilingColor) },
+      ...styleRows(bedroom.designStyle),
     ];
     if (bedroom.hasVJWall)         rows.push({ label: "VJ Feature Wall",    value: "Floor-to-ceiling tongue-and-groove boards" });
     if (bedroom.hasMediaJoinery)   rows.push({ label: "Media Joinery",      value: "Built-in TV unit with integrated shelving" });
@@ -184,12 +189,13 @@ function buildMatRows(
   const vanityLabel  = sel.vanity  ? (VANITY_OPTIONS.find((v)  => v.id === sel.vanity)?.label  ?? sel.vanity)  : "Not selected";
   const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : "Not selected";
   const rows: MatRow[] = [
-    { label: "Floor Tile",    value: selectionText(sel.floorTile?.name, isKept(sel.keepExisting, "floor")) },
-    { label: "Wall Tile",     value: selectionText(sel.wallTile?.name,  isKept(sel.keepExisting, "walls")) },
+    { label: "Floor",         value: selectionText(surfaceLabel(FLOOR_FORMATS.find((f) => f.id === sel.floorFormat), sel.floorTile, sel.customFloorColor), isKept(sel.keepExisting, "floor")) },
+    { label: "Walls",         value: selectionText(surfaceLabel(WALL_FORMATS.find((f) => f.id === sel.wallFormat),   sel.wallTile,  sel.customWallColor),  isKept(sel.keepExisting, "walls")) },
     { label: "Vanity Type",   value: vanityLabel },
     { label: "Tapware Finish",value: tapwareLabel },
+    ...styleRows(sel.designStyle),
   ];
-  if (sel.tileStyle)                                         rows.push({ label: "Tile Pattern",     value: sel.tileStyle });
+  if (sel.tileStyle && !sel.floorFormat && !sel.wallFormat)  rows.push({ label: "Tile Pattern",     value: sel.tileStyle });
   if (sel.lightingOption && sel.lightingOption !== "standard") rows.push({ label: "Lighting Upgrade", value: sel.lightingOption });
   if (sel.customNote?.trim())                                rows.push({ label: "Client Request",   value: sel.customNote.trim() });
   const sc = sel.structuralChanges;
@@ -217,7 +223,8 @@ function buildCostItems(
     return calcBedroomCost(bedroom).items;
   }
   // Bathroom
-  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity, sel.tapware, sel.structuralChanges, 0, sel.bathroomSize, sel.customLength, sel.customWidth, sel.lightingOption);
+  return buildItemisedCosts(sel.floorTile, sel.wallTile, sel.vanity, sel.tapware, sel.structuralChanges, 0, sel.bathroomSize, sel.customLength, sel.customWidth, sel.lightingOption,
+    { floorFormat: sel.floorFormat, wallFormat: sel.wallFormat, designStyle: sel.designStyle });
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

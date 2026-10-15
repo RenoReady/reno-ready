@@ -23,6 +23,9 @@ import { isKept, selectionText } from "@/lib/keepExisting";
 import {
   VANITY_OPTIONS,
   TAPWARE_OPTIONS,
+  FLOOR_FORMATS,
+  WALL_FORMATS,
+  surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
 } from "@/lib/types";
@@ -34,6 +37,9 @@ import {
 import {
   calcKitchenCost,
   calcBedroomCost,
+  kitchenFloorLabel,
+  bedroomFloorLabel,
+  bedroomWallLabel,
 } from "@/lib/roomTypes";
 import { cn, formatAUD } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
@@ -63,9 +69,15 @@ export default function PreviewPage() {
     customFloorColor,
     customWallColor,
     tileStyle,
+    floorFormat,
+    wallFormat,
+    designStyle,
     lightingOption,
     useCustomDimensions,
   } = useBuilderStore();
+  const surfaces = { floorFormat, wallFormat, designStyle };
+  const floorLabel = surfaceLabel(FLOOR_FORMATS.find((f) => f.id === floorFormat), floorTile, customFloorColor);
+  const wallLabel  = surfaceLabel(WALL_FORMATS.find((f) => f.id === wallFormat),   wallTile,  customWallColor);
 
   const hasImage = !!generatedImageUrl;
 
@@ -83,8 +95,8 @@ export default function PreviewPage() {
     baseItemisedCosts = result.items;
   } else {
     // Bathroom
-    estimatedCost     = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
-    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
+    estimatedCost     = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, surfaces);
+    baseItemisedCosts = buildItemisedCosts(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, surfaces);
   }
 
   const low  = Math.round(estimatedCost * 0.88 / 500) * 500;
@@ -135,6 +147,9 @@ export default function PreviewPage() {
           customFloorColor,
           customWallColor,
           tileStyle,
+          floorFormat,
+          wallFormat,
+          designStyle,
           structuralChanges,
           projectBrief,
           lightingOption,
@@ -261,9 +276,9 @@ export default function PreviewPage() {
                       Cabinetry: {kitchenSelections.cabinetry}
                     </span>
                   )}
-                  {roomType === "bedroom" && bedroomSelections.flooring && (
+                  {roomType === "bedroom" && bedroomFloorLabel(bedroomSelections) && (
                     <span className="bg-charcoal/70 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-xs font-semibold">
-                      Flooring: {bedroomSelections.flooring}
+                      Flooring: {bedroomFloorLabel(bedroomSelections)}
                     </span>
                   )}
                 </div>
@@ -454,15 +469,15 @@ export default function PreviewPage() {
                     { label: "Cabinetry",  value: selectionText(kitchenSelections.cabinetry,  isKept(kitchenSelections.keepExisting, "cabinetry")) },
                     { label: "Benchtop",   value: selectionText(kitchenSelections.benchtop,   isKept(kitchenSelections.keepExisting, "benchtop")) },
                     { label: "Splashback", value: selectionText(kitchenSelections.splashback, isKept(kitchenSelections.keepExisting, "splashback")) },
-                    { label: "Cooktop",    value: selectionText(kitchenSelections.cooktop,    isKept(kitchenSelections.keepExisting, "appliances")) },
+                    { label: "Floor",      value: selectionText(kitchenFloorLabel(kitchenSelections), isKept(kitchenSelections.keepExisting, "floor")) },
                   ] : roomType === "bedroom" ? [
-                    { label: "Flooring",  value: selectionText(bedroomSelections.flooring,      isKept(bedroomSelections.keepExisting, "flooring")) },
-                    { label: "Wall",      value: selectionText(bedroomSelections.wallTreatment, isKept(bedroomSelections.keepExisting, "walls")) },
+                    { label: "Flooring",  value: selectionText(bedroomFloorLabel(bedroomSelections), isKept(bedroomSelections.keepExisting, "flooring")) },
+                    { label: "Wall",      value: selectionText(bedroomWallLabel(bedroomSelections),  isKept(bedroomSelections.keepExisting, "walls")) },
                     { label: "Lighting",  value: selectionText(bedroomSelections.lighting,      isKept(bedroomSelections.keepExisting, "lighting")) },
                     { label: "Storage",   value: selectionText(bedroomSelections.storage,       isKept(bedroomSelections.keepExisting, "storage")) },
                   ] : [
-                    { label: "Floor",   value: selectionText(floorTile?.name, isKept(keepExisting, "floor")) },
-                    { label: "Wall",    value: selectionText(wallTile?.name,  isKept(keepExisting, "walls")) },
+                    { label: "Floor",   value: selectionText(floorLabel, isKept(keepExisting, "floor")) },
+                    { label: "Wall",    value: selectionText(wallLabel,  isKept(keepExisting, "walls")) },
                     { label: "Vanity",  value: vanity  ? vanityLabel  : "Not selected" },
                     { label: "Tapware", value: tapware ? tapwareLabel : "Not selected" },
                   ]

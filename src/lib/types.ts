@@ -1,3 +1,5 @@
+import { stylePremium, styleCostItem, type DesignStyleId } from "./designStyles";
+
 // ── Tile ──────────────────────────────────────────────────────────
 
 export interface TileOption {
@@ -6,6 +8,8 @@ export interface TileOption {
   bgClass:     string;       // Tailwind backgroundImage utility class
   description: string;       // Shown in the info tooltip
   textLight?:  boolean;      // Use white text on dark tiles
+  /** Small premium for this tone on top of its format's cost (AUD, medium bathroom) */
+  adj?:        number;
 }
 
 export type VanityType    = "floating" | "freestanding";
@@ -151,122 +155,120 @@ export interface BuilderSelections {
   customNote:           string;             // free-text design note → Gemini prompt
   customFloorColor:     string | null;      // hex colour for floor (custom picker)
   customWallColor:      string | null;      // hex colour for wall (custom picker)
-  tileStyle:            TileStyle | null;   // tile layout choice
+  tileStyle:            TileStyle | null;   // legacy tile layout (superseded by the surface formats)
+  /** Step A of the floor: the physical format; floorTile is Step B, the tone */
+  floorFormat:          FloorFormat | null;
+  /** Step A of the walls: the material/pattern; wallTile is Step B, the tone */
+  wallFormat:           WallFormat | null;
+  /** Overall look for the AI — never selects finishes */
+  designStyle:          import("./designStyles").DesignStyleId | null;
   structuralChanges:    StructuralChanges;
   generatedImageUrl:    string | null;      // returned by /api/generate
   generateDescription:  string | null;      // text description from AI
 }
 
-// ── Floor tiles (8 options) ───────────────────────────────────────
+// ── Surfaces: Step A format, Step B tone ─────────────────────────
 
-export const FLOOR_TILES: TileOption[] = [
-  {
-    id:          "travertine",
-    name:        "Nude Travertine",
-    bgClass:     "bg-travertine",
-    description: "Soft-hued natural limestone with warm ivory tones. Sealed finish for wet areas. Timeless and low-maintenance.",
-  },
-  {
-    id:          "desert-stone",
-    name:        "Desert Stone",
-    bgClass:     "bg-desert-stone",
-    description: "Australian sandstone-inspired porcelain. Earthy ochre warmth with subtle natural variation across each tile.",
-  },
-  {
-    id:          "charcoal-slate",
-    name:        "Charcoal Slate",
-    bgClass:     "bg-charcoal-slate",
-    description: "Dense metamorphic stone in deep charcoal. Naturally textured and non-slip — ideal for wet areas.",
-    textLight:   true,
-  },
-  {
-    id:          "zellige-ivory",
-    name:        "Zellige Ivory",
-    bgClass:     "bg-zellige-ivory",
-    description: "Hand-crafted Moroccan clay tiles with organic imperfections and a glazed ivory finish. Every tile is unique.",
-  },
-  {
-    id:          "terrazzo-blanc",
-    name:        "Terrazzo Blanc",
-    bgClass:     "bg-terrazzo-blanc",
-    description: "Contemporary white terrazzo with scattered grey and warm-tone chips. Polished finish for a premium spa feel.",
-  },
-  {
-    id:          "honed-limestone",
-    name:        "Honed Limestone",
-    bgClass:     "bg-honed-limestone",
-    description: "Matte-honed natural limestone in a soft cream. Slip-resistant texture and beautifully tactile underfoot.",
-  },
-  {
-    id:          "natural-oak",
-    name:        "Natural Oak Look",
-    bgClass:     "bg-natural-oak",
-    description: "Timber-look porcelain in warm oak tones. 100% waterproof — all the warmth of wood, none of the maintenance.",
-  },
-  {
-    id:          "matte-slate-lg",
-    name:        "Matte Slate",
-    bgClass:     "bg-matte-slate-lg",
-    description: "Large-format matte slate in a cool blue-grey. Clean, contemporary and hides water marks effortlessly.",
-    textLight:   true,
-  },
+export type FloorFormat = "large-format" | "herringbone" | "timber-look" | "polished-concrete";
+export type WallFormat  = "subway" | "fluted" | "zellige" | "venetian-plaster" | "stone-slab";
+
+export interface SurfaceFormat<T extends string = string> {
+  id:     T;
+  label:  string;
+  sub:    string;
+  /** Swatch image in /public/tiles */
+  swatch: string;
+  /** Supply + lay for a medium bathroom (scaled by size) */
+  cost:   number;
+  /** How the AI should lay or apply it */
+  prompt: string;
+  /** Tone ids that suit this format */
+  tones:  string[];
+}
+
+export const FLOOR_FORMATS: SurfaceFormat<FloorFormat>[] = [
+  { id: "large-format",      label: "Large Format Tile",  sub: "600×1200mm, minimal grout", swatch: "large-format",  cost: 2_000,
+    prompt: "large-format 600×1200mm tiles with minimal grout lines",
+    tones: ["travertine", "honed-limestone", "desert-stone", "terrazzo-blanc", "matte-slate-lg", "charcoal-slate"] },
+  { id: "herringbone",       label: "Herringbone",        sub: "Classic angled pattern",    swatch: "herringbone",   cost: 2_600,
+    prompt: "laid in a classic herringbone pattern",
+    tones: ["natural-oak", "blonde-oak", "smoked-oak", "travertine", "honed-limestone", "charcoal-slate"] },
+  { id: "timber-look",       label: "Timber-Look Planks", sub: "Waterproof porcelain",      swatch: "natural-oak",   cost: 2_000,
+    prompt: "timber-look porcelain planks laid lengthways",
+    tones: ["natural-oak", "blonde-oak", "smoked-oak"] },
+  { id: "polished-concrete", label: "Polished Concrete",  sub: "Seamless, sealed finish",   swatch: "concrete-pale", cost: 2_400,
+    prompt: "seamless polished concrete with a sealed satin finish",
+    tones: ["concrete-pale", "smoked-concrete", "concrete-charcoal"] },
 ];
 
-// ── Wall tiles (8 options) ────────────────────────────────────────
+export const WALL_FORMATS: SurfaceFormat<WallFormat>[] = [
+  { id: "subway",           label: "Subway Tile",       sub: "Glazed, brick bond",          swatch: "white-subway",  cost: 1_600,
+    prompt: "glazed subway tiles laid in a brick bond",
+    tones: ["white-subway", "sage-subway", "charcoal-subway"] },
+  { id: "fluted",           label: "Vertical Fluted",   sub: "Ribbed ceramic panels",       swatch: "fluted-white",  cost: 2_200,
+    prompt: "vertical fluted (ribbed) ceramic tiles",
+    tones: ["fluted-white", "fluted-sage", "fluted-sand"] },
+  { id: "zellige",          label: "Zellige",           sub: "Handmade, glossy glaze",      swatch: "zellige-white", cost: 2_600,
+    prompt: "handmade zellige tiles with an irregular, glossy glaze",
+    tones: ["zellige-white", "zellige-ivory", "zellige-sage", "terracotta-feature"] },
+  { id: "venetian-plaster", label: "Venetian Plaster",  sub: "Seamless, waterproof finish", swatch: "plaster-chalk", cost: 2_000,
+    prompt: "seamless waterproof Venetian plaster (tadelakt-style) with a soft burnished sheen",
+    tones: ["plaster-chalk", "plaster-sand", "plaster-sage", "plaster-charcoal"] },
+  { id: "stone-slab",       label: "Large Format Stone", sub: "Marble & stone-look slabs",  swatch: "marble-blanc",  cost: 2_400,
+    prompt: "large-format stone-look slab tiles with minimal grout lines",
+    tones: ["marble-blanc", "travertine", "coastal-terrazzo", "smoked-concrete"] },
+];
+
+/** Tones that suit a format, in the format's order */
+export function tonesFor<T extends string>(all: TileOption[], format: SurfaceFormat<T> | null | undefined): TileOption[] {
+  if (!format) return [];
+  return format.tones.map((id) => all.find((t) => t.id === id)).filter((t): t is TileOption => !!t);
+}
+
+/** "Sage · Subway Tile" — for summaries and briefs */
+export function surfaceLabel(format: SurfaceFormat | null | undefined, tone: { name: string } | null | undefined, custom?: string | null): string | null {
+  const parts = [tone?.name ?? (custom ? `Custom ${custom}` : null), format?.label].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+// ── Floor tones ───────────────────────────────────────────────────
+
+export const FLOOR_TILES: TileOption[] = [
+  { id: "travertine",        name: "Nude Travertine",    bgClass: "bg-travertine",     adj: 300, description: "Soft ivory natural limestone with gentle banding. Sealed for wet areas." },
+  { id: "honed-limestone",   name: "Honed Limestone",    bgClass: "bg-honed-limestone", adj: 200, description: "Matte cream limestone — slip-resistant and beautifully tactile underfoot." },
+  { id: "desert-stone",      name: "Desert Stone",       bgClass: "bg-desert-stone",                description: "Warm ochre sandstone-look porcelain with natural variation." },
+  { id: "terrazzo-blanc",    name: "Terrazzo Blanc",     bgClass: "bg-terrazzo-blanc", adj: 500, description: "White terrazzo with grey and warm chips. Polished for a spa feel." },
+  { id: "matte-slate-lg",    name: "Blue-Grey Slate",    bgClass: "bg-matte-slate-lg",  textLight: true, description: "Cool blue-grey matte slate look. Hides water marks effortlessly." },
+  { id: "charcoal-slate",    name: "Charcoal Slate",     bgClass: "bg-charcoal-slate", adj: 200, textLight: true, description: "Deep charcoal natural slate with a textured, non-slip face." },
+  { id: "natural-oak",       name: "Natural Oak",        bgClass: "bg-natural-oak",                 description: "Warm mid-tone oak look. All the warmth of timber, fully waterproof." },
+  { id: "blonde-oak",        name: "Blonde Oak",         bgClass: "bg-natural-oak",                 description: "Pale Scandinavian oak look — light, airy and calm." },
+  { id: "smoked-oak",        name: "Smoked Oak",         bgClass: "bg-natural-oak",    adj: 200, textLight: true, description: "Deep smoked oak look — rich and grounding." },
+  { id: "concrete-pale",     name: "Pale Concrete",      bgClass: "bg-smoked-concrete",             description: "Soft pale-grey concrete with a subtle cloudy finish." },
+  { id: "smoked-concrete",   name: "Warm Grey Concrete", bgClass: "bg-smoked-concrete", textLight: true, description: "Mid warm-grey concrete with natural pinholes." },
+  { id: "concrete-charcoal", name: "Charcoal Concrete",  bgClass: "bg-charcoal-slate",  textLight: true, description: "Dark charcoal concrete — moody and modern." },
+];
+
+// ── Wall tones ────────────────────────────────────────────────────
 
 export const WALL_TILES: TileOption[] = [
-  {
-    id:          "marble-blanc",
-    name:        "Marble Blanc",
-    bgClass:     "bg-marble-blanc",
-    description: "Classic white Carrara marble with subtle grey veining. Cool, luxurious, and enduringly elegant.",
-  },
-  {
-    id:          "sage-subway",
-    name:        "Sage Subway",
-    bgClass:     "bg-sage-subway",
-    description: "Glazed ceramic subway tiles in a soft muted sage. Easy to clean, highly durable, and enduringly stylish.",
-    textLight:   true,
-  },
-  {
-    id:          "terracotta-feature",
-    name:        "Terracotta Feature",
-    bgClass:     "bg-terracotta-feature",
-    description: "Earthy red-clay tiles inspired by Mediterranean craftsmanship. Use as a feature wall for bold warmth.",
-    textLight:   true,
-  },
-  {
-    id:          "zellige-white",
-    name:        "Zellige White",
-    bgClass:     "bg-zellige-white",
-    description: "White-glazed handmade Moroccan zellige. Irregular facets catch and scatter light beautifully throughout the day.",
-  },
-  {
-    id:          "zellige-sage",
-    name:        "Zellige Sage",
-    bgClass:     "bg-zellige-sage",
-    description: "Handmade sage-green zellige with irregular glaze depth. A trending Australian choice pairing warmth with nature.",
-    textLight:   true,
-  },
-  {
-    id:          "fluted-white",
-    name:        "Fluted White",
-    bgClass:     "bg-fluted-white",
-    description: "Ribbed white ceramic with vertical fluting. Adds architectural texture and dimension to any wet area wall.",
-  },
-  {
-    id:          "coastal-terrazzo",
-    name:        "Coastal Terrazzo",
-    bgClass:     "bg-coastal-terrazzo",
-    description: "Warm sand-toned terrazzo wall tile. Brings a laid-back coastal luxe feel — pairs beautifully with brushed gold.",
-  },
-  {
-    id:          "smoked-concrete",
-    name:        "Smoked Concrete",
-    bgClass:     "bg-smoked-concrete",
-    description: "Large-format matte concrete-look wall tile in warm grey. Industrial edge with a boutique hotel finish.",
-    textLight:   true,
-  },
+  { id: "white-subway",       name: "White",            bgClass: "bg-marble-blanc",                       description: "Bright white gloss — timeless and easy to clean." },
+  { id: "sage-subway",        name: "Sage",             bgClass: "bg-sage-subway",       textLight: true, description: "Soft muted sage gloss." },
+  { id: "charcoal-subway",    name: "Charcoal",         bgClass: "bg-smoked-concrete",   textLight: true, description: "Deep charcoal gloss with a light grout." },
+  { id: "fluted-white",       name: "White",            bgClass: "bg-fluted-white",                       description: "Crisp white ribbed panels that catch the light." },
+  { id: "fluted-sage",        name: "Sage",             bgClass: "bg-sage-subway",       textLight: true, description: "Soft sage ribbed panels." },
+  { id: "fluted-sand",        name: "Sand",             bgClass: "bg-coastal-terrazzo",                   description: "Warm sand ribbed panels." },
+  { id: "zellige-white",      name: "White",            bgClass: "bg-zellige-white",                      description: "White handmade zellige that scatters light beautifully." },
+  { id: "zellige-ivory",      name: "Ivory",            bgClass: "bg-zellige-ivory",                      description: "Warm ivory handmade zellige." },
+  { id: "zellige-sage",       name: "Sage",             bgClass: "bg-zellige-sage",      textLight: true, description: "Sage-green handmade zellige with deep glaze variation." },
+  { id: "terracotta-feature", name: "Terracotta",       bgClass: "bg-terracotta-feature", textLight: true, description: "Earthy red-clay — a warm Mediterranean feature." },
+  { id: "plaster-chalk",      name: "Chalk White",      bgClass: "bg-marble-blanc",                       description: "Soft chalk-white plaster with a gentle sheen." },
+  { id: "plaster-sand",       name: "Warm Sand",        bgClass: "bg-coastal-terrazzo",                   description: "Warm sandy plaster — calm and organic." },
+  { id: "plaster-sage",       name: "Soft Sage",        bgClass: "bg-sage-subway",       textLight: true, description: "Muted sage plaster." },
+  { id: "plaster-charcoal",   name: "Charcoal",         bgClass: "bg-smoked-concrete",   textLight: true, description: "Deep charcoal plaster with a burnished finish." },
+  { id: "marble-blanc",       name: "Marble Blanc",     bgClass: "bg-marble-blanc",      adj: 600,        description: "White Carrara-look marble with soft grey veining." },
+  { id: "travertine",         name: "Nude Travertine",  bgClass: "bg-travertine",        adj: 300,        description: "Soft ivory travertine-look stone." },
+  { id: "coastal-terrazzo",   name: "Coastal Terrazzo", bgClass: "bg-coastal-terrazzo",  adj: 300,        description: "Warm sand terrazzo with soft chips." },
+  { id: "smoked-concrete",    name: "Smoked Concrete",  bgClass: "bg-smoked-concrete",   textLight: true, description: "Warm grey concrete-look stone." },
 ];
 
 export const VANITY_OPTIONS: {
@@ -466,6 +468,25 @@ export const BATHROOM_SIZE_TILE_SCALE: Record<string, number> = {
 
 // ── Cost engine ───────────────────────────────────────────────────
 
+/** Formats and style that refine the bathroom estimate */
+export interface BathroomSurfaces {
+  floorFormat?: FloorFormat | null;
+  wallFormat?:  WallFormat  | null;
+  designStyle?: DesignStyleId | string | null;
+}
+
+/** Floor supply + lay before size scaling: the format's cost plus the tone's small premium */
+function floorCost(tone: TileOption | null, format: FloorFormat | null | undefined): number {
+  const f = FLOOR_FORMATS.find((x) => x.id === format);
+  if (f) return f.cost + (tone?.adj ?? 0);
+  return tone ? (FLOOR_TILE_COSTS[tone.id] ?? 1_800) : 0;   // tone only (designs made before formats)
+}
+function wallCost(tone: TileOption | null, format: WallFormat | null | undefined): number {
+  const f = WALL_FORMATS.find((x) => x.id === format);
+  if (f) return f.cost + (tone?.adj ?? 0);
+  return tone ? (WALL_TILE_COSTS[tone.id] ?? 1_600) : 0;
+}
+
 /** Fixed 2026 Australian bathroom renovation base price (kept for display contexts) */
 export const BASE_RENOVATION_COST = 12_000;
 
@@ -491,6 +512,7 @@ export function calcEstimatedCost(
   customLength:      number = 0,
   customWidth:       number = 0,
   lightingOption:    LightingOption | null = null,
+  surfaces:          BathroomSurfaces = {},
 ): number {
   const round = (n: number) => Math.round(n);
 
@@ -504,8 +526,9 @@ export function calcEstimatedCost(
 
   // 2. Materials
   let materials = 0;
-  if (floorTile)  materials += round((FLOOR_TILE_COSTS[floorTile.id] ?? 1_800) * scale);
-  if (wallTile)   materials += round((WALL_TILE_COSTS[wallTile.id]   ?? 1_600) * scale);
+  const floor = floorCost(floorTile, surfaces.floorFormat), wall = wallCost(wallTile, surfaces.wallFormat);
+  if (floor) materials += round(floor * scale);
+  if (wall)  materials += round(wall  * scale);
   if (vanity)     materials += BATHROOM_VANITY_COSTS[vanity]  ?? 2_200;
   if (tapware)    materials += BATHROOM_TAPWARE_COSTS[tapware] ?? 850;
   if (lightingOption && lightingOption !== "none") materials += BATHROOM_LIGHTING_COSTS[lightingOption] ?? 650;
@@ -520,14 +543,17 @@ export function calcEstimatedCost(
   structural += NICHE_COST[structuralChanges.showerNiche];
   structural += SHOWER_FIXTURES_COST[structuralChanges.showerFixtures];
 
-  // 4. Early exit when nothing selected
-  if (materials === 0 && structural === 0) return 0;
+  // 4. Style premium (only the luxury tier has one)
+  const premium = stylePremium(surfaces.designStyle);
 
-  // 5. Labour
+  // 5. Early exit when nothing selected
+  if (materials === 0 && structural === 0 && premium === 0) return 0;
+
+  // 6. Labour
   const labour = materials > 0 ? round(materials * 0.40) : 0;
 
-  // 6. Round to $500
-  return Math.round((materials + structural + labour) / 500) * 500;
+  // 7. Round to $500
+  return Math.round((materials + structural + labour + premium) / 500) * 500;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -551,6 +577,7 @@ export function buildItemisedCosts(
   customLength:      number = 0,
   customWidth:       number = 0,
   lightingOption:    LightingOption | null = null,
+  surfaces:          BathroomSurfaces = {},
 ): CostLineItem[] {
   const round = (n: number) => Math.round(n);
 
@@ -564,14 +591,11 @@ export function buildItemisedCosts(
 
   // 2. Material line items
   const materialItems: CostLineItem[] = [];
-  if (floorTile) {
-    const cost = round((FLOOR_TILE_COSTS[floorTile.id] ?? 1_800) * scale);
-    materialItems.push({ label: `Floor Tiles — ${floorTile.name}`, amount: cost, detail: floorTile.description });
-  }
-  if (wallTile) {
-    const cost = round((WALL_TILE_COSTS[wallTile.id] ?? 1_600) * scale);
-    materialItems.push({ label: `Wall Tiles — ${wallTile.name}`, amount: cost, detail: wallTile.description });
-  }
+  const floorFmt = FLOOR_FORMATS.find((f) => f.id === surfaces.floorFormat);
+  const wallFmt  = WALL_FORMATS.find((f)  => f.id === surfaces.wallFormat);
+  const floor = floorCost(floorTile, surfaces.floorFormat), wall = wallCost(wallTile, surfaces.wallFormat);
+  if (floor) materialItems.push({ label: `Floor — ${surfaceLabel(floorFmt, floorTile) ?? "Tiles"}`, amount: round(floor * scale), detail: floorTile?.description ?? floorFmt?.sub });
+  if (wall)  materialItems.push({ label: `Walls — ${surfaceLabel(wallFmt, wallTile) ?? "Tiles"}`,  amount: round(wall * scale),  detail: wallTile?.description ?? wallFmt?.sub });
   if (vanity) {
     materialItems.push({
       label:  vanity === "floating" ? "Floating Vanity" : "Freestanding Vanity",
@@ -618,6 +642,9 @@ export function buildItemisedCosts(
     items.push({ label: "Double shower niche",        amount: NICHE_COST.double });
   if (structuralChanges.showerFixtures === "dual")
     items.push({ label: "Dual shower heads", amount: SHOWER_FIXTURES_COST.dual, detail: "Rain + handheld with plumbing split" });
+
+  const styleItem = styleCostItem(surfaces.designStyle);
+  if (styleItem) items.push(styleItem);
 
   return items;
 }

@@ -14,7 +14,10 @@ import {
   TapwareFinish,
   LightingOption,
   LIGHTING_OPTIONS,
+  FLOOR_FORMATS,
+  WALL_FORMATS,
 } from "./types";
+import { styleSection } from "./designStyles";
 import {
   type ProjectBrief,
   SCOPE_PROMPT_SUFFIX,
@@ -47,6 +50,11 @@ interface PromptInput {
     customFloorColor?:  string | null;
     customWallColor?:   string | null;
     tileStyle?:         TileStyle | string | null;
+    /** Floor / wall Step A formats */
+    floorFormat?:       string | null;
+    wallFormat?:        string | null;
+    /** Overall look — guides the AI, never overrides chosen finishes */
+    designStyle?:       string | null;
     lightingOption?:    LightingOption | string | null;
     structuralChanges?: BuilderSelections["structuralChanges"];
     /** Bathroom categories the client is keeping as they are */
@@ -96,12 +104,16 @@ function buildRoomPrompt(req: PromptInput): string {
     selections.tapware === "brushed-gold" ? "brushed gold" :
     "chrome";
 
-  const floorDesc = selections.customFloorColor
-    ? `${floorName} in ${selections.customFloorColor}`
-    : floorName;
-  const wallDesc = selections.customWallColor
-    ? `${wallName} in ${selections.customWallColor}`
-    : wallName;
+  // Format (Step A) + tone (Step B): "Nude Travertine, laid in a classic herringbone pattern"
+  const floorFmt = FLOOR_FORMATS.find((f) => f.id === selections.floorFormat);
+  const wallFmt  = WALL_FORMATS.find((f)  => f.id === selections.wallFormat);
+  const withColour = (name: string, hex?: string | null) => hex ? `${name} in ${hex}` : name;
+  const floorDesc = floorFmt
+    ? `${withColour(selections.floorTile?.name ?? (selections.customFloorColor ? "custom-coloured" : "neutral-toned"), selections.customFloorColor)} ${floorFmt.prompt}`
+    : withColour(floorName, selections.customFloorColor);
+  const wallDesc = wallFmt
+    ? `${withColour(selections.wallTile?.name ?? (selections.customWallColor ? "custom-coloured" : "neutral-toned"), selections.customWallColor)} ${wallFmt.prompt}`
+    : withColour(wallName, selections.customWallColor);
 
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
@@ -203,7 +215,7 @@ function buildRoomPrompt(req: PromptInput): string {
   const tileStyleId = typeof selections.tileStyle === "string" ? selections.tileStyle : selections.tileStyle ?? "";
 
   // ── Tile style / layout (only meaningful when tiles are being changed) ──
-  const tileStyleSection = tileStyleId && TILE_STYLE_PHRASES[tileStyleId] && !(keep("floor") && keep("walls"))
+  const tileStyleSection = tileStyleId && TILE_STYLE_PHRASES[tileStyleId] && !floorFmt && !wallFmt && !(keep("floor") && keep("walls"))
     ? `\n\nTile layout: Apply the tiles using ${TILE_STYLE_PHRASES[tileStyleId]}.`
     : "";
 
@@ -265,5 +277,7 @@ function buildRoomPrompt(req: PromptInput): string {
       ].join("\n")
     : "";
 
-  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + lightingSection + customNoteSection + briefSection + spatialReminder;
+  const styleBlock = styleSection(selections.designStyle, "bathroom", isPhotoMode);
+
+  return systemInstruction + tileStyleSection + customFloorColorSection + customWallColorSection + structuralSection + lightingSection + styleBlock + customNoteSection + briefSection + spatialReminder;
 }

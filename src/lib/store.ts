@@ -10,13 +10,18 @@ import {
   StructuralChanges,
   TileOption,
   TileStyle,
+  FloorFormat,
+  WallFormat,
   VanityType,
   TapwareFinish,
   LightingOption,
   BUDGET_MIN,
   BUDGET_MAX,
+  FLOOR_FORMATS,
+  WALL_FORMATS,
 } from "./types";
 import { type ProjectBrief } from "./projectBrief";
+import { isDesignStyle, type DesignStyleId } from "./designStyles";
 import {
   type RoomType,
   type KitchenSelections,
@@ -60,6 +65,9 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
     customFloorColor:  s.customFloorColor,
     customWallColor:   s.customWallColor,
     tileStyle:         s.tileStyle,
+    floorFormat:       s.floorFormat,
+    wallFormat:        s.wallFormat,
+    designStyle:       s.designStyle,
     structuralChanges:    s.structuralChanges,
     bathroomSize:         s.bathroomSize,
     useCustomDimensions:  s.useCustomDimensions,
@@ -98,9 +106,9 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.roomType      !== undefined) store.setRoomType(saved.roomType as RoomType);
     if (saved.roomConfirmed !== undefined) store.setRoomConfirmed(saved.roomConfirmed as boolean);
     if (saved.kitchenSelections !== undefined)
-      store.setKitchenSelections(saved.kitchenSelections as KitchenSelections);
+      store.setKitchenSelections(sanitiseRoom(saved.kitchenSelections as Partial<KitchenSelections>));
     if (saved.bedroomSelections !== undefined)
-      store.setBedroomSelections(saved.bedroomSelections as BedroomSelections);
+      store.setBedroomSelections(sanitiseRoom(saved.bedroomSelections as Partial<BedroomSelections>));
 
     // ── Bathroom fields ────────────────────────────────────────────────────────
     if (saved.projectBrief   !== undefined) store.setProjectBrief(saved.projectBrief as ProjectBrief | null);
@@ -119,6 +127,9 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.customFloorColor !== undefined) store.setCustomFloorColor(saved.customFloorColor as string | null);
     if (saved.customWallColor  !== undefined) store.setCustomWallColor(saved.customWallColor as string | null);
     if (saved.tileStyle     !== undefined) store.setTileStyle(saved.tileStyle as TileStyle | null);
+    if (saved.floorFormat   !== undefined) store.setFloorFormat(saved.floorFormat as FloorFormat | null);
+    if (saved.wallFormat    !== undefined) store.setWallFormat(saved.wallFormat as WallFormat | null);
+    store.setDesignStyle(isDesignStyle(saved.designStyle) ? saved.designStyle : null);
     if (saved.structuralChanges !== undefined)
       store.setStructuralChanges(saved.structuralChanges as Partial<StructuralChanges>);
     if (saved.bathroomSize        !== undefined) store.setBathroomSize(saved.bathroomSize as BathroomSize | null);
@@ -131,6 +142,12 @@ export function restoreBuilderStateFromAuth(): boolean {
   }
 }
 
+/** Ceiling options were simplified to white or a custom colour; older choices fall back to white */
+function sanitiseRoom<T extends { ceilingStyle?: unknown; designStyle?: unknown }>(sel: T): T {
+  const ceiling = sel.ceilingStyle === "custom-paint" || sel.ceilingStyle === "standard-white" ? sel.ceilingStyle : null;
+  return { ...sel, ceilingStyle: ceiling, designStyle: isDesignStyle(sel.designStyle) ? sel.designStyle : null };
+}
+
 // ── Default kitchen selections ────────────────────────────────────────────────
 const defaultKitchenSelections: KitchenSelections = {
   roomSize:            null,
@@ -140,12 +157,16 @@ const defaultKitchenSelections: KitchenSelections = {
   benchtop:            null,
   mixer:               null,
   splashback:          null,
-  floorFinish:         null,
+  floorFormat:         null,
+  floorTone:           null,
   floorColor:          null,
+  wallFinish:          null,
   wallColor:           null,
   cooktop:             null,
   dishwasher:          null,
   ceilingStyle:        null,
+  ceilingColor:        null,
+  designStyle:         null,
   hasIsland:           false,
   hasApplianceRoughin: false,
   hasSinkRoughin:      false,
@@ -161,7 +182,8 @@ const defaultBedroomSelections: BedroomSelections = {
   roomSize:          null,
   customLength:      0,
   customWidth:       0,
-  flooring:          null,
+  flooringFormat:    null,
+  flooringTone:      null,
   flooringColor:     null,
   wallTreatment:     null,
   wallColor:         null,
@@ -170,6 +192,7 @@ const defaultBedroomSelections: BedroomSelections = {
   windowTreatment:   null,
   ceilingStyle:      null,
   ceilingColor:      null,
+  designStyle:       null,
   hasElectricalWork: false,
   hasVJWall:         false,
   hasMediaJoinery:   false,
@@ -223,6 +246,10 @@ interface BuilderStore extends BuilderSelections {
   setCustomFloorColor:    (color: string | null)           => void;
   setCustomWallColor:     (color: string | null)           => void;
   setTileStyle:           (style: TileStyle | null)        => void;
+  /** Floor Step A — changing format clears a tone that doesn't suit it */
+  setFloorFormat:         (f: FloorFormat | null)          => void;
+  setWallFormat:          (f: WallFormat | null)           => void;
+  setDesignStyle:         (id: DesignStyleId | null)       => void;
   setStructuralChanges:   (c: Partial<StructuralChanges>)  => void;
   /** Keep a bathroom category as it is (clears its selection, so it costs nothing) */
   setBathroomKeep:        (key: BathroomKeepKey, on: boolean) => void;
@@ -259,6 +286,9 @@ const defaults: BuilderSelections = {
   customFloorColor:    null,
   customWallColor:     null,
   tileStyle:           null,
+  floorFormat:         null,
+  wallFormat:          null,
+  designStyle:         null,
   structuralChanges:   {
     removeBathtub:   false,
     addWalkinShower: false,
@@ -321,6 +351,11 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
       ...base,
       floorTile:         null,
       wallTile:          null,
+      floorFormat:       null,
+      wallFormat:        null,
+      designStyle:       null,
+      customFloorColor:  null,
+      customWallColor:   null,
       vanity:            null,
       tapware:           null,
       keepExisting:      [],
@@ -389,6 +424,17 @@ export const useBuilderStore = create<BuilderStore>((set, get) => ({
   setCustomFloorColor:    (color) => set((st) => ({ customFloorColor: color, ...releaseKeep(st, "floor", color) })),
   setCustomWallColor:     (color) => set((st) => ({ customWallColor: color, ...releaseKeep(st, "walls", color) })),
   setTileStyle:           (style) => set({ tileStyle: style }),
+  setFloorFormat:         (f)     => set((st) => ({
+    floorFormat: f,
+    floorTile:   f && st.floorTile && !FLOOR_FORMATS.find((x) => x.id === f)?.tones.includes(st.floorTile.id) ? null : st.floorTile,
+    ...releaseKeep(st, "floor", f),
+  })),
+  setWallFormat:          (f)     => set((st) => ({
+    wallFormat: f,
+    wallTile:   f && st.wallTile && !WALL_FORMATS.find((x) => x.id === f)?.tones.includes(st.wallTile.id) ? null : st.wallTile,
+    ...releaseKeep(st, "walls", f),
+  })),
+  setDesignStyle:         (id)    => set({ designStyle: id }),
   setStructuralChanges:   (c)     => set((s) => ({
     structuralChanges: { ...s.structuralChanges, ...c },
   })),

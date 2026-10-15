@@ -13,15 +13,15 @@ import { cn } from "@/lib/utils";
 import {
   type KitchenSelections,
   type KitchenRoomSize,
-  type KitchenFloorFinish,
+  type KitchenWallFinish,
   KITCHEN_SIZE_OPTIONS,
-  KITCHEN_FLOOR_OPTIONS,
+  KITCHEN_FLOOR_FORMATS,
+  KITCHEN_WALL_FINISHES,
   KITCHEN_WALL_OPTIONS,
   CABINETRY_OPTIONS,
   BENCHTOP_OPTIONS,
   MIXER_OPTIONS,
   SPLASHBACK_OPTIONS,
-  CEILING_OPTIONS,
   KITCHEN_BUDGET_MIN,
   KITCHEN_BUDGET_MAX,
   KITCHEN_BUDGET_STEP,
@@ -30,6 +30,8 @@ import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } 
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, KITCHEN_KEEP_FIELDS, type KitchenKeepKey } from "@/lib/keepExisting";
+import { FLOOR_TILES, tonesFor, type FloorFormat } from "@/lib/types";
+import { StepLabel, FormatGrid, ToneGrid, CeilingPicker } from "@/components/builder/SurfacePicker";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -193,86 +195,60 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
         </div>
       </div>
 
-      {/* Floor & Wall Colour */}
+      {/* Kitchen Floor — format, then tone */}
       <div>
-        <SectionLabel>Floor &amp; Wall Colour</SectionLabel>
+        <SectionLabel>Kitchen Floor</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="kitchen floor" className="mb-3" active={isKept(selections.keepExisting, "floor")} onToggle={(on) => keep("floor", on)} />
+        <StepLabel n={1}>Choose a format</StepLabel>
+        <FormatGrid
+          options={KITCHEN_FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+          value={selections.floorFormat}
+          onChange={(id) => {
+            const fmt = KITCHEN_FLOOR_FORMATS.find((f) => f.id === id);
+            onChange({ floorFormat: id as FloorFormat | null, floorTone: fmt?.tones.includes(selections.floorTone ?? "") ? selections.floorTone : null });
+          }}
+        />
+        {selections.floorFormat && (
+          <div className="mt-4">
+            <StepLabel n={2}>Choose a colour or tone</StepLabel>
+            <ToneGrid
+              tones={tonesFor(FLOOR_TILES, KITCHEN_FLOOR_FORMATS.find((f) => f.id === selections.floorFormat)).map((t) => ({ id: t.id, label: t.name, swatch: t.id }))}
+              value={selections.floorColor ? null : selections.floorTone}
+              onChange={(id) => onChange({ floorTone: id, floorColor: null })}
+            >
+              <ColourPickerSwatch
+                label="Custom Floor Colour"
+                value={selections.floorColor ?? null}
+                onChange={(c) => onChange({ floorColor: c, floorTone: c ? null : selections.floorTone })}
+                variant="square"
+              />
+            </ToneGrid>
+          </div>
+        )}
+      </div>
 
-        {/* Floor finish */}
-        <p className="text-[10px] font-semibold text-charcoal/50 mb-2">Kitchen Floor</p>
-        <KeepExistingToggle room="kitchen" thing="kitchen floor" className="mb-2" active={isKept(selections.keepExisting, "floor")} onToggle={(on) => keep("floor", on)} />
-        <div className="grid grid-cols-3 gap-2 mb-2">
-          {KITCHEN_FLOOR_OPTIONS.map((opt) => {
-            const active = selections.floorFinish === opt.id && !selections.floorColor;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ floorFinish: selections.floorFinish === opt.id && !selections.floorColor ? null : opt.id as KitchenFloorFinish, floorColor: null })}
-                title={opt.sub}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-200",
-                  active ? "border-terracotta shadow-warm-sm scale-[1.03]" : "border-sand-200 hover:border-terracotta/40",
-                )}
-              >
-                <div className="w-10 h-10 rounded-lg ring-1 ring-black/10" style={{ background: opt.color }} />
-                <p className="text-[9px] font-semibold text-charcoal/70 text-center leading-tight truncate w-full">{opt.label}</p>
-                {opt.costAdj > 0 && (
-                  <p className={cn("text-[8px] font-bold", active ? "text-terracotta" : "text-charcoal/30")}>
-                    +${(opt.costAdj / 1000).toFixed(1)}k
-                  </p>
-                )}
-                {active && (
-                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-terracotta flex items-center justify-center">
-                    <CheckCircle2 size={9} className="text-white" strokeWidth={3} />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Custom colour swatch */}
-          <ColourPickerSwatch
-            label="Custom Floor Colour"
-            value={selections.floorColor ?? null}
-            onChange={(c) => onChange({ floorColor: c, floorFinish: c ? null : selections.floorFinish })}
-            variant="square"
-          />
-        </div>
-
-        {/* Wall paint colour */}
-        <p className="text-[10px] font-semibold text-charcoal/50 mb-2 mt-4">Wall Paint Colour</p>
-        <KeepExistingToggle room="kitchen" thing="wall colour" className="mb-2" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
-        <div className="grid grid-cols-3 gap-2 mb-2">
-          {KITCHEN_WALL_OPTIONS.map((opt) => {
-            const active = selections.wallColor === opt.color;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ wallColor: selections.wallColor === opt.color ? null : opt.color })}
-                title={opt.sub}
-                className={cn(
-                  "relative flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-200",
-                  active ? "border-terracotta shadow-warm-sm scale-[1.03]" : "border-sand-200 hover:border-terracotta/40",
-                )}
-              >
-                <div className="w-10 h-10 rounded-lg ring-1 ring-black/10" style={{ background: opt.color }} />
-                <p className="text-[9px] font-semibold text-charcoal/70 text-center leading-tight truncate w-full">{opt.label}</p>
-                {active && (
-                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-terracotta flex items-center justify-center">
-                    <CheckCircle2 size={9} className="text-white" strokeWidth={3} />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Custom colour wheel */}
-          <ColourPickerSwatch
-            label="Custom Wall Colour"
-            value={selections.wallColor ?? null}
-            onChange={(c) => onChange({ wallColor: c })}
-            variant="square"
-          />
-        </div>
+      {/* Kitchen Walls — finish, then colour */}
+      <div>
+        <SectionLabel>Kitchen Walls</SectionLabel>
+        <KeepExistingToggle room="kitchen" thing="wall finish" className="mb-3" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
+        <StepLabel n={1}>Choose a finish</StepLabel>
+        <FormatGrid
+          options={KITCHEN_WALL_FINISHES.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, css: selections.wallColor ?? "#F3F0EA", cost: f.cost }))}
+          value={selections.wallFinish}
+          onChange={(id) => onChange({ wallFinish: id as KitchenWallFinish | null })}
+        />
+        {selections.wallFinish && (
+          <div className="mt-4">
+            <StepLabel n={2}>Choose a colour</StepLabel>
+            <ToneGrid
+              tones={KITCHEN_WALL_OPTIONS.map((o) => ({ id: o.color, label: o.label, color: o.color }))}
+              value={selections.wallColor}
+              onChange={(c) => onChange({ wallColor: c })}
+            >
+              <ColourPickerSwatch label="Custom Wall Colour" value={selections.wallColor ?? null} onChange={(c) => onChange({ wallColor: c })} variant="square" />
+            </ToneGrid>
+          </div>
+        )}
       </div>
 
       {/* Appliance Integration */}
@@ -333,38 +309,11 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
 
       </div>
 
-      {/* Ceiling Style */}
+      {/* Ceiling */}
       <div>
-        <SectionLabel>Ceiling Treatment</SectionLabel>
+        <SectionLabel>Ceiling</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="ceiling" className="mb-2" active={isKept(selections.keepExisting, "ceiling")} onToggle={(on) => keep("ceiling", on)} />
-        <div className="flex flex-col gap-2">
-          {CEILING_OPTIONS.map((opt) => {
-            const active = selections.ceilingStyle === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {opt.cost > 0 && (
-                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                      +${(opt.cost / 1000).toFixed(1)}k
-                    </span>
-                  )}
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <CeilingPicker style={selections.ceilingStyle} color={selections.ceilingColor} onChange={onChange} />
       </div>
 
     </div>

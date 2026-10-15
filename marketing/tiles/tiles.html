@@ -211,6 +211,80 @@ function plank(N, w, h, seed, base = [204, 160, 110], dark = [150, 104, 64]) {
   return c;
 }
 
+// ── reusable tone painters ──────────────────────────────────────
+function oakFloor(ctx, seed, base, dark) {
+  const N = makeNoise(seed), R = mulberry(seed * 3 + 1), h = 80;
+  for (let row = 0; row < S / h; row++) {
+    let x = -R() * 160;
+    while (x < S) { const w = 190 + R() * 140; ctx.drawImage(plank(N, Math.round(w), h, row * 50 + Math.round(x), base, dark), x, row * h); x += w; }
+  }
+  polish(ctx, .08); studio(ctx, .9);
+}
+function concrete(ctx, seed, baseHex, { seam = false } = {}) {
+  const N = makeNoise(seed), base = hex(baseHex);
+  tiled(ctx, { tw: 400, th: seam ? 200 : 400, gap: seam ? 3 : 0, grout: base.map((v) => v * .78), bevel: seam ? 3 : 0, bevelK: .08, noise: N },
+    (x, y, t) => {
+      const v = (N.fbm(x * .005, y * .005 + t.id) - .5) * 30 + (N.fbm(x * .03, y * .03, 4) - .5) * 14 + (N.n(x * .9, y * .9) - .5) * 10;
+      return [base[0] + v, base[1] + v * .98, base[2] + v * .95];
+    });
+  const R = mulberry(seed + 5);
+  for (let i = 0; i < 150; i++) { const x = R() * S, y = R() * S, r = .6 + R() * 1.3; ctx.fillStyle = "rgba(40,38,36,.45)"; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.beginPath(); ctx.arc(x + r * .5, y + r * .5, r * .5, 0, 7); ctx.fill(); }
+  polish(ctx, .1); studio(ctx, .8);
+}
+function subway(ctx, seed, rgb, grout = "#EEEBE4") {
+  const N = makeNoise(seed);
+  tiled(ctx, { tw: 100, th: 50, gap: 3, grout: hex(grout), offset: true, bevel: 6, bevelK: .24, gloss: .32, sheen: .3, noise: N },
+    (x, y, t) => { const j = (t.rnd[0] - .5) * 14, g = (N.fbm(x * .03 + t.id, y * .05, 3) - .5) * 12; return [rgb[0] + j + g, rgb[1] + j + g, rgb[2] + j * .9 + g]; });
+  studio(ctx, .8);
+}
+function fluted(ctx, seed, tint) {
+  const N = makeNoise(seed), f = 26, img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const ph = (x % f) / f, nx = -Math.cos(ph * Math.PI), nz = Math.sin(ph * Math.PI);
+    const diff = clamp01(-nx * .55 + nz * .8 + .15), spec = Math.pow(clamp01(-nx * .5 + nz * .86), 40) * .4;
+    const groove = 1 - (1 - smooth(0, .06, Math.min(ph, 1 - ph))) * .5;
+    const seam = Math.abs((y % 200) - 1.5) < 1.5 ? .8 : 1, tone = (N.n(x * .3, y * .3) - .5) * 5;
+    const l = (.6 + .4 * diff) * groove * seam;
+    const i = (y * S + x) * 4;
+    d[i] = tint[0] * l + spec * 255 + tone; d[i + 1] = tint[1] * l + spec * 255 + tone; d[i + 2] = tint[2] * l + spec * 255 + tone; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); studio(ctx, .6);
+}
+// polished Venetian plaster / limewash: soft clouds with trowel-burnished sheen
+function plaster(ctx, seed, baseHex, { sheen = .5, cloud = 18, chalk = 0 } = {}) {
+  const N = makeNoise(seed), base = hex(baseHex), img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const c = (N.fbm(x * .004, y * .004, 6) - .5) * cloud * 2 + (N.fbm(x * .015 + 9, y * .015, 4) - .5) * cloud * .7;
+    const u = (x + y) * .7, w = (y - x) * .7;
+    const stroke = N.fbm(u * .0045 + N.fbm(x * .006, y * .006, 4) * 1.6, w * .009, 5);
+    const burnish = Math.pow(clamp01((stroke - .46) * 1.7), 2.2) * sheen * 34;
+    const grain = (N.n(x * .9, y * .9) - .5) * (4 + chalk * 8);
+    const i = (y * S + x) * 4;
+    d[i] = base[0] + c + burnish + grain; d[i + 1] = base[1] + c + burnish + grain; d[i + 2] = base[2] + c * .95 + burnish + grain; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); studio(ctx, .7);
+}
+function carpet(ctx, seed, baseHex) {
+  const N = makeNoise(seed), base = hex(baseHex), img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const loop = (N.n(x * 1.3, y * 1.3) - .5) * 26 + Math.sin(y * 1.6 + N.n(x * .2, y * .2) * 3) * 5;
+    const mottle = (N.fbm(x * .01, y * .01, 4) - .5) * 14, fleck = N.n(x * 2.1 + 5, y * 2.1) > .86 ? 14 : 0;
+    const i = (y * S + x) * 4;
+    d[i] = base[0] + loop + mottle + fleck; d[i + 1] = base[1] + loop + mottle + fleck; d[i + 2] = base[2] + loop * .95 + mottle + fleck; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); studio(ctx, .8);
+}
+function vjPanel(ctx, seed, baseHex) {
+  const N = makeNoise(seed), base = hex(baseHex), w = 50, img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const lx = x % w, v = lx < 3 ? -46 + lx * 8 : lx > w - 3 ? -18 : 0;   // V-groove, lit on one side
+    const grain = (N.fbm(x * .02, y * .004, 3) - .5) * 6, tone = (N.n(x * .5, y * .5) - .5) * 4;
+    const i = (y * S + x) * 4;
+    d[i] = base[0] + v + grain + tone; d[i + 1] = base[1] + v + grain + tone; d[i + 2] = base[2] + v + grain * .9 + tone; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); polish(ctx, .06); studio(ctx, .75);
+}
+
 // ── materials ───────────────────────────────────────────────────
 const M = {
   /* ── floor tiles ── */
@@ -405,6 +479,25 @@ const M = {
     polish(ctx, .16); studio(ctx, .8);
   },
   "honed-travertine"(ctx) { M["travertine"](ctx); },
+
+  /* ── tones for the two-step pickers ── */
+  "blonde-oak"(ctx)        { oakFloor(ctx, 41, [230, 202, 158], [192, 158, 112]); },
+  "smoked-oak"(ctx)        { oakFloor(ctx, 42, [132, 100, 70], [82, 58, 38]); },
+  "concrete-pale"(ctx)     { concrete(ctx, 43, "#C4C0B9"); },
+  "concrete-charcoal"(ctx) { concrete(ctx, 44, "#59595A"); },
+  "white-subway"(ctx)      { subway(ctx, 45, [238, 236, 230], "#D9D5CD"); },
+  "charcoal-subway"(ctx)   { subway(ctx, 46, [70, 73, 78], "#B9B5AE"); },
+  "fluted-sage"(ctx)       { fluted(ctx, 47, [180, 198, 178]); },
+  "fluted-sand"(ctx)       { fluted(ctx, 48, [234, 220, 196]); },
+  "plaster-chalk"(ctx)     { plaster(ctx, 49, "#ECE8E0"); },
+  "plaster-sand"(ctx)      { plaster(ctx, 50, "#D8C4A6"); },
+  "plaster-sage"(ctx)      { plaster(ctx, 51, "#A9B7A2"); },
+  "plaster-charcoal"(ctx)  { plaster(ctx, 52, "#5C5D5B", { sheen: .7 }); },
+  "limewash"(ctx)          { plaster(ctx, 53, "#E7E0D4", { sheen: .15, cloud: 26, chalk: 1 }); },
+  "vj-panel"(ctx)          { vjPanel(ctx, 54, "#F2F0EB"); },
+  "carpet-oatmeal"(ctx)    { carpet(ctx, 55, "#CDC2AE"); },
+  "carpet-dove"(ctx)       { carpet(ctx, 56, "#B3B1AD"); },
+  "carpet-charcoal"(ctx)   { carpet(ctx, 57, "#5E5E61"); },
 };
 
 window.TILE_IDS = Object.keys(M);

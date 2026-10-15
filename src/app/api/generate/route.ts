@@ -61,6 +61,9 @@ interface GenerateRequest {
     customFloorColor?:  string | null;
     customWallColor?:   string | null;
     tileStyle?:         string | null;
+    floorFormat?:       string | null;
+    wallFormat?:        string | null;
+    designStyle?:       string | null;
     keepExisting?:      string[] | null;
     lightingOption?:    string | null;
     structuralChanges?: {

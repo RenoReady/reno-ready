@@ -15,14 +15,15 @@ import { cn } from "@/lib/utils";
 import {
   type BedroomSelections,
   type BedroomRoomSize,
-  type CeilingStyle,
+  type BedroomFloorFormat,
   BEDROOM_SIZE_OPTIONS,
-  BEDROOM_FLOORING_OPTIONS,
+  BEDROOM_FLOOR_FORMATS,
+  BEDROOM_FLOOR_TONES,
+  KITCHEN_WALL_OPTIONS,
   WALL_TREATMENT_OPTIONS,
   BEDROOM_LIGHTING_OPTIONS,
   STORAGE_OPTIONS,
   WINDOW_TREATMENT_OPTIONS,
-  CEILING_OPTIONS,
   BEDROOM_BUDGET_MIN,
   BEDROOM_BUDGET_MAX,
   BEDROOM_BUDGET_STEP,
@@ -31,6 +32,8 @@ import { Ruler, SlidersHorizontal } from "lucide-react";
 import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, BEDROOM_KEEP_FIELDS, type BedroomKeepKey } from "@/lib/keepExisting";
+import { tonesFor } from "@/lib/types";
+import { StepLabel, FormatGrid, ToneGrid, CeilingPicker } from "@/components/builder/SurfacePicker";
 
 // ── Section label ─────────────────────────────────────────────────────────────
 
@@ -58,55 +61,43 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Flooring */}
+      {/* Flooring — format, then tone */}
       <div>
         <SectionLabel>Flooring</SectionLabel>
-        <KeepExistingToggle room="bedroom" thing="flooring" className="mb-2" active={isKept(selections.keepExisting, "flooring")} onToggle={(on) => keep("flooring", on)} />
-        <div className="flex flex-col gap-2">
-          {BEDROOM_FLOORING_OPTIONS.map((opt) => {
-            const active = selections.flooring === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ flooring: selections.flooring === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="flex rounded-xl overflow-hidden w-9 h-9 flex-shrink-0">
-                  <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
-                    {opt.palette.slice(0, 4).map((col, i) => <div key={i} style={{ background: col }} />)}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
-                </div>
-                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                  <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                    ~${(opt.cost / 1000).toFixed(1)}k
-                  </span>
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-
-          {/* Custom flooring colour */}
-          <ColourPickerSwatch
-            label="Custom Flooring Colour"
-            value={selections.flooringColor ?? null}
-            onChange={(hex) => onChange({ flooringColor: hex })}
-            variant="row"
-          />
-        </div>
+        <KeepExistingToggle room="bedroom" thing="flooring" className="mb-3" active={isKept(selections.keepExisting, "flooring")} onToggle={(on) => keep("flooring", on)} />
+        <StepLabel n={1} hint="Priced for a 16m² room">Choose a format</StepLabel>
+        <FormatGrid
+          options={BEDROOM_FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+          value={selections.flooringFormat}
+          onChange={(id) => {
+            const fmt = BEDROOM_FLOOR_FORMATS.find((f) => f.id === id);
+            onChange({ flooringFormat: id as BedroomFloorFormat | null, flooringTone: fmt?.tones.includes(selections.flooringTone ?? "") ? selections.flooringTone : null });
+          }}
+        />
+        {selections.flooringFormat && (
+          <div className="mt-4">
+            <StepLabel n={2}>Choose a colour or tone</StepLabel>
+            <ToneGrid
+              tones={tonesFor(BEDROOM_FLOOR_TONES, BEDROOM_FLOOR_FORMATS.find((f) => f.id === selections.flooringFormat)).map((t) => ({ id: t.id, label: t.name, swatch: t.id }))}
+              value={selections.flooringColor ? null : selections.flooringTone}
+              onChange={(id) => onChange({ flooringTone: id, flooringColor: null })}
+            >
+              <ColourPickerSwatch
+                label="Custom Flooring Colour"
+                value={selections.flooringColor ?? null}
+                onChange={(hex) => onChange({ flooringColor: hex, flooringTone: hex ? null : selections.flooringTone })}
+                variant="square"
+              />
+            </ToneGrid>
+          </div>
+        )}
       </div>
 
       {/* Wall Treatment */}
       <div>
-        <SectionLabel>Wall Treatment</SectionLabel>
-        <KeepExistingToggle room="bedroom" thing="wall finish" className="mb-2" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
+        <SectionLabel>Walls</SectionLabel>
+        <KeepExistingToggle room="bedroom" thing="wall finish" className="mb-3" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
+        <StepLabel n={1}>Choose a material or finish</StepLabel>
         <div className="flex flex-col gap-2">
           {WALL_TREATMENT_OPTIONS.map((opt) => {
             const active = selections.wallTreatment === opt.id;
@@ -133,56 +124,26 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
             );
           })}
 
-          {/* Custom wall colour */}
-          <ColourPickerSwatch
-            label="Custom Wall Colour"
-            value={selections.wallColor ?? null}
-            onChange={(hex) => onChange({ wallColor: hex })}
-            variant="row"
-          />
         </div>
+        {selections.wallTreatment && (
+          <div className="mt-4">
+            <StepLabel n={2}>Choose a colour</StepLabel>
+            <ToneGrid
+              tones={KITCHEN_WALL_OPTIONS.map((o) => ({ id: o.color, label: o.label, color: o.color }))}
+              value={selections.wallColor}
+              onChange={(c) => onChange({ wallColor: c })}
+            >
+              <ColourPickerSwatch label="Custom Wall Colour" value={selections.wallColor ?? null} onChange={(hex) => onChange({ wallColor: hex })} variant="square" />
+            </ToneGrid>
+          </div>
+        )}
       </div>
 
-      {/* Ceiling Treatment (moved up to group with surfaces) */}
+      {/* Ceiling */}
       <div>
-        <SectionLabel>Ceiling Treatment</SectionLabel>
+        <SectionLabel>Ceiling</SectionLabel>
         <KeepExistingToggle room="bedroom" thing="ceiling" className="mb-2" active={isKept(selections.keepExisting, "ceiling")} onToggle={(on) => keep("ceiling", on)} />
-        <div className="flex flex-col gap-2">
-          {CEILING_OPTIONS.map((opt) => {
-            const active = selections.ceilingStyle === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ ceilingStyle: selections.ceilingStyle === opt.id ? null : opt.id as CeilingStyle })}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug">{opt.sub}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {opt.cost > 0 && (
-                    <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                      +${(opt.cost / 1000).toFixed(1)}k
-                    </span>
-                  )}
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-
-          {/* Custom ceiling colour */}
-          <ColourPickerSwatch
-            label="Custom Ceiling Colour"
-            value={selections.ceilingColor ?? null}
-            onChange={(hex) => onChange({ ceilingColor: hex })}
-            variant="row"
-          />
-        </div>
+        <CeilingPicker style={selections.ceilingStyle} color={selections.ceilingColor} onChange={onChange} />
       </div>
 
       {/* Lighting & Atmosphere */}

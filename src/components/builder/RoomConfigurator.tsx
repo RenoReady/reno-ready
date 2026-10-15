@@ -16,7 +16,8 @@ import TileTexture from "@/components/ui/TileTexture";
 import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth } from "@/lib/store";
 import {
   FLOOR_TILES, WALL_TILES, VANITY_OPTIONS, TAPWARE_OPTIONS,
-  TILE_STYLE_OPTIONS, LIGHTING_OPTIONS,
+  FLOOR_FORMATS, WALL_FORMATS, tonesFor, type FloorFormat, type WallFormat,
+  LIGHTING_OPTIONS,
   COST_BREAKDOWN, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP,
   BATHROOM_SIZE_OPTIONS,
   TileOption, VanityType, TapwareFinish, TileStyle, ShowerNiche, ShowerFixtures,
@@ -27,13 +28,15 @@ import PaywallModal from "@/components/ui/PaywallModal";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
-import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES, withoutKept, clearPatch } from "@/lib/stylePresets";
+import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES } from "@/lib/stylePresets";
+import { isDesignStyle } from "@/lib/designStyles";
+import { StepLabel, FormatGrid } from "@/components/builder/SurfacePicker";
 import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import DesignNote from "@/components/builder/DesignNote";
-import { isKept, KITCHEN_KEEP_FIELDS, BEDROOM_KEEP_FIELDS } from "@/lib/keepExisting";
+import { isKept } from "@/lib/keepExisting";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
@@ -481,9 +484,9 @@ function EstimateAccuracyBadge() {
 function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
   const { budget, floorTile, wallTile, vanity, tapware, structuralChanges,
           bathroomSize, customLength, customWidth, projectBrief,
-          lightingOption } = useBuilderStore();
+          lightingOption, floorFormat, wallFormat, designStyle } = useBuilderStore();
 
-  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
+  const estimated = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle });
   const low  = Math.round(estimated * 0.88 / 500) * 500;
   const high = Math.round(estimated * 1.12 / 500) * 500;
 
@@ -1409,6 +1412,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     savedRooms,         saveCurrentRoom,
     roomConfirmed,      setRoomConfirmed,
     keepExisting,       setBathroomKeep,
+    floorFormat,        setFloorFormat,
+    wallFormat,         setWallFormat,
+    designStyle,        setDesignStyle,
     generatedImageUrl,
   } = useBuilderStore();
 
@@ -1450,7 +1456,6 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [showPaywallModal,   setShowPaywallModal]   = useState(false);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
   const [showHygieneModal,   setShowHygieneModal]   = useState(false);
-  const [activeStylePreset,  setActiveStylePreset]  = useState<string | null>(null);
   const [activeZone,         setActiveZone]         = useState<ZoneId | null>(null);
   const [modalTile,          setModalTile]          = useState<TileOption | null>(null);
   const [refinementNote,     setRefinementNote]     = useState("");
@@ -1544,46 +1549,15 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     if (!roomPhotoUrl && stage !== "upload" && !isGeneratingRef.current) setStage("upload");
   }, [roomPhotoUrl, stage]);
 
-  // "Start from a style": applies the room's preset, skipping anything the user
-  // is keeping as it is. Tapping the active style again clears what it set.
+  // "Start from a style" sets the design's overall look for the AI. It never
+  // selects finishes; tapping the active style again clears it.
   const handleStyle = useCallback((id: string) => {
     const st = useBuilderStore.getState();
-    const again = activeStylePreset === id;
-    setActiveStylePreset(again ? null : id);
-
-    if (st.roomType === "kitchen") {
-      const preset = KITCHEN_STYLES.find((p) => p.id === id);
-      if (!preset) return;
-      const patch = again ? clearPatch(preset.patch) : preset.patch;
-      setKitchenSelections(withoutKept(patch, KITCHEN_KEEP_FIELDS, st.kitchenSelections.keepExisting));
-      return;
-    }
-    if (st.roomType === "bedroom") {
-      const preset = BEDROOM_STYLES.find((p) => p.id === id);
-      if (!preset) return;
-      const patch = again ? clearPatch(preset.patch) : preset.patch;
-      setBedroomSelections(withoutKept(patch, BEDROOM_KEEP_FIELDS, st.bedroomSelections.keepExisting));
-      return;
-    }
-
-    const preset = BATHROOM_STYLES.find((p) => p.id === id);
-    if (!preset) return;
-    const keepFloor = isKept(st.keepExisting, "floor"), keepWalls = isKept(st.keepExisting, "walls");
-    if (again) {
-      if (!keepFloor) setFloorTile(null);
-      if (!keepWalls) setWallTile(null);
-      setVanity(null);
-      setTapware(null);
-      setTileStyle(null);
-      return;
-    }
-    if (!keepFloor) { setFloorTile(FLOOR_TILES.find((t) => t.id === preset.floorTileId) ?? null); setCustomFloorColor(null); }
-    if (!keepWalls) { setWallTile(WALL_TILES.find((t) => t.id === preset.wallTileId) ?? null);   setCustomWallColor(null); }
-    setVanity(preset.vanity);
-    setTapware(preset.tapware);
-    setTileStyle(preset.tileStyle);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStylePreset]);
+    const style = isDesignStyle(id) ? id : null;
+    if (st.roomType === "kitchen") { setKitchenSelections({ designStyle: st.kitchenSelections.designStyle === style ? null : style }); return; }
+    if (st.roomType === "bedroom") { setBedroomSelections({ designStyle: st.bedroomSelections.designStyle === style ? null : style }); return; }
+    setDesignStyle(st.designStyle === style ? null : style);
+  }, [setKitchenSelections, setBedroomSelections, setDesignStyle]);
 
   // Zone click → pre-fill refinement text with zone-specific instruction
   const handleZoneClick = useCallback((zone: ZoneId) => {
@@ -1663,6 +1637,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             customFloorColor:  store.customFloorColor,
             customWallColor:   store.customWallColor,
             tileStyle:         store.tileStyle,
+            floorFormat:       store.floorFormat,
+            wallFormat:        store.wallFormat,
+            designStyle:       store.designStyle,
             lightingOption:    store.lightingOption,
             structuralChanges: store.structuralChanges,
             keepExisting:      store.keepExisting,
@@ -1832,7 +1809,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const liveEstimate = (() => {
     if (roomType === "kitchen") return formatAUD(Math.round(calcKitchenCost(kitchenSelections).total / 500) * 500);
     if (roomType === "bedroom") return formatAUD(Math.round(calcBedroomCost(bedroomSelections).total / 500) * 500);
-    const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption);
+    const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, designStyle });
     if (!est) return formatAUD(0);
     return `${formatAUD(Math.round(est * 0.88 / 500) * 500)}–${formatAUD(Math.round(est * 1.12 / 500) * 500)}`;
   })();
@@ -1963,113 +1940,82 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <div className="lg:order-1 flex flex-col gap-5 min-w-0">
               <StepCard step={2}>
                 {roomType === "bathroom" && (<>
-                  <StyleLibrary looks={BATHROOM_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
-                  {/* 2. Floor Tiles */}
-                  <SidebarSection icon={Layers} title="Floor Tiles (Colour)">
+                  <StyleLibrary looks={BATHROOM_STYLES} activeId={designStyle} onSelect={handleStyle} />
+                  {/* Floor — format, then tone */}
+                  <SidebarSection icon={Layers} title="Floor">
                   <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
-                    <div className="grid grid-cols-4 gap-2">
-                      {FLOOR_TILES.map((tile) => (
-                        <TileCard key={tile.id} tile={tile}
-                          selected={floorTile?.id === tile.id}
-                          onSelect={() => setFloorTile(floorTile?.id === tile.id ? null : tile)}
-                          onInfo={() => setModalTile(tile)} />
-                      ))}
-                      {/* Custom hex swatch */}
-                      <CustomHexSwatch
-                        value={customFloorColor}
-                        onChange={setCustomFloorColor}
-                        label="Custom Floor Colour"
+                    <div>
+                      <StepLabel n={1}>Choose a format</StepLabel>
+                      <FormatGrid
+                        options={FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+                        value={floorFormat}
+                        onChange={(id) => setFloorFormat(id as FloorFormat | null)}
                       />
                     </div>
-                    {floorTile && (
-                      <p className="text-[11px] text-charcoal/50 text-center">
-                        <span className="font-semibold text-charcoal/70">{floorTile.name}</span>
-                        {customFloorColor && <span className="text-terracotta font-semibold"> · {customFloorColor}</span>}
-                        {" — "}{floorTile.description.split(".")[0]}.
-                      </p>
-                    )}
-                    {!floorTile && customFloorColor && (
-                      <p className="text-[11px] text-charcoal/50 text-center">
-                        Custom colour <span className="font-semibold text-terracotta">{customFloorColor}</span> will be applied to the floor.
-                      </p>
+                    {floorFormat && (
+                      <div>
+                        <StepLabel n={2}>Choose a colour or tone</StepLabel>
+                        <div className="grid grid-cols-4 gap-2">
+                          {tonesFor(FLOOR_TILES, FLOOR_FORMATS.find((f) => f.id === floorFormat)).map((tile) => (
+                            <TileCard key={tile.id} tile={tile}
+                              selected={floorTile?.id === tile.id}
+                              onSelect={() => setFloorTile(floorTile?.id === tile.id ? null : tile)}
+                              onInfo={() => setModalTile(tile)} />
+                          ))}
+                          <CustomHexSwatch value={customFloorColor} onChange={setCustomFloorColor} label="Custom Floor Colour" />
+                        </div>
+                        {floorTile && (
+                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
+                            <span className="font-semibold text-charcoal/70">{floorTile.name}</span>
+                            {customFloorColor && <span className="text-terracotta font-semibold"> · {customFloorColor}</span>}
+                            {" — "}{floorTile.description.split(".")[0]}.
+                          </p>
+                        )}
+                        {!floorTile && customFloorColor && (
+                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
+                            Custom colour <span className="font-semibold text-terracotta">{customFloorColor}</span> will be applied.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </SidebarSection>
 
-                  {/* 3. Wall Tiles */}
-                  <SidebarSection icon={Layers} title="Wall Tiles (Colour)">
+                  {/* Walls — format, then tone */}
+                  <SidebarSection icon={Layers} title="Walls">
                   <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
-                    <div className="grid grid-cols-4 gap-2">
-                      {WALL_TILES.map((tile) => (
-                        <TileCard key={tile.id} tile={tile}
-                          selected={wallTile?.id === tile.id}
-                          onSelect={() => setWallTile(wallTile?.id === tile.id ? null : tile)}
-                          onInfo={() => setModalTile(tile)} />
-                      ))}
-                      {/* Custom hex swatch */}
-                      <CustomHexSwatch
-                        value={customWallColor}
-                        onChange={setCustomWallColor}
-                        label="Custom Wall Colour"
+                    <div>
+                      <StepLabel n={1}>Choose a material or pattern</StepLabel>
+                      <FormatGrid
+                        options={WALL_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+                        value={wallFormat}
+                        onChange={(id) => setWallFormat(id as WallFormat | null)}
                       />
                     </div>
-                    {wallTile && (
-                      <p className="text-[11px] text-charcoal/50 text-center">
-                        <span className="font-semibold text-charcoal/70">{wallTile.name}</span>
-                        {customWallColor && <span className="text-terracotta font-semibold"> · {customWallColor}</span>}
-                        {" — "}{wallTile.description.split(".")[0]}.
-                      </p>
-                    )}
-                    {!wallTile && customWallColor && (
-                      <p className="text-[11px] text-charcoal/50 text-center">
-                        Custom colour <span className="font-semibold text-terracotta">{customWallColor}</span> will be applied to the walls.
-                      </p>
-                    )}
-                  </SidebarSection>
-
-                  {/* 4. Tile Layout & Texture */}
-                  <SidebarSection icon={Layers} title="Tile Layout & Texture">
-                    <div className="grid grid-cols-4 gap-2">
-                      {TILE_STYLE_OPTIONS.map((style) => {
-                        const active = tileStyle === style.id;
-                        return (
-                          <button
-                            key={style.id}
-                            onClick={() => setTileStyle(active ? null : style.id as TileStyle)}
-                            className={cn(
-                              "group relative w-full aspect-square rounded-2xl overflow-hidden transition-all duration-200 outline-none",
-                              active
-                                ? "ring-2 ring-terracotta ring-offset-2 shadow-warm scale-[1.04]"
-                                : "ring-1 ring-sand-200 hover:ring-terracotta/40 hover:shadow-warm-sm hover:scale-[1.02]",
-                            )}
-                          >
-                            {/* Texture thumbnail */}
-                            <TileTexture
-                              tileId={style.id}
-                              size={80}
-                              className="absolute inset-0 w-full h-full"
-                              style={{ width: "100%", height: "100%" }}
-                            />
-                            {/* Selected badge */}
-                            {active && (
-                              <div className="absolute top-1.5 right-1.5 z-10 w-5 h-5 rounded-full bg-terracotta flex items-center justify-center shadow-warm-sm">
-                                <CheckCircle2 size={11} className="text-white" strokeWidth={3} />
-                              </div>
-                            )}
-                            {/* Label */}
-                            <div className="absolute bottom-0 inset-x-0 px-1.5 py-1.5 rounded-b-2xl bg-gradient-to-t from-black/65 to-transparent">
-                              <p className="text-[9px] font-bold text-white text-center drop-shadow truncate leading-tight">
-                                {style.label}
-                              </p>
-                              <p className="text-[8px] text-white/60 text-center leading-none mt-0.5">{style.tag}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {tileStyle && (
-                      <p className="text-[11px] text-charcoal/45 text-center">
-                        {TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.promptPhrase}
-                      </p>
+                    {wallFormat && (
+                      <div>
+                        <StepLabel n={2}>Choose a colour or tone</StepLabel>
+                        <div className="grid grid-cols-4 gap-2">
+                          {tonesFor(WALL_TILES, WALL_FORMATS.find((f) => f.id === wallFormat)).map((tile) => (
+                            <TileCard key={tile.id} tile={tile}
+                              selected={wallTile?.id === tile.id}
+                              onSelect={() => setWallTile(wallTile?.id === tile.id ? null : tile)}
+                              onInfo={() => setModalTile(tile)} />
+                          ))}
+                          <CustomHexSwatch value={customWallColor} onChange={setCustomWallColor} label="Custom Walls Colour" />
+                        </div>
+                        {wallTile && (
+                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
+                            <span className="font-semibold text-charcoal/70">{wallTile.name}</span>
+                            {customWallColor && <span className="text-terracotta font-semibold"> · {customWallColor}</span>}
+                            {" — "}{wallTile.description.split(".")[0]}.
+                          </p>
+                        )}
+                        {!wallTile && customWallColor && (
+                          <p className="mt-2 text-[11px] text-charcoal/50 text-center">
+                            Custom colour <span className="font-semibold text-terracotta">{customWallColor}</span> will be applied.
+                          </p>
+                        )}
+                      </div>
                     )}
                   </SidebarSection>
 
@@ -2146,11 +2092,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
                 </>)}
                 {roomType === "kitchen" && (<>
-                  <StyleLibrary looks={KITCHEN_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
+                  <StyleLibrary looks={KITCHEN_STYLES} activeId={kitchenSelections.designStyle} onSelect={handleStyle} />
                   <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
                 </>)}
                 {roomType === "bedroom" && (<>
-                  <StyleLibrary looks={BEDROOM_STYLES} activeId={activeStylePreset} onSelect={handleStyle} />
+                  <StyleLibrary looks={BEDROOM_STYLES} activeId={bedroomSelections.designStyle} onSelect={handleStyle} />
                   <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
                 </>)}
               </StepCard>

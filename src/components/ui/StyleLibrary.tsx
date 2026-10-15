@@ -2,9 +2,9 @@
 
 /**
  * StyleLibrary — "Start from a style" cards for any design tool.
- * Each card previews the look (upper and lower surface plus a fixture swatch);
- * picking one applies the room's preset, and every choice can still be changed.
- * Presets live in src/lib/stylePresets.ts.
+ * Each card previews the look. Picking one sets the design's overall style for
+ * the AI; it never selects finishes, and only the luxury tier adds a premium.
+ * Cards live in src/lib/stylePresets.ts, styles in src/lib/designStyles.ts.
  */
 
 import { Check, Sparkles } from "lucide-react";
@@ -23,7 +23,7 @@ export default function StyleLibrary({ looks, activeId, onSelect }: StyleLibrary
       <div className="flex items-center gap-2">
         <Sparkles size={14} className="text-terracotta" />
         <p className="text-sm font-bold text-charcoal">Start from a style</p>
-        <span className="ml-auto text-xs text-charcoal/40">Tap to apply · change anything after</span>
+        <span className="ml-auto text-xs text-charcoal/40">Sets the look for your AI preview</span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -57,6 +57,9 @@ export default function StyleLibrary({ looks, activeId, onSelect }: StyleLibrary
               <div className={cn("flex-1 px-3 py-2.5", active && "bg-terracotta/5")}>
                 <p className={cn("text-sm font-bold leading-tight", active ? "text-terracotta" : "text-charcoal")}>{look.name}</p>
                 <p className="mt-0.5 text-[11px] leading-snug text-charcoal/50">{look.description}</p>
+                <p className={cn("mt-1.5 text-[10px] font-bold uppercase tracking-wider", look.premium > 0 ? "text-terracotta" : "text-emerald-700")}>
+                  {look.premium > 0 ? `+$${look.premium.toLocaleString("en-AU")} luxury detailing` : "No extra cost"}
+                </p>
               </div>
             </button>
           );

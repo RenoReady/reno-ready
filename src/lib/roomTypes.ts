@@ -10,6 +10,8 @@
  */
 
 import { isKept, type KitchenKeepKey, type BedroomKeepKey } from "./keepExisting";
+import { FLOOR_TILES, FLOOR_FORMATS, surfaceLabel, type TileOption, type FloorFormat, type SurfaceFormat } from "./types";
+import { styleSection, styleCostItem, type DesignStyleId } from "./designStyles";
 
 // ── Room type ────────────────────────────────────────────────────────────────
 
@@ -29,14 +31,25 @@ export const ROOM_DESCRIPTIONS: Record<RoomType, string> = {
 
 // ── Global ceiling ────────────────────────────────────────────────────────────
 
-export type CeilingStyle = "standard-white" | "vj-paneling" | "exposed-beam" | "coffered";
+export type CeilingStyle = "standard-white" | "custom-paint";
+
+export const CEILING_CUSTOM_COST = 450;
 
 export const CEILING_OPTIONS: { id: CeilingStyle; label: string; sub: string; cost: number }[] = [
-  { id: "standard-white", label: "Standard White Paint",     sub: "Clean flat white — the classic, cost-effective choice",   cost: 0       },
-  { id: "vj-paneling",    label: "VJ Paneling (Whitewashed)", sub: "Tongue-and-groove boards ceiling-mounted — coastal/hamptons", cost: 3_200 },
-  { id: "exposed-beam",   label: "Exposed Beam (AI rendered)", sub: "Rustic or industrial raw beam ceiling — high visual impact", cost: 4_800 },
-  { id: "coffered",       label: "Coffered Ceiling",          sub: "Recessed grid panels — formal, grand architectural statement", cost: 5_500 },
+  { id: "standard-white", label: "Standard Crisp White", sub: "Fresh flat white — the default",      cost: 0 },
+  { id: "custom-paint",   label: "Custom Paint Colour",  sub: "Any colour from the colour wheel",     cost: CEILING_CUSTOM_COST },
 ];
+
+/** Ceiling for the AI: crisp white unless a custom colour is chosen */
+export function ceilingPrompt(style: CeilingStyle | string | null | undefined, color: string | null | undefined): string {
+  return style === "custom-paint" && color ? `painted ceiling in the exact colour ${color}` : "crisp flat white painted ceiling";
+}
+export function ceilingCost(style: CeilingStyle | string | null | undefined): number {
+  return style === "custom-paint" ? CEILING_CUSTOM_COST : 0;
+}
+export function ceilingLabel(style: CeilingStyle | string | null | undefined, color: string | null | undefined): string {
+  return style === "custom-paint" ? `Custom Paint${color ? ` ${color}` : ""}` : "Standard Crisp White";
+}
 
 // ── Kitchen types ─────────────────────────────────────────────────────────────
 
@@ -47,7 +60,7 @@ export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome" | "whi
 export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab" | "mirrored" | "vj-panel" | "slab-match";
 export type CooktopType      = "induction" | "gas";
 export type DishwasherType   = "integrated" | "freestanding";
-export type KitchenFloorFinish = "large-white" | "large-grey" | "large-charcoal" | "timber-oak" | "polished-concrete" | "terrazzo";
+export type KitchenWallFinish = "paint" | "vj-panelling" | "limewash" | "venetian-plaster";
 
 export interface KitchenSizeOption {
   id:       KitchenRoomSize;
@@ -79,12 +92,19 @@ export interface KitchenSelections {
   benchtop:             BenchtopMaterial | null;
   mixer:                MixerFinish      | null;
   splashback:           SplashbackStyle  | null;
-  floorFinish:          KitchenFloorFinish | null; // kitchen floor tile/finish
-  floorColor:           string | null;             // custom hex override for floor
-  wallColor:            string | null;             // painted wall colour
+  /** Floor Step A — the format; Step B is floorTone (or a custom floorColor) */
+  floorFormat:          FloorFormat | null;
+  floorTone:            string | null;             // tone id (FLOOR_TILES)
+  floorColor:           string | null;             // custom hex instead of a tone
+  /** Wall Step A — the material; Step B is wallColor */
+  wallFinish:           KitchenWallFinish | null;
+  wallColor:            string | null;             // wall colour
   cooktop:              CooktopType | null;
   dishwasher:           DishwasherType | null;
   ceilingStyle:         CeilingStyle | null;
+  ceilingColor:         string | null;             // custom ceiling paint colour
+  /** Overall look for the AI — never selects finishes */
+  designStyle:          DesignStyleId | null;
   hasIsland:            boolean;  // triggers gas/plumbing advisory
   hasApplianceRoughin:  boolean;  // new gas point / 15-amp circuit
   hasSinkRoughin:       boolean;  // moving the plumbing stack
@@ -183,15 +203,21 @@ export const SPLASHBACK_OPTIONS: { id: SplashbackStyle; label: string; sub: stri
   { id: "slab-match",     label: "Benchtop Slab Match",     sub: "Seamless stone continuation — the most dramatic look",        costAdj: 2_200 },
 ];
 
-export const KITCHEN_FLOOR_OPTIONS: { id: KitchenFloorFinish; label: string; sub: string; color: string; costAdj: number }[] = [
-  { id: "large-white",       label: "Large Format White",    sub: "600×1200mm white porcelain — bright, clean, timeless",               color: "#F5F0E8", costAdj: 0      },
-  { id: "large-grey",        label: "Large Format Grey",     sub: "600×1200mm grey stone-look — contemporary and versatile",            color: "#C0BCBA", costAdj: 0      },
-  { id: "large-charcoal",    label: "Large Format Charcoal", sub: "Dark porcelain slab — dramatic, hides everyday dirt and scuffs",     color: "#4A4A4A", costAdj: 500    },
-  { id: "timber-oak",        label: "Timber-Look Oak",       sub: "Plank-format oak-look — warmth of timber, durability of porcelain",  color: "#C4956A", costAdj: 800    },
-  { id: "polished-concrete", label: "Polished Concrete",     sub: "Grind-and-seal existing slab — industrial-luxe, effortless to clean", color: "#ABABAB", costAdj: 1_200 },
-  { id: "terrazzo",          label: "Terrazzo",              sub: "Chip-speckled surface — retro luxe, increasingly popular in kitchens", color: "#D4C8B8", costAdj: 2_500 },
+/** Kitchen floors use the shared formats and tones, priced for a typical kitchen */
+const KITCHEN_FLOOR_COST: Record<FloorFormat, number> = {
+  "large-format": 2_800, herringbone: 4_000, "timber-look": 3_200, "polished-concrete": 3_800,
+};
+export const KITCHEN_FLOOR_FORMATS: SurfaceFormat<FloorFormat>[] =
+  FLOOR_FORMATS.map((f) => ({ ...f, cost: KITCHEN_FLOOR_COST[f.id] }));
+
+export const KITCHEN_WALL_FINISHES: { id: KitchenWallFinish; label: string; sub: string; swatch: string | null; cost: number; prompt: string }[] = [
+  { id: "paint",            label: "Paint",            sub: "Low-sheen wash-and-wear",      swatch: null,            cost: 0,     prompt: "low-sheen painted walls" },
+  { id: "vj-panelling",     label: "VJ Panelling",     sub: "Tongue-and-groove, painted",   swatch: "vj-panel",      cost: 2_800, prompt: "vertical VJ (tongue-and-groove) panelling, painted" },
+  { id: "limewash",         label: "Limewash",         sub: "Soft, cloudy mineral finish",  swatch: "limewash",      cost: 1_400, prompt: "a soft, cloudy limewash finish" },
+  { id: "venetian-plaster", label: "Venetian Plaster", sub: "Polished, seamless plaster",   swatch: "plaster-chalk", cost: 3_200, prompt: "polished Venetian plaster with a soft sheen" },
 ];
 
+/** Paint colours offered for walls (kitchen and bedroom) */
 export const KITCHEN_WALL_OPTIONS: { id: string; label: string; sub: string; color: string }[] = [
   { id: "wall-warm-white",  label: "Warm White",   sub: "Soft white with warm undertones",        color: "#F8F5F0" },
   { id: "wall-soft-grey",   label: "Soft Grey",    sub: "Cool neutral — pairs with any cabinet",  color: "#D4D8DC" },
@@ -217,7 +243,9 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
   const benchtopOpt   = sel.benchtop    ? BENCHTOP_OPTIONS.find((o)      => o.id === sel.benchtop)    : null;
   const splashbackOpt = sel.splashback  ? SPLASHBACK_OPTIONS.find((o)    => o.id === sel.splashback)  : null;
   const mixerOpt      = sel.mixer       ? MIXER_OPTIONS.find((o)         => o.id === sel.mixer)       : null;
-  const floorOpt      = sel.floorFinish ? KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish) : null;
+  const floorFmt      = sel.floorFormat ? KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat) : null;
+  const floorTone     = sel.floorTone   ? FLOOR_TILES.find((t) => t.id === sel.floorTone)           : null;
+  const wallFin       = sel.wallFinish  ? KITCHEN_WALL_FINISHES.find((f) => f.id === sel.wallFinish) : null;
 
   const materialItems: RoomCostItem[] = [];
 
@@ -242,15 +270,15 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
       detail: splashbackOpt.label,
     });
   }
-  if ((sel.floorFinish || sel.floorColor) && floorOpt) {
+  if (floorFmt || floorTone || sel.floorColor) {
     materialItems.push({
-      label:  `Kitchen Floor — ${floorOpt.label}`,
-      amount: 2_800 + floorOpt.costAdj,
-      detail: floorOpt.sub,
+      label:  `Kitchen Floor — ${surfaceLabel(floorFmt, floorTone, sel.floorColor) ?? "Tiles"}`,
+      amount: (floorFmt?.cost ?? 2_800) + (floorTone?.adj ?? 0),
+      detail: floorFmt?.sub ?? floorTone?.description,
     });
-  } else if (sel.floorColor && !floorOpt) {
-    // custom colour without a tile finish option
-    materialItems.push({ label: "Kitchen Floor — Custom Colour", amount: 2_800 });
+  }
+  if (wallFin && wallFin.cost > 0) {
+    materialItems.push({ label: `Walls — ${wallFin.label}`, amount: wallFin.cost, detail: wallFin.sub });
   }
   if (sel.mixer && mixerOpt) {
     materialItems.push({
@@ -273,11 +301,8 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
       detail: sel.dishwasher === "integrated" ? "Panel-match integrated, supply + install" : "Freestanding, supply + connection",
     });
   }
-  if (sel.ceilingStyle) {
-    const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
-    if (ceilingOpt && ceilingOpt.cost > 0) {
-      materialItems.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
-    }
+  if (ceilingCost(sel.ceilingStyle) > 0) {
+    materialItems.push({ label: `Ceiling — ${ceilingLabel(sel.ceilingStyle, sel.ceilingColor)}`, amount: ceilingCost(sel.ceilingStyle), detail: "Ceiling repaint in a custom colour" });
   }
 
   const materialTotal = materialItems.reduce((s, i) => s + i.amount, 0);
@@ -309,6 +334,9 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
     items.push({ label: "Butler's Pantry Integration", amount: 8_000, detail: "Separate prep space with cabinetry, sink, additional storage" });
   }
 
+  const styleItem = styleCostItem(sel.designStyle);
+  if (styleItem) items.push(styleItem);
+
   const total = items.reduce((s, i) => s + i.amount, 0);
   return { items, total };
 }
@@ -316,7 +344,7 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
 // ── Bedroom types ─────────────────────────────────────────────────────────────
 
 export type BedroomRoomSize    = "standard" | "master" | "large" | "custom";
-export type BedroomFlooring    = "engineered-oak-herringbone" | "herringbone-stone-grey" | "herringbone-stone-white" | "ash-rustic" | "ash" | "beech" | "hybrid-plank" | "polished-concrete" | "wool-carpet";
+export type BedroomFloorFormat = "timber-boards" | "herringbone" | "hybrid-plank" | "polished-concrete" | "carpet";
 export type WallTreatment      =
   | "feature-paint"
   | "limewash-paint"
@@ -358,15 +386,19 @@ export interface BedroomSelections {
   roomSize:          BedroomRoomSize | null;
   customLength:      number;   // metres — used when roomSize === "custom"
   customWidth:       number;
-  flooring:          BedroomFlooring  | null;  // null = deselected
-  flooringColor:     string | null;            // custom hex override for flooring
+  /** Flooring Step A — the format; Step B is flooringTone (or a custom flooringColor) */
+  flooringFormat:    BedroomFloorFormat | null;
+  flooringTone:      string | null;            // tone id (BEDROOM_FLOOR_TONES)
+  flooringColor:     string | null;            // custom hex instead of a tone
   wallTreatment:     WallTreatment    | null;
   wallColor:         string | null;            // custom hex override for wall
   lighting:          BedroomLighting  | null;
   storage:           StorageOption    | null;
   windowTreatment:   WindowTreatment  | null;
   ceilingStyle:      CeilingStyle | null;
-  ceilingColor:      string | null;            // custom hex override for ceiling
+  ceilingColor:      string | null;            // custom ceiling paint colour
+  /** Overall look for the AI — never selects finishes */
+  designStyle:       DesignStyleId | null;
   hasElectricalWork: boolean;  // bedside pendants / re-wiring → advisory
   hasVJWall:         boolean;  // VJ feature wall (structural add)
   hasMediaJoinery:   boolean;  // built-in media/TV joinery
@@ -379,70 +411,27 @@ export interface BedroomSelections {
 
 // ── Bedroom options ───────────────────────────────────────────────────────────
 
-export const BEDROOM_FLOORING_OPTIONS: { id: BedroomFlooring; label: string; sub: string; palette: string[]; cost: number }[] = [
-  {
-    id:      "engineered-oak-herringbone",
-    label:   "Engineered Oak — Herringbone",
-    sub:     "190mm boards in herringbone pattern — warm, architecturally striking",
-    palette: ["#C4956A", "#A87850", "#8B6040", "#6E4828"],
-    cost:    6_500,
-  },
-  {
-    id:      "herringbone-stone-grey",
-    label:   "Herringbone Stone Grey",
-    sub:     "Grey stone-look tiles in herringbone — cool, contemporary, durable",
-    palette: ["#9AA0A6", "#7C8490", "#606870", "#484E58"],
-    cost:    7_200,
-  },
-  {
-    id:      "herringbone-stone-white",
-    label:   "Herringbone Stone White",
-    sub:     "White marble-look herringbone — bright, airy, luxury hotel feel",
-    palette: ["#F0EDE8", "#E4E0D8", "#D8D4CC", "#CCC8C0"],
-    cost:    7_200,
-  },
-  {
-    id:      "ash-rustic",
-    label:   "Ash Rustic Floorboard",
-    sub:     "Wide-board rustic ash timber — characterful grain, warm earthy tones",
-    palette: ["#D4BC98", "#BCA07C", "#A4845E", "#8C6840"],
-    cost:    5_800,
-  },
-  {
-    id:      "ash",
-    label:   "Ash Timber",
-    sub:     "Clean ash boards — light, Scandinavian-inspired, pairs with any palette",
-    palette: ["#E0CCAA", "#CCBC94", "#B8A87E", "#A49468"],
-    cost:    5_200,
-  },
-  {
-    id:      "beech",
-    label:   "Beech Timber",
-    sub:     "Smooth blonde beech — bright and consistent grain for a fresh look",
-    palette: ["#D4B88A", "#C0A070", "#AC8858", "#987040"],
-    cost:    4_800,
-  },
-  {
-    id:      "hybrid-plank",
-    label:   "Hybrid Plank",
-    sub:     "100% waterproof click-lock — great value, durable, beige/warm tones",
-    palette: ["#D4B898", "#B89878", "#9C7C58", "#806040"],
-    cost:    3_800,
-  },
-  {
-    id:      "polished-concrete",
-    label:   "Polished Concrete",
-    sub:     "Grind-and-seal existing slab — industrial-luxe, effortless to clean",
-    palette: ["#C0C0BC", "#B0B0AC", "#A0A09C", "#90908C"],
-    cost:    4_500,
-  },
-  {
-    id:      "wool-carpet",
-    label:   "Wool Carpet",
-    sub:     "Plush 100% NZ wool loop pile — soft underfoot, excellent acoustics",
-    palette: ["#E8E0D8", "#D8D0C8", "#C8C0B8", "#B8B0A8"],
-    cost:    4_200,
-  },
+const OAK = ["natural-oak", "blonde-oak", "smoked-oak"];
+
+export const CARPET_TONES: TileOption[] = [
+  { id: "carpet-oatmeal",  name: "Oatmeal",   bgClass: "bg-honed-limestone", description: "Warm oatmeal loop pile — soft and forgiving." },
+  { id: "carpet-dove",     name: "Dove Grey", bgClass: "bg-smoked-concrete", description: "Cool dove grey loop pile." },
+  { id: "carpet-charcoal", name: "Charcoal",  bgClass: "bg-charcoal-slate",  textLight: true, description: "Deep charcoal loop pile — hides wear well." },
+];
+export const BEDROOM_FLOOR_TONES: TileOption[] = [...FLOOR_TILES, ...CARPET_TONES];
+
+/** Flooring formats, priced per 16m² and scaled to the room */
+export const BEDROOM_FLOOR_FORMATS: SurfaceFormat<BedroomFloorFormat>[] = [
+  { id: "timber-boards",     label: "Timber Boards",     sub: "Engineered, wide boards",       swatch: "natural-oak",    cost: 5_200,
+    prompt: "engineered timber floorboards laid lengthways", tones: OAK },
+  { id: "herringbone",       label: "Herringbone",       sub: "Classic angled boards",         swatch: "herringbone",    cost: 6_500,
+    prompt: "laid in a classic herringbone pattern", tones: [...OAK, "honed-limestone", "matte-slate-lg"] },
+  { id: "hybrid-plank",      label: "Hybrid Plank",      sub: "Waterproof, great value",       swatch: "blonde-oak",     cost: 3_800,
+    prompt: "hybrid planks with a realistic timber look", tones: OAK },
+  { id: "polished-concrete", label: "Polished Concrete", sub: "Grind and seal the slab",       swatch: "concrete-pale",  cost: 4_500,
+    prompt: "seamless polished concrete with a sealed satin finish", tones: ["concrete-pale", "smoked-concrete", "concrete-charcoal"] },
+  { id: "carpet",            label: "Carpet",            sub: "Soft wool-blend loop pile",     swatch: "carpet-oatmeal", cost: 4_200,
+    prompt: "soft wool-blend loop-pile carpet, wall to wall", tones: ["carpet-oatmeal", "carpet-dove", "carpet-charcoal"] },
 ];
 
 export const WALL_TREATMENT_OPTIONS: { id: WallTreatment; label: string; sub: string; cost: number }[] = [
@@ -561,12 +550,46 @@ export const WINDOW_TREATMENT_OPTIONS: { id: WindowTreatment; label: string; sub
   },
 ];
 
+/** Product-matching tags for a bedroom flooring format (shop-the-look lists use these ids) */
+export function flooringProductTags(sel: BedroomSelections): string[] {
+  const map: Record<BedroomFloorFormat, string[]> = {
+    "timber-boards":     ["ash", "ash-rustic", "beech"],
+    herringbone:         ["engineered-oak-herringbone", "herringbone-stone-grey", "herringbone-stone-white"],
+    "hybrid-plank":      ["hybrid-plank"],
+    "polished-concrete": ["polished-concrete"],
+    carpet:              ["wool-carpet"],
+  };
+  return sel.flooringFormat ? map[sel.flooringFormat] : [];
+}
+
+// ── Summary labels (briefs, PDF, preview) ──────────────────────────────────────
+
+export function kitchenFloorLabel(sel: KitchenSelections): string | null {
+  return surfaceLabel(KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat), FLOOR_TILES.find((t) => t.id === sel.floorTone), sel.floorColor);
+}
+export function kitchenWallLabel(sel: KitchenSelections): string | null {
+  const fin = KITCHEN_WALL_FINISHES.find((f) => f.id === sel.wallFinish);
+  const colour = KITCHEN_WALL_OPTIONS.find((o) => o.color === sel.wallColor)?.label ?? sel.wallColor;
+  const parts = [colour, fin?.label].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+export function bedroomFloorLabel(sel: BedroomSelections): string | null {
+  return surfaceLabel(BEDROOM_FLOOR_FORMATS.find((f) => f.id === sel.flooringFormat), BEDROOM_FLOOR_TONES.find((t) => t.id === sel.flooringTone), sel.flooringColor);
+}
+export function bedroomWallLabel(sel: BedroomSelections): string | null {
+  const wall = WALL_TREATMENT_OPTIONS.find((o) => o.id === sel.wallTreatment)?.label;
+  const colour = KITCHEN_WALL_OPTIONS.find((o) => o.color === sel.wallColor)?.label ?? sel.wallColor;
+  const parts = [colour, wall].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 // ── Bedroom cost engine ────────────────────────────────────────────────────────
 
 export const BEDROOM_BASE_COST = 3_500; // kept for reference
 
 export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]; total: number } {
-  const flooringOpt = sel.flooring       ? BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === sel.flooring)       : null;
+  const floorFmt    = sel.flooringFormat ? BEDROOM_FLOOR_FORMATS.find((f)    => f.id === sel.flooringFormat) : null;
+  const floorTone   = sel.flooringTone   ? BEDROOM_FLOOR_TONES.find((t)      => t.id === sel.flooringTone)   : null;
   const wallOpt     = sel.wallTreatment  ? WALL_TREATMENT_OPTIONS.find((o)    => o.id === sel.wallTreatment)  : null;
   const lightOpt    = sel.lighting       ? BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)       : null;
   const storageOpt  = sel.storage        ? STORAGE_OPTIONS.find((o)           => o.id === sel.storage)        : null;
@@ -580,12 +603,13 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   const sqmLabel = `approx ${sqm.toFixed(0)}m²`;
 
   // Scale flooring cost by area (base cost is per 16m²)
-  const flooringCost = flooringOpt ? Math.round((flooringOpt.cost * sqm) / 16 / 100) * 100 : 0;
+  const hasFloor = !!(floorFmt || floorTone || sel.flooringColor);
+  const flooringCost = hasFloor ? Math.round((((floorFmt?.cost ?? 5_200) + (floorTone?.adj ?? 0)) * sqm) / 16 / 100) * 100 : 0;
 
   const materialItems: RoomCostItem[] = [];
 
-  if (flooringOpt) {
-    materialItems.push({ label: `Flooring — ${flooringOpt.label}`, amount: flooringCost, detail: `Supply + lay, ${sqmLabel}` });
+  if (hasFloor) {
+    materialItems.push({ label: `Flooring — ${surfaceLabel(floorFmt, floorTone, sel.flooringColor) ?? "Flooring"}`, amount: flooringCost, detail: `Supply + lay, ${sqmLabel}` });
   }
   if (wallOpt) {
     materialItems.push({ label: `Wall — ${wallOpt.label}`, amount: wallOpt.cost, detail: wallOpt.sub });
@@ -612,11 +636,8 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   }
   items.push(...materialItems);
 
-  if (sel.ceilingStyle) {
-    const ceilingOpt = CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle);
-    if (ceilingOpt && ceilingOpt.cost > 0) {
-      items.push({ label: `Ceiling — ${ceilingOpt.label}`, amount: ceilingOpt.cost, detail: ceilingOpt.sub });
-    }
+  if (ceilingCost(sel.ceilingStyle) > 0) {
+    items.push({ label: `Ceiling — ${ceilingLabel(sel.ceilingStyle, sel.ceilingColor)}`, amount: ceilingCost(sel.ceilingStyle), detail: "Ceiling repaint in a custom colour" });
   }
   if (sel.hasVJWall) {
     items.push({ label: "VJ Feature Wall Installation", amount: 2_800, detail: "Floor-to-ceiling tongue-and-groove boards, painted" });
@@ -627,6 +648,9 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
   if (sel.hasPendantRoughin || sel.hasElectricalWork) {
     items.push({ label: "Electrical Re-wiring & Fit-off", amount: 2_200, detail: "New circuits for pendant/sconce/cove lighting, safety switch upgrades", warning: true });
   }
+
+  const styleItem = styleCostItem(sel.designStyle);
+  if (styleItem) items.push(styleItem);
 
   const total = items.reduce((s, i) => s + i.amount, 0);
   return { items, total };
@@ -733,12 +757,19 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)       => o.id === sel.benchtop)?.label    ?? sel.benchtop)   : null;
   const mixer    = sel.mixer      ? (MIXER_OPTIONS.find((o)          => o.id === sel.mixer)?.label       ?? sel.mixer)      : null;
   const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o)     => o.id === sel.splashback)?.label  ?? sel.splashback) : null;
-  const floor    = sel.floorFinish ? (KITCHEN_FLOOR_OPTIONS.find((o) => o.id === sel.floorFinish)?.label ?? sel.floorFinish): null;
+  const floorFmt = KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat);
+  const floorTn  = FLOOR_TILES.find((t) => t.id === sel.floorTone);
+  const floor    = floorFmt || floorTn || sel.floorColor
+    ? `${floorTn?.name ?? (sel.floorColor ? "custom-coloured" : "neutral")} ${floorFmt?.prompt ?? "floor tiles"}`
+    : null;
   const floorColorNote = sel.floorColor ? ` in the exact colour ${sel.floorColor}` : "";
-  const wallColorNote  = sel.wallColor  ? `Kitchen walls: Paint all visible walls in the exact colour ${sel.wallColor}.` : null;
+  const wallFin  = KITCHEN_WALL_FINISHES.find((f) => f.id === sel.wallFinish);
+  const wallColorNote  = wallFin || sel.wallColor
+    ? `Kitchen walls: ${wallFin?.prompt ?? "painted walls"}${sel.wallColor ? ` in the exact colour ${sel.wallColor}` : ""} on all visible walls.`
+    : null;
   const cooktop  = sel.cooktop ? (sel.cooktop === "induction" ? "induction cooktop" : "gas cooktop") : "cooktop (type not specified)";
   const dw       = sel.dishwasher ? (sel.dishwasher === "integrated" ? "integrated panel-match dishwasher" : "freestanding dishwasher") : "dishwasher (type not specified)";
-  const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
+  const ceiling  = ceilingPrompt(sel.ceilingStyle, sel.ceilingColor);
   const kept = (k: KitchenKeepKey) => isKept(sel.keepExisting, k);
 
   // ── No-photo mode: generate from scratch ─────────────────────────────────
@@ -769,7 +800,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
     if (sel.hasIsland)       lines.push("\nIsland bench: Include a freestanding kitchen island with matching benchtop and waterfall edges.");
     if (sel.hasWallChange)   lines.push("Open-plan connection: Show an open-plan kitchen-living space.");
     if (sel.hasButlersPantry) lines.push("Include a butler's pantry scullery adjacent to the main kitchen with matching cabinetry.");
-    return lines.join("\n") + clientRequestSection(sel.customNote, false);
+    return lines.join("\n") + styleSection(sel.designStyle, "kitchen", false) + clientRequestSection(sel.customNote, false);
   }
 
   // ── Photo mode: surface retexturing only ─────────────────────────────────
@@ -801,7 +832,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
     ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
-  return spatialLock + materials + islandNote + structuralSection + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
+  return spatialLock + materials + islandNote + structuralSection + styleSection(sel.designStyle, "kitchen", true) + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
 }
 
 /**
@@ -817,12 +848,19 @@ export function clientRequestSection(note: string | undefined | null, hasPhoto: 
 }
 
 export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): string {
-  const flooring = sel.flooring        ? (BEDROOM_FLOORING_OPTIONS.find((o)  => o.id === sel.flooring)?.label        ?? sel.flooring)        : null;
-  const wall     = sel.wallTreatment   ? (WALL_TREATMENT_OPTIONS.find((o)    => o.id === sel.wallTreatment)?.label   ?? sel.wallTreatment)   : null;
+  const floorFmt = BEDROOM_FLOOR_FORMATS.find((f) => f.id === sel.flooringFormat);
+  const floorTn  = BEDROOM_FLOOR_TONES.find((t) => t.id === sel.flooringTone);
+  const flooring = floorFmt || floorTn || sel.flooringColor
+    ? `${floorTn?.name ?? (sel.flooringColor ? "custom-coloured" : "neutral")} ${floorFmt?.prompt ?? "flooring"}${sel.flooringColor ? ` in the exact colour ${sel.flooringColor}` : ""}`
+    : null;
+  const wallOpt  = WALL_TREATMENT_OPTIONS.find((o) => o.id === sel.wallTreatment);
+  const wall     = wallOpt || sel.wallColor
+    ? `${wallOpt?.label ?? "Painted walls"}${sel.wallColor ? ` in the exact colour ${sel.wallColor}` : ""}`
+    : null;
   const light    = sel.lighting        ? (BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)?.label        ?? sel.lighting)        : null;
   const storage  = sel.storage         ? (STORAGE_OPTIONS.find((o)           => o.id === sel.storage)?.label         ?? sel.storage)         : null;
   const window_  = sel.windowTreatment ? (WINDOW_TREATMENT_OPTIONS.find((o)  => o.id === sel.windowTreatment)?.label ?? sel.windowTreatment) : null;
-  const ceiling  = sel.ceilingStyle ? (CEILING_OPTIONS.find((o) => o.id === sel.ceilingStyle)?.label ?? "standard white ceiling") : "standard white ceiling";
+  const ceiling  = ceilingPrompt(sel.ceilingStyle, sel.ceilingColor);
 
   const kept = (k: BedroomKeepKey) => isKept(sel.keepExisting, k);
 
@@ -860,7 +898,7 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     if (sel.hasVJWall)       lines.push("Add a floor-to-ceiling VJ paneled feature wall behind the bedhead.");
     if (sel.hasMediaJoinery) lines.push("Include a custom built-in media unit with TV recess, flanking shelves and integrated storage.");
     if (sel.hasPendantRoughin) lines.push("Show bedside wall-hung pendant sconces on each side of the bedhead.");
-    return lines.join("\n") + clientRequestSection(sel.customNote, false);
+    return lines.join("\n") + styleSection(sel.designStyle, "bedroom", false) + clientRequestSection(sel.customNote, false);
   }
 
   // ── Photo mode: surface retexturing only ─────────────────────────────────
@@ -887,5 +925,5 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     ? "\n\nPermitted structural changes (only these — no others): " + structuralNotes.join(" ")
     : "";
 
-  return spatialLock + materials + structuralSection + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
+  return spatialLock + materials + structuralSection + styleSection(sel.designStyle, "bedroom", true) + clientRequestSection(sel.customNote, true) + SPATIAL_REMINDER;
 }

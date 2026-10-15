@@ -15,6 +15,7 @@
 import { X, ExternalLink, ShoppingBag, MapPin, Star, Grid3X3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RoomType } from "@/lib/roomTypes";
+import { flooringProductTags } from "@/lib/roomTypes";
 import type { KitchenSelections, BedroomSelections } from "@/lib/roomTypes";
 import type { VanityType, TapwareFinish, TileOption } from "@/lib/types";
 
@@ -438,7 +439,7 @@ function resolveFeaturedProducts(
   }
 
   if (room === "bedroom" && bedroomSel) {
-    if (bedroomSel.flooring)       activeTags.push(bedroomSel.flooring);
+    activeTags.push(...flooringProductTags(bedroomSel));
     if (bedroomSel.wallTreatment)  activeTags.push(bedroomSel.wallTreatment);
     if (bedroomSel.lighting)       activeTags.push(bedroomSel.lighting);
     if (bedroomSel.storage)        activeTags.push(bedroomSel.storage);

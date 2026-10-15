@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { TileOption, VanityType, TapwareFinish } from "@/lib/types";
 import type { KitchenSelections, BedroomSelections } from "@/lib/roomTypes";
 import type { RoomType } from "@/lib/roomTypes";
+import { flooringProductTags } from "@/lib/roomTypes";
 
 // ── Product catalogue ─────────────────────────────────────────────────────────
 
@@ -668,7 +669,7 @@ function KitchenSections({ sel }: { sel: KitchenSelections }) {
 }
 
 function BedroomSections({ sel }: { sel: BedroomSelections }) {
-  const flooringProducts = filterProducts(BEDROOM_FLOORING_PRODUCTS,  sel.flooring      ? [sel.flooring]      : []);
+  const flooringProducts = filterProducts(BEDROOM_FLOORING_PRODUCTS,  flooringProductTags(sel));
   const wallProducts     = filterProducts(WALL_TREATMENT_PRODUCTS,     sel.wallTreatment ? [sel.wallTreatment] : []);
   const lightingProducts = filterProducts(BEDROOM_LIGHTING_PRODUCTS,   sel.lighting      ? [sel.lighting]      : []);
   const storageProducts  = filterProducts(STORAGE_PRODUCTS,            sel.storage       ? [sel.storage]       : []);

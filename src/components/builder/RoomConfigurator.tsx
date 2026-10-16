@@ -180,6 +180,13 @@ function DesignConcierge({ tips }: { tips: string[] }) {
   );
 }
 
+/** A room estimate plus the project-brief lines (plumbing moves, strip-out, asbestos) */
+function withBrief(est: { items: { label: string; amount: number }[]; total: number }, brief: ProjectBrief | null, room: RoomType) {
+  if (!brief) return est;
+  const extra = calcBriefCostItems(brief, room);
+  return { items: [...est.items, ...extra], total: est.total + extra.reduce((n, i) => n + i.amount, 0) };
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  SMALL REUSABLE PIECES
 // ══════════════════════════════════════════════════════════════════
@@ -359,7 +366,7 @@ function CostSummary({ onOpenBrief }: { onOpenBrief: () => void }) {
           className="flex items-center gap-2 w-full py-2 px-3 rounded-xl text-[10px] font-semibold text-white/30 hover:text-white/50 transition-colors"
         >
           <ClipboardList size={11} />
-          {projectBrief.yearBuilt} · {projectBrief.plumbingLayout === "move-plumbing" ? "Moving plumbing" : "Keep layout"} · {projectBrief.scope === "full-stripout" ? "Full strip-out" : "Cosmetic refresh"}
+          {projectBrief.yearBuilt > 0 ? `${projectBrief.yearBuilt} · ` : ""}{projectBrief.plumbingLayout === "move-plumbing" ? "Moving plumbing" : "Keep layout"}{projectBrief.scope ? ` · ${projectBrief.scope === "full-stripout" ? "Full strip-out" : "Cosmetic refresh"}` : ""}
           {hasAsbestos && <TriangleAlert size={10} className="text-amber-400 ml-1" />}
           <span className="ml-auto underline underline-offset-2">Edit brief</span>
         </button>
@@ -939,20 +946,19 @@ function InlineBriefPanel({
   const valid = !isNaN(y) && y >= 1900 && y <= new Date().getFullYear();
   const isOld = valid && y < 1990;
 
-  const canSave = scope !== null;
+  const canSave = scope !== null || (!isBedroom && plumbingLayout !== null);
 
   // For bedroom: asbestos triggered by full reno only (no plumbing move option)
   const asbestosTriggered = isBedroom
     ? isOld && scope === "full-stripout"
     : isOld && (scope === "full-stripout" || plumbingLayout === "move-plumbing");
 
-  // Auto-save whenever scope changes (year optional, plumbing optional)
+  // Auto-save as soon as a layout or a scope is picked, so each one moves the estimate on its own
   useEffect(() => {
-    if (!canSave || !scope) return;
-    const effectiveYear = valid ? y : new Date().getFullYear();
-    // Bedroom always uses keep-layout (no plumbing)
-    const effectivePlumbing = isBedroom ? "keep-layout" : (plumbingLayout ?? "keep-layout");
-    onSave({ yearBuilt: effectiveYear, plumbingLayout: effectivePlumbing, scope, bathroomCount: 1 });
+    const layout = isBedroom ? null : plumbingLayout;   // bedrooms have no plumbing choice
+    if (!scope && !layout) { if (projectBrief) onClear(); return; }
+    onSave({ yearBuilt: valid ? y : 0,   // 0 = not given (no asbestos flag, shown as "Not given")
+      plumbingLayout: layout ?? "keep-layout", scope, bathroomCount: 1 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, plumbingLayout, scope]);
 
@@ -1071,7 +1077,7 @@ function InlineBriefPanel({
       </div>
 
       {!canSave && (
-        <p className="text-[10px] text-charcoal/35 text-center">Select renovation scope to activate the cost estimate</p>
+        <p className="text-[10px] text-charcoal/35 text-center">Pick a layout or a scope to add these costs to your estimate</p>
       )}
     </div>
   );
@@ -1553,11 +1559,14 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const reachable  = roomPhotoUrl ? (hasPreview ? 2 : 1) : 0;
 
   const liveEstimate = (() => {
-    if (roomType === "kitchen") return formatAUD(Math.round(calcKitchenCost(kitchenSelections).total / 500) * 500);
-    if (roomType === "bedroom") return formatAUD(Math.round(calcBedroomCost(bedroomSelections).total / 500) * 500);
+    // project brief extras (plumbing moves, strip-out, asbestos) count in every room
+    const brief = projectBrief ? calcBriefTotal(projectBrief, roomType) : 0;
+    if (roomType === "kitchen") return formatAUD(Math.round((calcKitchenCost(kitchenSelections).total + brief) / 500) * 500);
+    if (roomType === "bedroom") return formatAUD(Math.round((calcBedroomCost(bedroomSelections).total + brief) / 500) * 500);
     const est = calcEstimatedCost(floorTile, wallTile, vanity, tapware, structuralChanges, 0, bathroomSize, customLength, customWidth, lightingOption, { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle });
-    if (!est) return formatAUD(0);
-    return `${formatAUD(Math.round(est * 0.88 / 500) * 500)}–${formatAUD(Math.round(est * 1.12 / 500) * 500)}`;
+    if (!est && !brief) return formatAUD(0);
+    const lo = Math.round((est * 0.88 + brief) / 500) * 500, hi = Math.round((est * 1.12 + brief) / 500) * 500;
+    return lo === hi ? formatAUD(lo) : `${formatAUD(lo)}–${formatAUD(hi)}`;
   })();
 
   const showFreeCounter = !userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium;
@@ -1697,6 +1706,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                       toneLabel={floorTile?.name ?? (customFloorColor ? `Custom ${customFloorColor}` : null)}
                       tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
                       thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      popularLabel="Popular floor tiles"
                       moreLabel="View More Floor Styles"
                       drawerTitle="Floor tiles"
                       onPick={(id, tone) => { setFloorFormat(id as FloorFormat); setFloorTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomFloorColor(null); }}
@@ -1719,6 +1729,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                       toneLabel={wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
                       tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
                       thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      popularLabel="Popular wall tiles"
                       moreLabel="View More Wall Styles"
                       drawerTitle="Wall tiles"
                       onPick={(id, tone) => { setWallFormat(id as WallFormat); setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomWallColor(null); }}
@@ -1741,6 +1752,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                       toneLabel={paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)}
                       tonesFor={(id) => (findPaintFinish(id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: paintSwatch(id, t.id) }))}
                       thumbFor={(id, tone) => paintSwatch(id, tone ?? findPaintFinish(id)?.defaultTone ?? "")}
+                      popularLabel="Popular finishes"
                       moreLabel="View More Paint & Wall Finishes"
                       drawerTitle="Wall colour"
                       onPick={(id, tone) => setWallPaint(id as WallPaintFinish, findPaintFinish(id)?.tones.find((t) => t.id === tone)?.color ?? null)}
@@ -1757,7 +1769,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   <SidebarSection icon={Layers} title="Vanity Style">
                     <div className="grid grid-cols-2 gap-3">
                       {VANITY_OPTIONS.map((opt) => (
-                        <button key={opt.id} onClick={() => setVanity(opt.id as VanityType)}
+                        <button key={opt.id} onClick={() => setVanity(vanity === opt.id ? null : opt.id as VanityType)} aria-pressed={vanity === opt.id}
                           className={cn(
                             "flex flex-col gap-2 p-4 rounded-2xl text-left border-2 transition-all duration-200 outline-none",
                             vanity === opt.id ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
@@ -1774,7 +1786,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   <SidebarSection icon={Droplets} title="Tapware Finish">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {TAPWARE_OPTIONS.map((opt) => (
-                        <button key={opt.id} onClick={() => setTapware(opt.id as TapwareFinish)}
+                        <button key={opt.id} onClick={() => setTapware(tapware === opt.id ? null : opt.id as TapwareFinish)} aria-pressed={tapware === opt.id}
                           className={cn(
                             "flex flex-col items-center gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 outline-none",
                             tapware === opt.id ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
@@ -2362,7 +2374,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
               <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Kitchen Cost Estimate</p>
                 {(() => {
-                  const { items, total } = calcKitchenCost(kitchenSelections);
+                  const { items, total } = withBrief(calcKitchenCost(kitchenSelections), projectBrief, "kitchen");
                   const rounded = Math.round(total / 500) * 500;
                   const isOver  = rounded > kitchenSelections.budget && rounded > 0;
                   return (
@@ -2402,7 +2414,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
               <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Bedroom Cost Estimate</p>
                 {(() => {
-                  const { items, total } = calcBedroomCost(bedroomSelections);
+                  const { items, total } = withBrief(calcBedroomCost(bedroomSelections), projectBrief, "bedroom");
                   const rounded = Math.round(total / 500) * 500;
                   const isOver  = rounded > bedroomSelections.budget && rounded > 0;
                   return (

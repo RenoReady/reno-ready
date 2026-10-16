@@ -113,8 +113,8 @@ export default function PreviewPage() {
     bathroomBudget;
 
   // Brief-driven verified items (bathroom only — brief not used for kitchen/bedroom)
-  const briefItems  = projectBrief ? calcBriefCostItems(projectBrief) : [];
-  const briefTotal  = projectBrief ? calcBriefTotal(projectBrief)     : 0;
+  const briefItems  = projectBrief ? calcBriefCostItems(projectBrief, roomType) : [];
+  const briefTotal  = projectBrief ? calcBriefTotal(projectBrief, roomType)     : 0;
   const grandTotal  = estimatedCost + briefTotal;
 
   const overBudget  = grandTotal > budget;
@@ -137,7 +137,7 @@ export default function PreviewPage() {
     setIsGeneratingPDF(true);
     try {
       const { generateProReportPDF } = await import("@/lib/generateProReportPDF");
-      const briefTotalForPDF = projectBrief ? calcBriefTotal(projectBrief) : 0;
+      const briefTotalForPDF = projectBrief ? calcBriefTotal(projectBrief, roomType) : 0;
       await generateProReportPDF({
         selections: {
           roomPhotoUrl,

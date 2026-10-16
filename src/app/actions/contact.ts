@@ -22,6 +22,8 @@ export interface ConnectSubmission {
   email:    string;
   phone?:   string;
   message?: string;
+  /** The client's Pro Report PDF (base64), attached to the notification email */
+  report?:  { filename: string; base64: string };
 
   // Snapshot of the user's design at submission time
   design: {
@@ -70,7 +72,7 @@ const fmtAUD = (n: number) =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(n);
 
 // ── HTML email template ────────────────────────────────────────────
-function renderEmailHtml(s: ConnectSubmission): string {
+function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
   const d  = s.design;
   const sc = d.structuralChanges;
 
@@ -145,6 +147,7 @@ function renderEmailHtml(s: ConnectSubmission): string {
               <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;"></span>
               Submitted just now ·  ${escape(s.email)}
             </p>
+            <p style="margin:4px 0 0 0;font-size:11px;color:#6B7480;">${hasReport ? "Pro Report PDF attached — ready to forward to builders." : "No report attached (the client's browser couldn't build it)."}</p>
           </td>
           <td align="right">
             <a href="${replyMailto}" style="background:#D27D5E;color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:8px 14px;border-radius:10px;display:inline-block;">Reply →</a>
@@ -230,13 +233,20 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
   const destination = LEAD_NOTIFICATION_DESTINATION;
   const fromAddress = RESEND_FROM;
 
+  // Only attach a well-formed PDF of a sensible size (base64 of ~2.8 MB max)
+  const report = payload.report;
+  const attachment = report && /^[w.-]{1,80}.pdf$/.test(report.filename) && report.base64.length < 3_800_000 && report.base64.startsWith("JVBER")
+    ? [{ filename: report.filename, content: Buffer.from(report.base64, "base64") }]
+    : undefined;
+
   try {
     const { error } = await resend.emails.send({
       from:     fromAddress,
       to:       destination,
       replyTo:  payload.email,
       subject:  `🛁 New Lead — ${payload.name} · ${fmtAUD(payload.design.estimatedCost)} reno brief`,
-      html:     renderEmailHtml(payload),
+      html:     renderEmailHtml(payload, !!attachment),
+      attachments: attachment,
     });
 
     if (error) {

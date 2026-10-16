@@ -205,6 +205,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
           toneLabel={SURFACE_TONES.find((t) => t.id === selections.floorTone)?.name ?? (selections.floorColor ? `Custom ${selections.floorColor}` : null)}
           tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
           thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : KITCHEN_FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+          popularLabel="Popular floor tiles"
           moreLabel="View More Floor Styles"
           drawerTitle="Kitchen floor"
           onPick={(id, tone) => onChange({ floorFormat: id as FloorFormat, floorTone: tone, floorColor: null })}
@@ -228,6 +229,7 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
           toneLabel={paintToneFor(findPaintFinish(selections.wallFinish), selections.wallColor)?.name ?? (selections.wallColor ? `Custom ${selections.wallColor}` : null)}
           tonesFor={(id) => (findPaintFinish(id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: paintSwatch(id, t.id) }))}
           thumbFor={(id, tone) => paintSwatch(id, tone ?? findPaintFinish(id)?.defaultTone ?? "")}
+          popularLabel="Popular finishes"
           moreLabel="View More Paint & Wall Finishes"
           drawerTitle="Wall colour"
           onPick={(id, tone) => onChange({ wallFinish: id as KitchenWallFinish, wallColor: findPaintFinish(id)?.tones.find((t) => t.id === tone)?.color ?? null })}

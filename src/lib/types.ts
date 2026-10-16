@@ -182,7 +182,8 @@ export type FloorFormat =
   | "timber-plank" | "encaustic" | "terracotta" | "small-hexagon";
 export type WallFormat =
   | "subway" | "kitkat" | "zellige" | "large-slab"
-  | "terrazzo-wall" | "fluted" | "herringbone-wall" | "geometric";
+  | "terrazzo-wall" | "fluted" | "herringbone-wall" | "geometric"
+  | "wet-zones";
 
 export interface SurfaceFormat<T extends string = string> {
   id:     T;
@@ -198,6 +199,8 @@ export interface SurfaceFormat<T extends string = string> {
   tones:  string[];
   /** Shown under "View more" rather than in the top four */
   more?:  boolean;
+  /** A cheaper alternative, shown as its own card under the popular four */
+  budget?: boolean;
 }
 
 /** The five tones shared by every floor and wall tile style */
@@ -236,6 +239,8 @@ export const WALL_FORMATS: SurfaceFormat<WallFormat>[] = [
     prompt: "{tone} handmade zellige-look tiles with an irregular, glossy glaze", tones: ALL_TONES },
   { id: "large-slab",       label: "Large Format Slab",       sub: "Seamless Porcelain",  swatch: surfaceSwatch("large-slab", "light-grey"),       cost: 2_400,
     prompt: "seamless {tone} large-format porcelain slab panels with almost invisible joins", tones: ALL_TONES },
+  { id: "wet-zones",        label: "Wet Zones Only + Paint",  sub: "Shower & splashback tiled, the rest painted", swatch: surfaceSwatch("wet-zones", "warm-white"), cost: 700, budget: true,
+    prompt: "tiles only in the wet zones (the shower walls floor-to-ceiling and a splashback behind the vanity) in {tone} glazed subway tiles; every other wall is painted, not tiled", tones: ALL_TONES },
   { id: "terrazzo-wall",    label: "Terrazzo Wall",           sub: "Porcelain",           swatch: surfaceSwatch("terrazzo-wall", "sand"),          cost: 2_600, more: true,
     prompt: "{tone} terrazzo-look wall tiles with fine scattered chips", tones: ALL_TONES },
   { id: "fluted",           label: "Fluted / Ribbed Tile",    sub: "Ceramic Panels",      swatch: surfaceSwatch("fluted", "warm-white"),           cost: 2_200, more: true,

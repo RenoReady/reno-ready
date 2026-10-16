@@ -15,7 +15,8 @@ export type RenovationScope = "full-stripout" | "cosmetic-refresh";
 export interface ProjectBrief {
   yearBuilt:      number;         // e.g. 1985
   plumbingLayout: PlumbingLayout;
-  scope:          RenovationScope;
+  /** null until a scope is picked — the layout choice still counts on its own */
+  scope:          RenovationScope | null;
   bathroomCount:  1 | 2 | 3;     // 1 = sole bathroom → triggers hygiene advisory
 }
 
@@ -96,7 +97,7 @@ export interface BriefCostItem {
  * Returns the extra line items driven by the project brief.
  * All figures are conservative mid-range estimates unless sourced from invoices.
  */
-export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
+export function calcBriefCostItems(brief: ProjectBrief, room: "bathroom" | "kitchen" | "bedroom" = "bathroom"): BriefCostItem[] {
   const items: BriefCostItem[] = [];
 
   // 1. Asbestos — only when walls will be disturbed in a pre-1990 home
@@ -117,7 +118,7 @@ export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
       amount: STRIPOUT_LABOUR_COST + WATERPROOFING_COST,
       detail: "Labour, skip bin, clean waste disposal + new waterproofing membrane",
     });
-  } else {
+  } else if (brief.scope === "cosmetic-refresh") {
     items.push({
       label:  "Surface Prep & Waterproofing",
       amount: COSMETIC_PREP_COST,
@@ -133,6 +134,9 @@ export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
       detail: "Repositioning drain points and rough-in plumbing. Final cost depends on slab type and move distance.",
     });
   }
+
+  // 4–5. Bathroom-only allowances, once the scope is known
+  if (room !== "bathroom" || !brief.scope) return items;
 
   // 4. Shower screen — standard mid-range (Millennium Glass invoice anchor)
   items.push({
@@ -153,6 +157,6 @@ export function calcBriefCostItems(brief: ProjectBrief): BriefCostItem[] {
 }
 
 /** Total of all brief-driven line items */
-export function calcBriefTotal(brief: ProjectBrief): number {
-  return calcBriefCostItems(brief).reduce((sum, item) => sum + item.amount, 0);
+export function calcBriefTotal(brief: ProjectBrief, room: "bathroom" | "kitchen" | "bedroom" = "bathroom"): number {
+  return calcBriefCostItems(brief, room).reduce((sum, item) => sum + item.amount, 0);
 }

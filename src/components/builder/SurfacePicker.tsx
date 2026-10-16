@@ -193,6 +193,8 @@ export interface PickerStyle {
   cost:  number;
   /** Behind "View more" rather than in the top four */
   more?: boolean;
+  /** A cheaper alternative, shown as a wide card under the popular four */
+  budget?: boolean;
 }
 
 export interface PickerTone {
@@ -210,7 +212,7 @@ const price = (n: number) => (n > 0 ? `+$${n.toLocaleString("en-AU")}` : "Includ
  * Choosing a tone selects the style and the tone together.
  */
 export function StylePicker({
-  styles, value, tone, toneLabel, tonesFor, thumbFor, moreLabel, drawerTitle,
+  styles, value, tone, toneLabel, tonesFor, thumbFor, popularLabel, moreLabel, drawerTitle,
   onPick, onClear, custom,
 }: {
   styles:      PickerStyle[];
@@ -223,6 +225,8 @@ export function StylePicker({
   tonesFor:    (styleId: string) => PickerTone[];
   /** Card thumbnail for a style — in the chosen tone when it is the selected style */
   thumbFor:    (styleId: string, toneId: string | null) => string;
+  /** Heading over the first four, e.g. "Popular floor tiles" */
+  popularLabel: string;
   moreLabel:   string;
   /** Small heading in the drawer, e.g. "Floor tiles" */
   drawerTitle: string;
@@ -231,8 +235,9 @@ export function StylePicker({
   /** Optional custom colour inside the drawer */
   custom?:     { label: string; value: string | null; onChange: (styleId: string, hex: string | null) => void };
 }) {
-  const top  = styles.filter((s) => !s.more);
-  const rest = styles.filter((s) => s.more);
+  const top    = styles.filter((s) => !s.more && !s.budget);
+  const budget = styles.filter((s) => s.budget);
+  const rest   = styles.filter((s) => s.more);
   const activeIsMore = rest.some((s) => s.id === value);
   const [showMore, setShowMore] = useState(activeIsMore);
   const [open, setOpen] = useState<string | null>(null);
@@ -286,11 +291,43 @@ export function StylePicker({
     );
   };
 
+  // the budget option: one wide card with a small swatch, so it reads as an alternative, not a fifth style
+  const budgetCard = (s: PickerStyle) => {
+    const active = s.id === value;
+    return (
+      <button
+        key={s.id}
+        type="button"
+        onClick={() => setOpen(s.id)}
+        aria-pressed={active}
+        aria-haspopup="dialog"
+        className={cn(
+          "group mt-2.5 flex w-full items-center gap-3 overflow-hidden rounded-2xl border-2 p-2 pr-3 text-left transition-all duration-200",
+          active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/60 hover:border-terracotta/40 hover:shadow-warm-sm",
+        )}
+      >
+        <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-sand-100">
+          <TileTexture tileId={thumbFor(s.id, active ? tone : null)} size={112} className="absolute inset-0 h-full w-full" style={{ width: "100%", height: "100%" }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="mb-0.5 inline-block rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">Budget saver</span>
+          <p className={cn("text-xs font-bold leading-tight", active ? "text-terracotta" : "text-charcoal/85")}>{s.label}</p>
+          <p className="text-[10px] leading-snug text-charcoal/45">{active && toneLabel ? toneLabel : s.sub}</p>
+        </div>
+        <span className={cn("flex-shrink-0 text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/35")}>
+          {active ? <Check size={14} strokeWidth={3} /> : price(s.cost)}
+        </span>
+      </button>
+    );
+  };
+
   const openStyle = styles.find((s) => s.id === open) ?? null;
 
   return (
     <div>
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal/45">{popularLabel}</p>
       <div className="grid grid-cols-2 gap-2.5">{top.map(card)}</div>
+      {budget.map(budgetCard)}
       {rest.length > 0 && (
         <>
           <button

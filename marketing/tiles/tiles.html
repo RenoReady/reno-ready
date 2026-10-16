@@ -667,6 +667,19 @@ const WALL_STYLE_PAINTERS = {
     }
     ctx.restore(); studio(ctx, .8);
   },
+  // budget option: painted wall above, a band of subway tiles below (the wet zone)
+  "wet-zones"(ctx, rgb, seed) {
+    const tiles = document.createElement("canvas"); tiles.width = tiles.height = S;
+    subway(tiles.getContext("2d"), seed, rgb, toHex(groutFor(rgb)));
+    const paint = document.createElement("canvas"); paint.width = paint.height = S;
+    plaster(paint.getContext("2d"), seed + 1, "#EFEBE3", { sheen: .06, cloud: 3 });
+    const edge = 200;
+    ctx.drawImage(paint, 0, 0);
+    ctx.drawImage(tiles, 0, edge, S, S - edge, 0, edge, S, S - edge);
+    const g = ctx.createLinearGradient(0, edge - 5, 0, edge + 4);          // the tile edge catching the light
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(.6, "rgba(0,0,0,.16)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, edge - 5, S, 9);
+  },
   "geometric"(ctx, rgb, seed) {
     const R = mulberry(seed), w = 56, h = w * .5;
     ctx.fillStyle = toHex(groutFor(rgb)); ctx.fillRect(0, 0, S, S);
@@ -708,7 +721,11 @@ const PAINT_PAINTERS = {
 };
 
 for (const [style, paint] of [...Object.entries(FLOOR_STYLE_PAINTERS), ...Object.entries(WALL_STYLE_PAINTERS)])
-  for (const [tone, h] of Object.entries(TONE_HEX)) { const seed = nextSeed(); M[`${style}--${tone}`] = (ctx) => paint(ctx, hex(h), seed, tone); }
+  for (const [tone, h] of Object.entries(TONE_HEX)) {
+    // wet-zones was added later: a fixed seed keeps every other swatch's seed (and look) unchanged
+    const seed = style === "wet-zones" ? 4242 : nextSeed();
+    M[`${style}--${tone}`] = (ctx) => paint(ctx, hex(h), seed, tone);
+  }
 for (const [finish, tones] of Object.entries(PAINT_FINISH_TONES))
   for (const tone of tones) { const seed = nextSeed(); M[`paint-${finish}--${tone}`] = (ctx) => PAINT_PAINTERS[finish](ctx, PAINT_TONE_HEX[tone], seed); }
 

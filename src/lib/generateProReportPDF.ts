@@ -99,16 +99,44 @@ function addFooter(pdf: jsPDF, PW: number, PH: number) {
 
 async function loadImageAsDataUrl(url: string): Promise<string | null> {
   try {
-    if (url.startsWith("data:")) return url;
-    const res  = await fetch(url);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror  = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
+    let dataUrl: string | null = url;
+    if (!url.startsWith("data:")) {
+      const res  = await fetch(url);
+      const blob = await res.blob();
+      dataUrl = await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror  = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    }
+    return dataUrl ? await toCompactJpeg(dataUrl) : null;
   } catch { return null; }
+}
+
+/**
+ * Photos go into the report as ~1400px JPEGs. Raw uploads and AI renders are often
+ * multi-megabyte PNGs; this keeps the PDF small enough to download quickly and to
+ * attach to the builder-brief email.
+ */
+function toCompactJpeg(dataUrl: string, maxW = 1400, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxW / img.naturalWidth);
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round(img.naturalWidth * k);
+      canvas.height = Math.round(img.naturalHeight * k);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(dataUrl);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 // ── Room label helper ────────────────────────────────────────────────────────
@@ -230,13 +258,26 @@ function buildCostItems(
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
+export const REPORT_FILENAME = "Reno-Ready-Pro-Report.pdf";
+
+/** Download the report in the browser */
 export async function generateProReportPDF(input: ProReportInput): Promise<void> {
+  (await buildProReportPDF(input)).save(REPORT_FILENAME);
+}
+
+/** The same report as base64, for attaching to the builder-brief email */
+export async function proReportBase64(input: ProReportInput): Promise<string> {
+  const pdf = await buildProReportPDF(input);
+  return (pdf.output("datauristring") as string).split(",")[1];
+}
+
+async function buildProReportPDF(input: ProReportInput): Promise<jsPDF> {
   const {
     selections, projectBrief, generatedImageUrl, roomPhotoUrl,
     grandTotal, estimatedCost, roomType, kitchenSelections, bedroomSelections,
   } = input;
 
-  const pdf    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pdf    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   const PW     = pdf.internal.pageSize.getWidth();   // 210mm
   const PH     = pdf.internal.pageSize.getHeight();  // 297mm
   const MARGIN = 13;
@@ -247,7 +288,7 @@ export async function generateProReportPDF(input: ProReportInput): Promise<void>
 
   const matRows   = buildMatRows(roomType, selections, kitchenSelections, bedroomSelections);
   const costItems = buildCostItems(roomType, selections, kitchenSelections, bedroomSelections);
-  const briefItems = projectBrief ? calcBriefCostItems(projectBrief) : [];
+  const briefItems = projectBrief ? calcBriefCostItems(projectBrief, roomType) : [];
 
   // Pre-load images
   const [aiImageData, roomImageData] = await Promise.all([
@@ -462,8 +503,8 @@ export async function generateProReportPDF(input: ProReportInput): Promise<void>
   if (projectBrief) {
     y += 2;
     const briefLines = [
-      `Year of Construction: ${projectBrief.yearBuilt ?? "Unknown"}`,
-      `Renovation Scope: ${projectBrief.scope === "full-stripout" ? "Full Strip-out & Rebuild" : "Cosmetic Refresh"}`,
+      `Year of Construction: ${projectBrief.yearBuilt > 0 ? projectBrief.yearBuilt : "Not given"}`,
+      `Renovation Scope: ${projectBrief.scope === "full-stripout" ? "Full Strip-out & Rebuild" : projectBrief.scope === "cosmetic-refresh" ? "Cosmetic Refresh" : "Not specified"}`,
       `Plumbing: ${projectBrief.plumbingLayout === "keep-layout" ? "Keeping existing layout" : "Moving plumbing / walls"}`,
       `Bathrooms in home: ${projectBrief.bathroomCount === 3 ? "3 or more" : String(projectBrief.bathroomCount)}${projectBrief.bathroomCount === 1 ? " (sole bathroom — access plan required)" : ""}`,
       ...(needsAsbestosCheck(projectBrief) ? ["⚠  Asbestos risk flagged — testing & removal included in estimate above"] : []),
@@ -491,5 +532,5 @@ export async function generateProReportPDF(input: ProReportInput): Promise<void>
 
   addFooter(pdf, PW, PH);
 
-  pdf.save("Reno-Ready-Pro-Report.pdf");
+  return pdf;
 }

@@ -121,7 +121,9 @@ function buildRoomPrompt(req: PromptInput): string {
     ? surfacePrompt(wallFmt, SURFACE_TONES.find((t) => t.id === selections.wallTile?.id), selections.customWallColor)
     : withColour(wallName, selections.customWallColor);
   // Wall colour: the painted areas above and around the tiles
-  const paintDesc = paintPrompt(selections.wallPaintFinish, selections.wallPaintColor);
+  // (with wet-zone-only tiling there is always paint; default to a soft white if none was chosen)
+  const paintDesc = paintPrompt(selections.wallPaintFinish, selections.wallPaintColor)
+    ?? (selections.wallFormat === "wet-zones" ? "a crisp low-sheen painted finish in a soft warm white" : null);
 
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
@@ -179,8 +181,8 @@ function buildRoomPrompt(req: PromptInput): string {
     keep("floor")   ? keepLine("Floor surface", "floor tiles")  : `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")    : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
     ...(paintDesc ? [`Painted wall areas: any wall area that is not tiled (for example above the tile line) gets ${paintDesc}.`] : []),
-    `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
-    `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
+    !selections.tapware ? keepLine("Tapware finish", "tapware") : `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
+    !selections.vanity  ? keepLine("Vanity style", "vanity")    : `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
     "",
     "Remove all personal clutter, towels, and toiletries. The result should look like a",
     "professional architectural photography shot — clean, staged, Australian styling.",
@@ -211,8 +213,8 @@ function buildRoomPrompt(req: PromptInput): string {
     keep("floor")   ? keepLine("Floor surface", "floor tiles") : `Floor surface: ${floorDesc}.`,
     keep("walls")   ? keepLine("Wall surface", "wall tiles")   : `Wall surface: ${wallDesc}.`,
     ...(paintDesc ? [`Painted wall areas: tile the wet zones and paint the remaining wall area above the tiles with ${paintDesc}.`] : []),
-    `Tapware: ${tapwareFmt} finish throughout.`,
-    `Vanity: ${vanityStyle}.`,
+    selections.tapware ? `Tapware: ${tapwareFmt} finish throughout.` : "Tapware: a simple finish that suits the overall look.",
+    selections.vanity  ? `Vanity: ${vanityStyle}.`                  : "Vanity: a simple vanity that suits the overall look.",
     "Style: High-end architectural photography, natural Australian daylight, clean staging.",
     "Output: 2K image, no text labels, no watermarks, no annotations on any surface.",
     "",
@@ -265,7 +267,7 @@ function buildRoomPrompt(req: PromptInput): string {
     : "";
 
   // ── Project brief injections ──────────────────────────────────
-  const scopeSuffix    = req.projectBrief ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope]                    : "";
+  const scopeSuffix    = req.projectBrief?.scope ? SCOPE_PROMPT_SUFFIX[req.projectBrief.scope]             : "";
   const plumbingSuffix = req.projectBrief ? PLUMBING_LAYOUT_PROMPT_SUFFIX[req.projectBrief.plumbingLayout] : "";
   const briefSection   =
     (scopeSuffix || plumbingSuffix)

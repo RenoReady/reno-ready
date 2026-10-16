@@ -56,6 +56,7 @@ import {
   ceilingLabel,
 } from "@/lib/roomTypes";
 import { buildGeminiPrompt } from "@/lib/buildPrompt";
+import { calcBriefTotal } from "@/lib/projectBrief";
 import { submitConnectForm } from "@/app/actions/contact";
 import { cn, formatAUD } from "@/lib/utils";
 
@@ -156,8 +157,8 @@ export default function ConnectPage() {
     bedroomSelections,
     selections: {
       floorTile, wallTile,
-      vanity:  vanity  ?? "floating",
-      tapware: tapware ?? "chrome",
+      vanity:  vanity  ?? "",
+      tapware: tapware ?? "",
       customNote, customFloorColor, customWallColor,
       tileStyle, structuralChanges,
       floorFormat, wallFormat, designStyle,
@@ -323,7 +324,33 @@ export default function ConnectPage() {
     }
     setLoading(true);
     try {
+      // The same Pro Report the client can download, attached to the email so it can go straight to builders.
+      // If it can't be built (or is too big to send) the brief still goes through without it.
+      let report: { filename: string; base64: string } | undefined;
+      try {
+        const { proReportBase64 } = await import("@/lib/generateProReportPDF");
+        const s = useBuilderStore.getState();
+        const roomBudget = s.roomType === "kitchen" ? s.kitchenSelections.budget : s.roomType === "bedroom" ? s.bedroomSelections.budget : s.budget;
+        const briefTotal = s.projectBrief ? calcBriefTotal(s.projectBrief, s.roomType) : 0;
+        const base64 = await proReportBase64({
+          selections:        { ...s, budget: roomBudget },
+          projectBrief:      s.projectBrief,
+          generatedImageUrl: s.generatedImageUrl,
+          roomPhotoUrl:      s.roomPhotoUrl,
+          grandTotal:        estimatedCost + briefTotal,
+          estimatedCost,
+          roomType:          s.roomType,
+          kitchenSelections: s.kitchenSelections,
+          bedroomSelections: s.bedroomSelections,
+        });
+        const who = form.name.trim().replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "Client";
+        if (base64.length < 3_800_000) report = { filename: `Reno-Ready-${roomLabel}-Report-${who}.pdf`, base64 };
+      } catch (err) {
+        console.error("Report attachment failed:", err);
+      }
+
       const result = await submitConnectForm({
+        report,
         name:    form.name.trim(),
         email:   form.email.trim(),
         phone:   form.phone.trim() || undefined,

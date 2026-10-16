@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // The builder-brief form sends the client's Pro Report PDF (photos compressed, usually < 1 MB)
+  experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
+  },
   // The admin dashboard lives at /admin — send /dashboard there too
   async redirects() {
     return [

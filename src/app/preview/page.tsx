@@ -28,7 +28,7 @@ import {
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
-  paintLabel,
+  bathroomWallLabel,
 } from "@/lib/types";
 import {
   calcBriefCostItems,
@@ -79,9 +79,8 @@ export default function PreviewPage() {
     useCustomDimensions,
   } = useBuilderStore();
   const surfaces = { floorFormat, wallFormat, wallPaintFinish, wallPaintColor, designStyle };
-  const paintRowLabel = paintLabel(wallPaintFinish, wallPaintColor);
   const floorLabel = surfaceLabel(FLOOR_FORMATS.find((f) => f.id === floorFormat), floorTile, customFloorColor);
-  const wallLabel  = surfaceLabel(WALL_FORMATS.find((f) => f.id === wallFormat),   wallTile,  customWallColor);
+  const wallLabel  = bathroomWallLabel(wallFormat, wallTile, customWallColor, wallPaintColor);
 
   const hasImage = !!generatedImageUrl;
 
@@ -269,7 +268,6 @@ export default function PreviewPage() {
                   {roomType === "bathroom" && [
                     floorLabel    && `Floor: ${floorLabel}`,
                     wallLabel     && `Wall: ${wallLabel}`,
-                    paintRowLabel && `Paint: ${paintRowLabel}`,
                   ].filter(Boolean).map((label) => (
                     <span
                       key={label as string}
@@ -485,7 +483,6 @@ export default function PreviewPage() {
                   ] : [
                     { label: "Floor",   value: selectionText(floorLabel, isKept(keepExisting, "floor")) },
                     { label: "Wall",    value: selectionText(wallLabel,  isKept(keepExisting, "walls")) },
-                    { label: "Wall Colour", value: paintRowLabel ?? "Not selected" },
                     { label: "Vanity",  value: vanity  ? vanityLabel  : "Not selected" },
                     { label: "Tapware", value: tapware ? tapwareLabel : "Not selected" },
                   ]

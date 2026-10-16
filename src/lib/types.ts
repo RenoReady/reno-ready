@@ -239,8 +239,10 @@ export const WALL_FORMATS: SurfaceFormat<WallFormat>[] = [
     prompt: "{tone} handmade zellige-look tiles with an irregular, glossy glaze", tones: ALL_TONES },
   { id: "large-slab",       label: "Large Format Slab",       sub: "Seamless Porcelain",  swatch: surfaceSwatch("large-slab", "light-grey"),       cost: 2_400,
     prompt: "seamless {tone} large-format porcelain slab panels with almost invisible joins", tones: ALL_TONES },
-  { id: "wet-zones",        label: "Wet Zones Only + Paint",  sub: "Shower & splashback tiled, the rest painted", swatch: surfaceSwatch("wet-zones", "warm-white"), cost: 700, budget: true,
-    prompt: "tiles only in the wet zones (the shower walls floor-to-ceiling and a splashback behind the vanity) in {tone} glazed subway tiles; every other wall is painted, not tiled", tones: ALL_TONES },
+  // Budget saver: the walls stay as they are, only the painted areas are redone (colour = wallPaintColor).
+  // The id predates the rename; prompts and labels treat it specially (see KEEP_WALLS_PAINT).
+  { id: "wet-zones",        label: "Keep Walls + Fresh Paint", sub: "Your walls stay as they are, freshly painted in your colour", swatch: "#F1EEE6", cost: 700, budget: true,
+    prompt: "", tones: ["natural-white", "lexicon-quarter", "hog-bristle", "slate-grey", "sage-green", "navy-charcoal"] },
   { id: "terrazzo-wall",    label: "Terrazzo Wall",           sub: "Porcelain",           swatch: surfaceSwatch("terrazzo-wall", "sand"),          cost: 2_600, more: true,
     prompt: "{tone} terrazzo-look wall tiles with fine scattered chips", tones: ALL_TONES },
   { id: "fluted",           label: "Fluted / Ribbed Tile",    sub: "Ceramic Panels",      swatch: surfaceSwatch("fluted", "warm-white"),           cost: 2_200, more: true,
@@ -250,6 +252,9 @@ export const WALL_FORMATS: SurfaceFormat<WallFormat>[] = [
   { id: "geometric",        label: "Geometric Feature",       sub: "Fish-Scale / Shapes", swatch: surfaceSwatch("geometric", "sage"),              cost: 2_500, more: true,
     prompt: "{tone} geometric feature tiles in a fish-scale pattern", tones: ALL_TONES },
 ];
+
+/** The budget wall option: keep the existing walls, repaint the painted areas */
+export const KEEP_WALLS_PAINT: WallFormat = "wet-zones";
 
 /** Tones that suit a format, in the format's order */
 export function tonesFor<T extends string>(all: TileOption[], format: SurfaceFormat<T> | null | undefined): TileOption[] {
@@ -371,6 +376,16 @@ export function paintLabel(finishId: string | null | undefined, color: string | 
   const parts = [tone?.name ?? (color ? `Custom ${color}` : null), fin?.label].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
+/** Bathroom walls for summaries: "Sage · Subway Tile", or "Hog Bristle · Keep Walls + Fresh Paint" */
+export function bathroomWallLabel(wallFormat: string | null | undefined, wallTile: { name: string } | null | undefined, customWallColor: string | null | undefined, wallPaintColor: string | null | undefined): string | null {
+  const fmt = WALL_FORMATS.find((f) => f.id === wallFormat);
+  if (wallFormat === KEEP_WALLS_PAINT) {
+    const colour = paintToneFor(null, wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null);
+    return [colour, fmt?.label].filter(Boolean).join(" · ");
+  }
+  return surfaceLabel(fmt, wallTile, customWallColor);
+}
+
 /** Prompt phrase for painted walls, e.g. "a crisp low-sheen painted finish in natural white (exact colour #F1EEE6)" */
 export function paintPrompt(finishId: string | null | undefined, color: string | null | undefined): string | null {
   const fin = findPaintFinish(finishId);
@@ -721,7 +736,7 @@ export function buildItemisedCosts(
   const wallFmt  = WALL_FORMATS.find((f)  => f.id === surfaces.wallFormat);
   const floor = floorCost(floorTile, surfaces.floorFormat), wall = wallCost(wallTile, surfaces.wallFormat);
   if (floor) materialItems.push({ label: `Floor — ${surfaceLabel(floorFmt, floorTile) ?? "Tiles"}`, amount: round(floor * scale), detail: floorTile?.description ?? floorFmt?.sub });
-  if (wall)  materialItems.push({ label: `Walls — ${surfaceLabel(wallFmt, wallTile) ?? "Tiles"}`,  amount: round(wall * scale),  detail: wallTile?.description ?? wallFmt?.sub });
+  if (wall)  materialItems.push({ label: `Walls — ${bathroomWallLabel(surfaces.wallFormat, wallTile, null, surfaces.wallPaintColor) ?? "Tiles"}`,  amount: round(wall * scale),  detail: wallTile?.description ?? wallFmt?.sub });
   const paintFin = findPaintFinish(surfaces.wallPaintFinish);
   if (paintFin && paintFin.cost > 0) materialItems.push({ label: `Wall Colour — ${paintLabel(paintFin.id, surfaces.wallPaintColor)}`, amount: round(paintFin.cost * scale), detail: paintFin.sub });
   if (vanity) {

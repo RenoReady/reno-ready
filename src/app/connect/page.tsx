@@ -34,7 +34,7 @@ import {
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
-  paintLabel,
+  bathroomWallLabel,
 } from "@/lib/types";
 import { DESIGN_STYLES, isDesignStyle } from "@/lib/designStyles";
 import {
@@ -127,8 +127,7 @@ export default function ConnectPage() {
     ? TILE_STYLE_OPTIONS.find((s) => s.id === tileStyle)?.label ?? tileStyle
     : null;
   const floorLabel = surfaceLabel(FLOOR_FORMATS.find((f) => f.id === floorFormat), floorTile, customFloorColor);
-  const wallLabel  = surfaceLabel(WALL_FORMATS.find((f) => f.id === wallFormat),   wallTile,  customWallColor);
-  const paintRowLabel = paintLabel(wallPaintFinish, wallPaintColor);
+  const wallLabel  = bathroomWallLabel(wallFormat, wallTile, customWallColor, wallPaintColor);
   const roomStyle  = roomType === "kitchen" ? kitchenSelections.designStyle : roomType === "bedroom" ? bedroomSelections.designStyle : designStyle;
   const styleRow   = isDesignStyle(roomStyle) ? [{ label: "Style", value: DESIGN_STYLES[roomStyle].name }] : [];
 
@@ -221,13 +220,12 @@ export default function ConnectPage() {
     return [
       { label: "Floor",      value: selectionText(floorLabel, isKept(keepExisting, "floor")), color: customFloorColor },
       { label: "Walls",      value: selectionText(wallLabel,  isKept(keepExisting, "walls")), color: customWallColor  },
-      ...(paintRowLabel ? [{ label: "Wall Colour", value: paintRowLabel, color: wallPaintColor }] : []),
       { label: "Vanity",     value: vanityLabel },
       { label: "Tapware",    value: tapwareLabel },
       ...(tileStyleLabel ? [{ label: "Tile Layout", value: tileStyleLabel }] : []),
       ...styleRow,
     ];
-  }, [roomType, kitchenSelections, bedroomSelections, floorLabel, wallLabel, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel, keepExisting, styleRow, paintRowLabel, wallPaintColor]);
+  }, [roomType, kitchenSelections, bedroomSelections, floorLabel, wallLabel, customFloorColor, customWallColor, vanityLabel, tapwareLabel, tileStyleLabel, keepExisting, styleRow]);
 
   // ── Room-aware structural labels ──────────────────────────────────────────
   const structuralLabels = useMemo(() => {
@@ -287,7 +285,6 @@ export default function ConnectPage() {
     return [
       { icon: Layers,     label: "Floor",          value: selectionText(floorLabel, isKept(keepExisting, "floor")), accent: customFloorColor },
       { icon: Layers,     label: "Walls",           value: selectionText(wallLabel,  isKept(keepExisting, "walls")), accent: customWallColor  },
-      ...(paintRowLabel ? [{ icon: Layers, label: "Wall Colour", value: paintRowLabel, accent: wallPaintColor }] : []),
       { icon: Layers,     label: "Vanity",          value: vanityLabel },
       { icon: Droplets,   label: "Tapware",         value: tapwareLabel },
       { icon: DollarSign, label: "Budget Target",   value: formatAUD(budget) },
@@ -360,7 +357,6 @@ export default function ConnectPage() {
           wallTile:         wallLabel  ? { id: wallTile?.id  ?? wallFormat  ?? "custom", name: wallLabel  } : null,
           customFloorColor: customFloorColor ?? null,
           customWallColor:  customWallColor ?? null,
-          wallColour:       paintRowLabel,
           tileStyle:        tileStyle ?? null,
           vanity:           vanity  ?? "Not selected",
           tapware:          tapware ?? "Not selected",

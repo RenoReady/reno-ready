@@ -17,8 +17,10 @@ import {
   FLOOR_FORMATS,
   WALL_FORMATS,
   SURFACE_TONES,
+  KEEP_WALLS_PAINT,
   surfacePrompt,
   paintPrompt,
+  paintToneFor,
 } from "./types";
 import { styleSection } from "./designStyles";
 import {
@@ -122,8 +124,13 @@ function buildRoomPrompt(req: PromptInput): string {
     : withColour(wallName, selections.customWallColor);
   // Wall colour: the painted areas above and around the tiles
   // (with wet-zone-only tiling there is always paint; default to a soft white if none was chosen)
-  const paintDesc = paintPrompt(selections.wallPaintFinish, selections.wallPaintColor)
-    ?? (selections.wallFormat === "wet-zones" ? "a crisp low-sheen painted finish in a soft warm white" : null);
+  // "Keep Walls + Fresh Paint": the wall tiles stay exactly as they are; only the painted areas are redone
+  const keepWallsPaint = selections.wallFormat === KEEP_WALLS_PAINT;
+  const freshPaint = (() => {
+    const c = selections.wallPaintColor, t = paintToneFor(null, c);
+    return c ? `${t ? `${t.name.toLowerCase()} (exact colour ${c})` : `the exact colour ${c}`}` : "a soft warm white";
+  })();
+  const paintDesc = keepWallsPaint ? null : paintPrompt(selections.wallPaintFinish, selections.wallPaintColor);
 
   // ── No-photo mode: simpler prompt, no spatial constraints needed ──
   const isPhotoMode = !!req.imageBase64;
@@ -179,7 +186,9 @@ function buildRoomPrompt(req: PromptInput): string {
     // ── Materials ────────────────────────────────────────────────────────────
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
     keep("floor")   ? keepLine("Floor surface", "floor tiles")  : `Floor surface: Re-texture the existing floor with ${floorDesc}.`,
-    keep("walls")   ? keepLine("Wall surface", "wall tiles")    : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
+    keep("walls")   ? keepLine("Wall surface", "wall tiles")
+      : keepWallsPaint ? `Wall surface: KEEP the existing wall tiles exactly as they appear in the reference photo (same tiles, layout and colour). Repaint every painted, untiled wall area in ${freshPaint} with a crisp low-sheen finish.`
+      : `Wall surface: Re-texture the existing wall surfaces with ${wallDesc}.`,
     ...(paintDesc ? [`Painted wall areas: any wall area that is not tiled (for example above the tile line) gets ${paintDesc}.`] : []),
     !selections.tapware ? keepLine("Tapware finish", "tapware") : `Tapware finish: Replace visible tapware with ${tapwareFmt} finish fittings.`,
     !selections.vanity  ? keepLine("Vanity style", "vanity")    : `Vanity style: ${selections.vanity === "floating" ? "Replace with a floating / wall-mounted vanity with concealed plumbing." : "Replace with a freestanding / floor-mounted vanity."}`,
@@ -211,7 +220,9 @@ function buildRoomPrompt(req: PromptInput): string {
     "",
     // ── Materials ─────────────────────────────────────────────────────────────
     keep("floor")   ? keepLine("Floor surface", "floor tiles") : `Floor surface: ${floorDesc}.`,
-    keep("walls")   ? keepLine("Wall surface", "wall tiles")   : `Wall surface: ${wallDesc}.`,
+    keep("walls")   ? keepLine("Wall surface", "wall tiles")
+      : keepWallsPaint ? `Wall surface: simple plain wall tiles in the shower only, with every other wall freshly painted in ${freshPaint}.`
+      : `Wall surface: ${wallDesc}.`,
     ...(paintDesc ? [`Painted wall areas: tile the wet zones and paint the remaining wall area above the tiles with ${paintDesc}.`] : []),
     selections.tapware ? `Tapware: ${tapwareFmt} finish throughout.` : "Tapware: a simple finish that suits the overall look.",
     selections.vanity  ? `Vanity: ${vanityStyle}.`                  : "Vanity: a simple vanity that suits the overall look.",

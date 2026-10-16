@@ -201,8 +201,14 @@ export interface PickerTone {
   id:     string;
   label:  string;
   sub?:   string;
-  /** Swatch image id in /public/tiles */
+  /** Swatch image id in /public/tiles, or a "#RRGGBB" colour for a flat paint swatch */
   swatch: string;
+}
+
+/** A swatch: an image from /public/tiles, or a flat colour when given "#RRGGBB" */
+function Swatch({ id, size, className }: { id: string; size: number; className?: string }) {
+  if (id.startsWith("#")) return <div aria-hidden="true" className={cn("absolute inset-0", className)} style={{ background: id }} />;
+  return <TileTexture tileId={id} size={size} className={cn("absolute inset-0 h-full w-full", className)} style={{ width: "100%", height: "100%" }} />;
 }
 
 const price = (n: number) => (n > 0 ? `+$${n.toLocaleString("en-AU")}` : "Included");
@@ -263,12 +269,7 @@ export function StylePicker({
         )}
       >
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-sand-100">
-          <TileTexture
-            tileId={thumbFor(s.id, active ? tone : null)}
-            size={200}
-            className="absolute inset-0 h-full w-full transition-transform duration-500 group-hover:scale-105"
-            style={{ width: "100%", height: "100%" }}
-          />
+          <Swatch id={thumbFor(s.id, active ? tone : null)} size={200} className="transition-transform duration-500 group-hover:scale-105" />
           {active && (
             <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-terracotta text-white shadow-warm-sm">
               <Check size={11} strokeWidth={3} />
@@ -307,7 +308,7 @@ export function StylePicker({
         )}
       >
         <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-sand-100">
-          <TileTexture tileId={thumbFor(s.id, active ? tone : null)} size={112} className="absolute inset-0 h-full w-full" style={{ width: "100%", height: "100%" }} />
+          <Swatch id={thumbFor(s.id, active ? tone : null)} size={112} />
         </div>
         <div className="min-w-0 flex-1">
           <span className="mb-0.5 inline-block rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">Budget saver</span>
@@ -419,7 +420,7 @@ function ToneDrawer({ style, title, tones, selectedTone, isActive, onPick, onCle
         </div>
 
         <div className="overflow-y-auto px-5 py-4">
-          <p className="mb-3 text-xs font-semibold text-charcoal/60">Choose a tone</p>
+          <p className="mb-3 text-xs font-semibold text-charcoal/60">{tones.length > 0 && tones.every((t) => t.swatch.startsWith("#")) ? "Choose a paint colour" : "Choose a tone"}</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {tones.map((t, i) => {
               const active = t.id === selectedTone;
@@ -436,7 +437,7 @@ function ToneDrawer({ style, title, tones, selectedTone, isActive, onPick, onCle
                   )}
                 >
                   <div className="relative aspect-square w-full overflow-hidden">
-                    <TileTexture tileId={t.swatch} size={200} className="absolute inset-0 h-full w-full" style={{ width: "100%", height: "100%" }} />
+                    <Swatch id={t.swatch} size={200} />
                     {active && (
                       <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-terracotta text-white shadow-warm-sm">
                         <Check size={11} strokeWidth={3} />

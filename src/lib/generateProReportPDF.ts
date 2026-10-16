@@ -15,7 +15,7 @@ import type { BuilderSelections } from "./types";
 import type { ProjectBrief } from "./projectBrief";
 import type { RoomType, KitchenSelections, BedroomSelections } from "./roomTypes";
 import { calcBriefCostItems, needsAsbestosCheck, calcBriefTotal } from "./projectBrief";
-import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel, paintLabel } from "./types";
+import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel, bathroomWallLabel } from "./types";
 import { DESIGN_STYLES, isDesignStyle } from "./designStyles";
 import {
   calcKitchenCost, calcBedroomCost,
@@ -218,8 +218,7 @@ function buildMatRows(
   const tapwareLabel = sel.tapware ? (TAPWARE_OPTIONS.find((t) => t.id === sel.tapware)?.label ?? sel.tapware) : "Not selected";
   const rows: MatRow[] = [
     { label: "Floor",         value: selectionText(surfaceLabel(FLOOR_FORMATS.find((f) => f.id === sel.floorFormat), sel.floorTile, sel.customFloorColor), isKept(sel.keepExisting, "floor")) },
-    { label: "Walls",         value: selectionText(surfaceLabel(WALL_FORMATS.find((f) => f.id === sel.wallFormat),   sel.wallTile,  sel.customWallColor),  isKept(sel.keepExisting, "walls")) },
-    { label: "Wall Colour",   value: paintLabel(sel.wallPaintFinish, sel.wallPaintColor) ?? "Not selected" },
+    { label: "Walls",         value: selectionText(bathroomWallLabel(sel.wallFormat, sel.wallTile, sel.customWallColor, sel.wallPaintColor), isKept(sel.keepExisting, "walls")) },
     { label: "Vanity Type",   value: vanityLabel },
     { label: "Tapware Finish",value: tapwareLabel },
     ...styleRows(sel.designStyle),

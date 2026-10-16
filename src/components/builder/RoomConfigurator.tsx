@@ -6,7 +6,7 @@ import {
   Upload, ImagePlus, Sparkles, SlidersHorizontal, Layers, Droplets,
   CheckCircle2, X, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
-  ShieldCheck, BarChart2, Wrench, MessageSquare, Download, Palette,
+  ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
   ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft,
 } from "lucide-react";
@@ -15,8 +15,8 @@ import Button from "@/components/ui/Button";
 import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth } from "@/lib/store";
 import {
   VANITY_OPTIONS, TAPWARE_OPTIONS,
-  FLOOR_FORMATS, WALL_FORMATS, SURFACE_TONES, PAINT_FINISHES, surfaceSwatch, paintSwatch, findPaintFinish, paintToneFor,
-  type FloorFormat, type WallFormat, type WallPaintFinish,
+  FLOOR_FORMATS, WALL_FORMATS, SURFACE_TONES, PAINT_TONES, KEEP_WALLS_PAINT, surfaceSwatch, paintToneFor,
+  type FloorFormat, type WallFormat,
   LIGHTING_OPTIONS,
   COST_BREAKDOWN, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP,
   BATHROOM_SIZE_OPTIONS,
@@ -1719,48 +1719,41 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     />
                   </SidebarSection>
 
-                  {/* Wall tiles — style first, tone second (same tones as the floor, so they coordinate) */}
+                  {/* Wall tiles — style first, tone second (same tones as the floor, so they coordinate).
+                      The budget option keeps the walls as they are and only repaints them, so its
+                      drawer offers paint colours instead of tile tones. */}
                   <SidebarSection icon={Layers} title="Wall Tiles">
                   <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
                     <StylePicker
                       styles={WALL_FORMATS}
                       value={wallFormat}
-                      tone={wallTile?.id ?? null}
-                      toneLabel={wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
-                      tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
-                      thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      tone={wallFormat === KEEP_WALLS_PAINT ? paintToneFor(null, wallPaintColor)?.id ?? null : wallTile?.id ?? null}
+                      toneLabel={wallFormat === KEEP_WALLS_PAINT
+                        ? paintToneFor(null, wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)
+                        : wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
+                      tonesFor={(id) => id === KEEP_WALLS_PAINT
+                        ? PAINT_TONES.map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: t.color }))
+                        : SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => id === KEEP_WALLS_PAINT
+                        ? PAINT_TONES.find((t) => t.id === tone)?.color ?? ((wallFormat === KEEP_WALLS_PAINT && wallPaintColor) || "#F1EEE6")
+                        : tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
                       popularLabel="Popular wall tiles"
                       moreLabel="View More Wall Styles"
                       drawerTitle="Wall tiles"
-                      onPick={(id, tone) => { setWallFormat(id as WallFormat); setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomWallColor(null); }}
-                      onClear={() => { setWallFormat(null); setWallTile(null); setCustomWallColor(null); }}
-                      custom={{
-                        label:    "Custom wall tile colour",
-                        value:    customWallColor,
-                        onChange: (id, hex) => { setWallFormat(id as WallFormat); if (hex) setWallTile(null); setCustomWallColor(hex); },
+                      onPick={(id, tone) => {
+                        setWallFormat(id as WallFormat); setCustomWallColor(null);
+                        if (id === KEEP_WALLS_PAINT) { setWallTile(null); setWallPaint(null, PAINT_TONES.find((t) => t.id === tone)?.color ?? null); }
+                        else { setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setWallPaint(null, null); }
                       }}
-                    />
-                  </SidebarSection>
-
-                  {/* Wall colour — the painted areas above and around the tiles */}
-                  <SidebarSection icon={Palette} title="Wall Colour">
-                    <p className="-mt-1 text-[11px] leading-snug text-charcoal/50">For the painted walls above and around the tiles.</p>
-                    <StylePicker
-                      styles={PAINT_FINISHES}
-                      value={wallPaintFinish}
-                      tone={paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor)?.id ?? null}
-                      toneLabel={paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)}
-                      tonesFor={(id) => (findPaintFinish(id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: paintSwatch(id, t.id) }))}
-                      thumbFor={(id, tone) => paintSwatch(id, tone ?? findPaintFinish(id)?.defaultTone ?? "")}
-                      popularLabel="Popular finishes"
-                      moreLabel="View More Paint & Wall Finishes"
-                      drawerTitle="Wall colour"
-                      onPick={(id, tone) => setWallPaint(id as WallPaintFinish, findPaintFinish(id)?.tones.find((t) => t.id === tone)?.color ?? null)}
-                      onClear={() => setWallPaint(null, null)}
+                      onClear={() => { setWallFormat(null); setWallTile(null); setCustomWallColor(null); setWallPaint(null, null); }}
                       custom={{
-                        label:    "Custom paint colour",
-                        value:    wallPaintColor && !paintToneFor(findPaintFinish(wallPaintFinish), wallPaintColor) ? wallPaintColor : null,
-                        onChange: (id, hex) => setWallPaint(id as WallPaintFinish, hex),
+                        label:    "Custom colour",
+                        value:    wallFormat === KEEP_WALLS_PAINT ? (wallPaintColor && !paintToneFor(null, wallPaintColor) ? wallPaintColor : null) : customWallColor,
+                        onChange: (id, hex) => {
+                          setWallFormat(id as WallFormat);
+                          if (id === KEEP_WALLS_PAINT) { setWallTile(null); setCustomWallColor(null); setWallPaint(null, hex); }
+                          else { if (hex) setWallTile(null); setCustomWallColor(hex); setWallPaint(null, null); }
+                        },
                       }}
                     />
                   </SidebarSection>

@@ -180,6 +180,26 @@ function DesignConcierge({ tips }: { tips: string[] }) {
   );
 }
 
+/**
+ * Shown instead of a number until the first AI preview is done — the estimate and builder brief
+ * are the reward for generating, and a bare "$0" before then reads as broken.
+ */
+function EstimateLocked({ dark = false }: { dark?: boolean }) {
+  return (
+    <div className={cn("flex items-start gap-3", dark && "rounded-2xl bg-charcoal p-6")}>
+      <span className={cn("flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl", dark ? "bg-white/10 text-white/70" : "bg-terracotta/10 text-terracotta")}>
+        <BarChart2 size={17} />
+      </span>
+      <div className="min-w-0">
+        <p className={cn("text-xs font-bold uppercase tracking-[0.14em]", dark ? "text-white/50" : "text-charcoal/50")}>Estimated Cost</p>
+        <p className={cn("mt-1 text-sm leading-snug", dark ? "text-white/70" : "text-charcoal/65")}>
+          Generate your preview above to unlock your instant itemised cost estimate and builder brief.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** A room estimate plus the project-brief lines (plumbing moves, strip-out, asbestos) */
 function withBrief(est: { items: { label: string; amount: number }[]; total: number }, brief: ProjectBrief | null, room: RoomType) {
   if (!brief) return est;
@@ -1683,10 +1703,12 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 )}
               </div>
               <div className="hidden lg:flex flex-col gap-3 rounded-3xl border border-sand-200 bg-white/70 shadow-warm-sm p-5">
-                <div className="flex items-end justify-between gap-3">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/50">Estimate so far</p>
-                  <p className="text-xl font-bold text-charcoal tabular-nums">{liveEstimate}</p>
-                </div>
+                {hasPreview ? (
+                  <div className="flex items-end justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-charcoal/50">Estimate so far</p>
+                    <p className="text-xl font-bold text-charcoal tabular-nums">{liveEstimate}</p>
+                  </div>
+                ) : <EstimateLocked />}
                 {freeCounter}
                 {generateButton}
               </div>
@@ -2209,7 +2231,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             {/* Phones: the generate button is always one thumb away */}
             <div className="lg:hidden fixed inset-x-0 bottom-0 z-[60] border-t border-sand-200 bg-white/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(44,62,80,0.10)]">
               <div className="flex items-center justify-between gap-3 pb-2 text-xs">
-                <span className="font-semibold text-charcoal/55">Estimate <span className="font-bold text-charcoal tabular-nums">{liveEstimate}</span></span>
+                {hasPreview
+                  ? <span className="font-semibold text-charcoal/55">Estimate <span className="font-bold text-charcoal tabular-nums">{liveEstimate}</span></span>
+                  : <span className="font-semibold text-charcoal/55">Generate to unlock your cost estimate</span>}
                 {freeLeftLabel && <span className="font-semibold text-charcoal/45">{freeLeftLabel}</span>}
               </div>
               {generateButton}
@@ -2363,7 +2387,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             </div>
 
             <div className="flex flex-col gap-4 min-w-0 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pb-2 [&>*]:shrink-0">
-            {roomType === "kitchen" ? (
+            {!hasPreview ? (
+              <EstimateLocked dark />
+            ) : roomType === "kitchen" ? (
               <div className="rounded-2xl bg-charcoal p-6 flex flex-col gap-4">
                 <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Kitchen Cost Estimate</p>
                 {(() => {

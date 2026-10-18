@@ -13,7 +13,7 @@ import type { RoomType } from "@/lib/roomTypes";
 export const DESIGN_NOTE_MAX = 300;
 
 const IDEAS: Record<RoomType, string[]> = {
-  bathroom: ["I really want my basin to be blue", "Add an arched mirror", "Brass towel rail on the shower wall"],
+  bathroom: ["Make the sink blue", "Add an arched mirror", "Brass towel rail on the shower wall"],
   kitchen:  ["Make the island benchtop dark green", "Open shelves instead of top cupboards", "Add pendant lights over the island"],
   bedroom:  ["A reading nook by the window", "Make the bedhead wall deep green", "Add a built-in desk"],
 };
@@ -39,7 +39,8 @@ export default function DesignNote({ room, value, onChange }: {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-terracotta">Make it yours</p>
             <h3 className="text-lg font-bold leading-snug text-charcoal sm:text-xl">Anything specific you want?</h3>
             <p className="mt-1 text-sm leading-relaxed text-charcoal/60">
-              Type any unique request in your own words. We&apos;ll add it to your AI preview and your builder brief.
+              Type any custom tweak in your own words, like &ldquo;{IDEAS[room][0]}&rdquo; or &ldquo;{IDEAS[room][1]}&rdquo;.
+              We&apos;ll build it into your AI preview and add it to your builder brief.
             </p>
           </div>
         </div>

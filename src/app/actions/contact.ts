@@ -24,6 +24,8 @@ export interface ConnectSubmission {
   message?: string;
   /** The client's Pro Report PDF (base64), attached to the notification email */
   report?:  { filename: string; base64: string };
+  /** Why the report couldn't be attached, when it couldn't */
+  reportError?: string;
 
   // Snapshot of the user's design at submission time
   design: {
@@ -39,6 +41,12 @@ export interface ConnectSubmission {
     budget:            number;
     estimatedCost:     number;
     customNote?:       string;
+    /** "Kitchen", "Bedroom" or "Bathroom" */
+    room?:             string;
+    /** The design as shown on the connect page, for any room */
+    rows?:             { label: string; value: string; color?: string | null }[];
+    /** Structural / services items for any room */
+    structural?:       string[];
     structuralChanges: {
       removeBathtub:    boolean;
       addWalkinShower:  boolean;
@@ -75,17 +83,20 @@ const fmtAUD = (n: number) =>
 function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
   const d  = s.design;
   const sc = d.structuralChanges;
+  const room = d.room ?? "Bathroom";
 
   const escape = (str: string) => str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const structuralLines: string[] = [];
-  if (sc.removeBathtub)             structuralLines.push("Bathtub Removal");
-  if (sc.addWalkinShower)           structuralLines.push("Walk-in Shower Conversion");
-  if (sc.replaceToilet)             structuralLines.push("Toilet Replacement");
-  if (sc.inWallCistern)             structuralLines.push("In-Wall Cistern");
-  if (sc.showerNiche === "single")  structuralLines.push("Single Shower Niche");
-  if (sc.showerNiche === "double")  structuralLines.push("Double Shower Niche");
-  if (sc.showerFixtures === "dual") structuralLines.push("Dual Shower Heads (Rain + Handheld)");
+  // newer submissions send the room's own structural list; older ones only had the bathroom flags
+  const structuralLines: string[] = d.structural ? [...d.structural] : [];
+  const bathroomFlags = !d.structural;
+  if (bathroomFlags && sc.removeBathtub)             structuralLines.push("Bathtub Removal");
+  if (bathroomFlags && sc.addWalkinShower)           structuralLines.push("Walk-in Shower Conversion");
+  if (bathroomFlags && sc.replaceToilet)             structuralLines.push("Toilet Replacement");
+  if (bathroomFlags && sc.inWallCistern)             structuralLines.push("In-Wall Cistern");
+  if (bathroomFlags && sc.showerNiche === "single")  structuralLines.push("Single Shower Niche");
+  if (bathroomFlags && sc.showerNiche === "double")  structuralLines.push("Double Shower Niche");
+  if (bathroomFlags && sc.showerFixtures === "dual") structuralLines.push("Dual Shower Heads (Rain + Handheld)");
 
   const colorChip = (hex?: string | null) => hex
     ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${escape(hex)};border:1px solid rgba(0,0,0,0.1);vertical-align:middle;margin-left:6px;"></span><span style="font-family:'SF Mono',Menlo,monospace;font-size:10px;color:#9CA3AF;margin-left:4px;">${escape(hex)}</span>`
@@ -105,7 +116,11 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
       </tr>`)
     .join("");
 
-  const replyMailto = `mailto:${s.email}?subject=${encodeURIComponent("Re: Your Reno Ready bathroom design")}`;
+  const replyMailto = `mailto:${s.email}?subject=${encodeURIComponent(`Re: Your Reno Ready ${room.toLowerCase()} design`)}`;
+
+  const designRows = d.rows
+    ? d.rows.map((r) => tilesRow(r.label, r.value, r.color)).join("")
+    : `${tilesRow("Floor Tile", d.floorTile?.name, d.customFloorColor)}${tilesRow("Wall Tile", d.wallTile?.name, d.customWallColor)}${tilesRow("Vanity", d.vanity, null)}${tilesRow("Tapware", d.tapware, null)}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -122,7 +137,7 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
       <table width="100%" style="border-collapse:collapse;">
         <tr>
           <td>
-            <p style="margin:0;font-size:10px;color:#D27D5E;text-transform:uppercase;letter-spacing:3px;font-weight:800;">🛁  Reno Ready · New Lead</p>
+            <p style="margin:0;font-size:10px;color:#D27D5E;text-transform:uppercase;letter-spacing:3px;font-weight:800;">Reno Ready · New ${escape(room)} Lead</p>
             <h1 style="margin:8px 0 0 0;font-size:26px;font-weight:700;line-height:1.2;">${escape(s.name)}</h1>
             <p style="margin:6px 0 0 0;font-size:13px;color:rgba(255,255,255,0.7);">
               <a href="mailto:${escape(s.email)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.email)}</a>${s.phone ? `  ·  <a href="tel:${escape(s.phone)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.phone)}</a>` : ""}
@@ -147,7 +162,7 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
               <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;"></span>
               Submitted just now ·  ${escape(s.email)}
             </p>
-            <p style="margin:4px 0 0 0;font-size:11px;color:#6B7480;">${hasReport ? "Pro Report PDF attached — ready to forward to builders." : "No report attached (the client's browser couldn't build it)."}</p>
+            <p style="margin:4px 0 0 0;font-size:11px;color:#6B7480;">${hasReport ? "Pro Report PDF attached — ready to forward to builders." : `No report attached${s.reportError ? ` (${escape(s.reportError.slice(0, 160))})` : ""}.`}</p>
           </td>
           <td align="right">
             <a href="${replyMailto}" style="background:#D27D5E;color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:8px 14px;border-radius:10px;display:inline-block;">Reply →</a>
@@ -163,26 +178,21 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
         <p style="margin:6px 0 0 0;font-size:14px;line-height:1.6;color:#3E4A57;font-style:italic;">"${escape(s.message).replace(/\n/g, "<br>")}"</p>
       </div>` : ""}
 
-      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">🎨  Design Selections</h2>
+      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">${escape(room)} Design Selections</h2>
       <table style="width:100%;border-collapse:collapse;margin-bottom:24px;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #EFE9DD;">
-        ${tilesRow("Floor Tile",  d.floorTile?.name, d.customFloorColor)}
-        ${tilesRow("Wall Tile",   d.wallTile?.name,  d.customWallColor)}
-        ${d.wallColour ? tilesRow("Wall Colour", d.wallColour, null) : ""}
-        <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Tile Layout</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.tileStyle ?? "—")}</td></tr>
-        <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Vanity</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.vanity)}</td></tr>
-        <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;border-bottom:1px solid #EFE9DD;">Tapware</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;border-bottom:1px solid #EFE9DD;">${escape(d.tapware)}</td></tr>
+        ${designRows}
         <tr><td style="padding:8px 14px;color:#6B7480;font-size:12px;">Budget Target</td><td style="padding:8px 14px;color:#2C3E50;font-weight:600;font-size:13px;">${fmtAUD(d.budget)}</td></tr>
       </table>
 
       ${structuralLines.length > 0 ? `
-      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">🔧  Structural Changes</h2>
+      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">Structural &amp; Services</h2>
       <div style="background:#fff;border:1px solid #EFE9DD;border-radius:10px;padding:14px 18px;margin-bottom:24px;">
         <ul style="margin:0;padding-left:20px;color:#3E4A57;font-size:13px;line-height:1.85;">
           ${structuralLines.map(l => `<li>${escape(l)}</li>`).join("")}
         </ul>
       </div>` : ""}
 
-      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">💰  Itemised Cost Breakdown</h2>
+      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px 0;font-weight:700;">Itemised Cost Breakdown</h2>
       <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border-radius:10px;overflow:hidden;border:1px solid #EFE9DD;">
         ${costRows}
         <tr style="background:#2C3E50;color:#fff;">
@@ -192,13 +202,9 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
       </table>
 
       ${d.customNote ? `
-      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:28px 0 12px 0;font-weight:700;">📝  Builder Note</h2>
+      <h2 style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:1.5px;margin:28px 0 12px 0;font-weight:700;">Client Request</h2>
       <p style="margin:0 0 24px 0;color:#3E4A57;font-size:13px;line-height:1.6;font-style:italic;background:#FAF7F2;padding:14px 16px;border-radius:8px;">"${escape(d.customNote)}"</p>` : ""}
 
-      <details style="margin-top:28px;background:#1A1F28;border-radius:10px;padding:0;overflow:hidden;">
-        <summary style="cursor:pointer;font-size:10px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;padding:14px 18px;">⚙  AI Prompt (raw, sent to Gemini)</summary>
-        <pre style="margin:0;padding:14px 18px;font-family:'SF Mono',Menlo,monospace;font-size:11px;color:rgba(255,255,255,0.85);white-space:pre-wrap;line-height:1.5;border-top:1px solid rgba(255,255,255,0.1);">${escape(d.aiPrompt)}</pre>
-      </details>
     </div>
 
     <div style="padding:18px 32px;border-top:1px solid #EDE5D8;background:#FAF7F2;text-align:center;">
@@ -244,7 +250,7 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
       from:     fromAddress,
       to:       destination,
       replyTo:  payload.email,
-      subject:  `🛁 New Lead — ${payload.name} · ${fmtAUD(payload.design.estimatedCost)} reno brief`,
+      subject:  `New ${payload.design.room ?? "Bathroom"} Lead — ${payload.name} · ${fmtAUD(payload.design.estimatedCost)} reno brief`,
       html:     renderEmailHtml(payload, !!attachment),
       attachments: attachment,
     });

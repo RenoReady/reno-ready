@@ -97,7 +97,7 @@ function addFooter(pdf: jsPDF, PW: number, PH: number) {
   );
 }
 
-async function loadImageAsDataUrl(url: string): Promise<string | null> {
+async function loadImageAsDataUrl(url: string, maxW = 1400, quality = 0.85): Promise<string | null> {
   try {
     let dataUrl: string | null = url;
     if (!url.startsWith("data:")) {
@@ -110,7 +110,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
         reader.readAsDataURL(blob);
       });
     }
-    return dataUrl ? await toCompactJpeg(dataUrl) : null;
+    return dataUrl ? await toCompactJpeg(dataUrl, maxW, quality) : null;
   } catch { return null; }
 }
 
@@ -119,7 +119,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
  * multi-megabyte PNGs; this keeps the PDF small enough to download quickly and to
  * attach to the builder-brief email.
  */
-function toCompactJpeg(dataUrl: string, maxW = 1400, quality = 0.85): Promise<string> {
+function toCompactJpeg(dataUrl: string, maxW = 1400, quality = 0.85): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -128,13 +128,13 @@ function toCompactJpeg(dataUrl: string, maxW = 1400, quality = 0.85): Promise<st
       canvas.width  = Math.round(img.naturalWidth * k);
       canvas.height = Math.round(img.naturalHeight * k);
       const ctx = canvas.getContext("2d");
-      if (!ctx) return resolve(dataUrl);
+      if (!ctx) return resolve(null);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL("image/jpeg", quality));
     };
-    img.onerror = () => resolve(dataUrl);
+    img.onerror = () => resolve(null);   // a photo the browser can't decode is left out, not passed to jsPDF raw
     img.src = dataUrl;
   });
 }
@@ -266,11 +266,17 @@ export async function generateProReportPDF(input: ProReportInput): Promise<void>
 
 /** The same report as base64, for attaching to the builder-brief email */
 export async function proReportBase64(input: ProReportInput): Promise<string> {
-  const pdf = await buildProReportPDF(input);
-  return (pdf.output("datauristring") as string).split(",")[1];
+  const encode = (pdf: jsPDF) => (pdf.output("datauristring") as string).split(",")[1];
+  const first = encode(await buildProReportPDF(input));
+  if (first.length < REPORT_MAX_BASE64) return first;
+  // Unusually large (big photos): rebuild with smaller, lighter images
+  return encode(await buildProReportPDF(input, { maxW: 900, quality: 0.7 }));
 }
 
-async function buildProReportPDF(input: ProReportInput): Promise<jsPDF> {
+/** Largest report (as base64) the lead email will carry — keeps the upload well under Vercel's 4.5 MB limit */
+export const REPORT_MAX_BASE64 = 3_500_000;
+
+async function buildProReportPDF(input: ProReportInput, img: { maxW: number; quality: number } = { maxW: 1400, quality: 0.85 }): Promise<jsPDF> {
   const {
     selections, projectBrief, generatedImageUrl, roomPhotoUrl,
     grandTotal, estimatedCost, roomType, kitchenSelections, bedroomSelections,
@@ -291,8 +297,8 @@ async function buildProReportPDF(input: ProReportInput): Promise<jsPDF> {
 
   // Pre-load images
   const [aiImageData, roomImageData] = await Promise.all([
-    generatedImageUrl ? loadImageAsDataUrl(generatedImageUrl) : Promise.resolve(null),
-    roomPhotoUrl      ? loadImageAsDataUrl(roomPhotoUrl)      : Promise.resolve(null),
+    generatedImageUrl ? loadImageAsDataUrl(generatedImageUrl, img.maxW, img.quality) : Promise.resolve(null),
+    roomPhotoUrl      ? loadImageAsDataUrl(roomPhotoUrl, img.maxW, img.quality)      : Promise.resolve(null),
   ]);
 
   // ══════════════════════════════════════════════════════════════════
@@ -316,9 +322,13 @@ async function buildProReportPDF(input: ProReportInput): Promise<jsPDF> {
   // Before / After images
   const imgH = 58;
   const imgW = (IW - 5) / 2;
+  // an image jsPDF can't take is skipped (placeholder shown) rather than failing the whole report
+  const placeImage = (data: string | null, x: number) => {
+    if (!data) return false;
+    try { pdf.addImage(data, "JPEG", x, y, imgW, imgH); return true; } catch (err) { console.warn("Report image skipped:", err); return false; }
+  };
 
-  if (roomImageData) {
-    pdf.addImage(roomImageData, "JPEG", MARGIN, y, imgW, imgH);
+  if (placeImage(roomImageData, MARGIN)) {
     drawRect(pdf, MARGIN, y + imgH - 7, imgW, 7, CHARCOAL);
     sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
     pdf.text("CURRENT STATE", MARGIN + imgW / 2, y + imgH - 2.5, { align: "center" });
@@ -329,8 +339,7 @@ async function buildProReportPDF(input: ProReportInput): Promise<jsPDF> {
   }
 
   const rx = MARGIN + imgW + 5;
-  if (aiImageData) {
-    pdf.addImage(aiImageData, "JPEG", rx, y, imgW, imgH);
+  if (placeImage(aiImageData, rx)) {
     drawRect(pdf, rx, y + imgH - 7, imgW, 7, TERRACOTTA);
     sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
     pdf.text("AI FUTURE VISION", rx + imgW / 2, y + imgH - 2.5, { align: "center" });

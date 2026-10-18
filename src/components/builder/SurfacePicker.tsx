@@ -327,7 +327,7 @@ export function StylePicker({
   return (
     <div>
       <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal/45">{popularLabel}</p>
-      <div className="grid grid-cols-2 gap-2.5">{top.map(card)}</div>
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{top.map(card)}</div>
       {budget.map(budgetCard)}
       {rest.length > 0 && (
         <>
@@ -342,7 +342,7 @@ export function StylePicker({
             <ChevronDown size={13} className={cn("transition-transform duration-200", showMore && "rotate-180")} />
           </button>
           <div id={moreId} hidden={!showMore} className="mt-2.5">
-            <div className="grid grid-cols-2 gap-2.5">{rest.map(card)}</div>
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{rest.map(card)}</div>
           </div>
         </>
       )}

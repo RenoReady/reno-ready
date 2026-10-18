@@ -200,6 +200,16 @@ function EstimateLocked({ dark = false }: { dark?: boolean }) {
   );
 }
 
+/** A labelled divider between the groups inside Step 2 */
+function GroupHeading({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="border-t border-sand-200 pt-5 first:border-t-0 first:pt-0">
+      <p className="text-base font-bold text-charcoal">{title}</p>
+      <p className="mt-0.5 text-xs leading-snug text-charcoal/50">{hint}</p>
+    </div>
+  );
+}
+
 /** A room estimate plus the project-brief lines (plumbing moves, strip-out, asbestos) */
 function withBrief(est: { items: { label: string; amount: number }[]; total: number }, brief: ProjectBrief | null, room: RoomType) {
   if (!brief) return est;
@@ -1716,153 +1726,19 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
             <div className="lg:order-1 flex flex-col gap-5 min-w-0">
               <StepCard step={2}>
-                {roomType === "bathroom" && (<>
+                {roomType === "bathroom" && (
                   <StyleLibrary looks={BATHROOM_STYLES} activeId={designStyle} onSelect={handleStyle} />
-                  {/* Floor tiles — style first, tone second */}
-                  <SidebarSection icon={Layers} title="Floor Tiles">
-                  <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
-                    <StylePicker
-                      styles={FLOOR_FORMATS}
-                      value={floorFormat}
-                      tone={floorTile?.id ?? null}
-                      toneLabel={floorTile?.name ?? (customFloorColor ? `Custom ${customFloorColor}` : null)}
-                      tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
-                      thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
-                      popularLabel="Popular floor tiles"
-                      moreLabel="View More Floor Styles"
-                      drawerTitle="Floor tiles"
-                      onPick={(id, tone) => { setFloorFormat(id as FloorFormat); setFloorTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomFloorColor(null); }}
-                      onClear={() => { setFloorFormat(null); setFloorTile(null); setCustomFloorColor(null); }}
-                      custom={{
-                        label:    "Custom floor colour",
-                        value:    customFloorColor,
-                        onChange: (id, hex) => { setFloorFormat(id as FloorFormat); if (hex) setFloorTile(null); setCustomFloorColor(hex); },
-                      }}
-                    />
-                  </SidebarSection>
-
-                  {/* Wall tiles — style first, tone second (same tones as the floor, so they coordinate).
-                      The budget option keeps the walls as they are and only repaints them, so its
-                      drawer offers paint colours instead of tile tones. */}
-                  <SidebarSection icon={Layers} title="Wall Tiles">
-                  <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
-                    <StylePicker
-                      styles={WALL_FORMATS}
-                      value={wallFormat}
-                      tone={wallFormat === KEEP_WALLS_PAINT ? paintToneFor(null, wallPaintColor)?.id ?? null : wallTile?.id ?? null}
-                      toneLabel={wallFormat === KEEP_WALLS_PAINT
-                        ? paintToneFor(null, wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)
-                        : wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
-                      tonesFor={(id) => id === KEEP_WALLS_PAINT
-                        ? PAINT_TONES.map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: t.color }))
-                        : SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
-                      thumbFor={(id, tone) => id === KEEP_WALLS_PAINT
-                        ? PAINT_TONES.find((t) => t.id === tone)?.color ?? ((wallFormat === KEEP_WALLS_PAINT && wallPaintColor) || "#F1EEE6")
-                        : tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
-                      popularLabel="Popular wall tiles"
-                      moreLabel="View More Wall Styles"
-                      drawerTitle="Wall tiles"
-                      onPick={(id, tone) => {
-                        setWallFormat(id as WallFormat); setCustomWallColor(null);
-                        if (id === KEEP_WALLS_PAINT) { setWallTile(null); setWallPaint(null, PAINT_TONES.find((t) => t.id === tone)?.color ?? null); }
-                        else { setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setWallPaint(null, null); }
-                      }}
-                      onClear={() => { setWallFormat(null); setWallTile(null); setCustomWallColor(null); setWallPaint(null, null); }}
-                      custom={{
-                        label:    "Custom colour",
-                        value:    wallFormat === KEEP_WALLS_PAINT ? (wallPaintColor && !paintToneFor(null, wallPaintColor) ? wallPaintColor : null) : customWallColor,
-                        onChange: (id, hex) => {
-                          setWallFormat(id as WallFormat);
-                          if (id === KEEP_WALLS_PAINT) { setWallTile(null); setCustomWallColor(null); setWallPaint(null, hex); }
-                          else { if (hex) setWallTile(null); setCustomWallColor(hex); setWallPaint(null, null); }
-                        },
-                      }}
-                    />
-                  </SidebarSection>
-
-                  {/* 5. Vanity */}
-                  <SidebarSection icon={Layers} title="Vanity Style">
-                    <div className="grid grid-cols-2 gap-3">
-                      {VANITY_OPTIONS.map((opt) => (
-                        <button key={opt.id} onClick={() => setVanity(vanity === opt.id ? null : opt.id as VanityType)} aria-pressed={vanity === opt.id}
-                          className={cn(
-                            "flex flex-col gap-2 p-4 rounded-2xl text-left border-2 transition-all duration-200 outline-none",
-                            vanity === opt.id ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                          )}>
-                          <div className={cn("w-9 h-5 rounded-md", vanity === opt.id ? "bg-terracotta/20" : "bg-sand-200", opt.id === "floating" && "mt-3")} />
-                          <p className={cn("text-sm font-bold", vanity === opt.id ? "text-terracotta" : "text-charcoal")}>{opt.label}</p>
-                          <p className="text-[11px] text-charcoal/50 leading-snug">{opt.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </SidebarSection>
-
-                  {/* 6. Tapware */}
-                  <SidebarSection icon={Droplets} title="Tapware Finish">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {TAPWARE_OPTIONS.map((opt) => (
-                        <button key={opt.id} onClick={() => setTapware(tapware === opt.id ? null : opt.id as TapwareFinish)} aria-pressed={tapware === opt.id}
-                          className={cn(
-                            "flex flex-col items-center gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 outline-none",
-                            tapware === opt.id ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                          )}>
-                          <div className="w-10 h-10 rounded-full shadow-warm-sm ring-1 ring-black/10" style={{ background: opt.swatchBg }} />
-                          <p className={cn("text-[11px] font-bold", tapware === opt.id ? "text-terracotta" : "text-charcoal/70")}>{opt.label}</p>
-                          {opt.premium && (
-                            <span className="text-[9px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full -mt-1">{opt.premium}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </SidebarSection>
-                  {/* 8. Lighting & Electrical */}
-                  <SidebarSection icon={Lightbulb} title="Lighting & Electrical">
-                    <div className="flex flex-col gap-2">
-                      {LIGHTING_OPTIONS.map((opt) => {
-                        const active = lightingOption === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => setLightingOption(opt.id as LightingOption)}
-                            className={cn(
-                              "flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200",
-                              active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
-                            )}
-                          >
-                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
-                              active ? "bg-terracotta/15" : "bg-sand-100")}>
-                              <Lightbulb size={15} className={active ? "text-terracotta" : "text-charcoal/40"} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={cn("text-sm font-semibold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
-                              <p className="text-[11px] text-charcoal/45 mt-0.5 leading-snug">{opt.sub}</p>
-                            </div>
-                            {opt.cost > 0 && (
-                              <p className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/40")}>
-                                +${opt.cost.toLocaleString()}
-                              </p>
-                            )}
-                          </button>
-                        );
-                      })}
-                      <p className="text-[10px] text-charcoal/35 leading-snug">
-                        Prices include supply + estimated electrician labour. Marvel 3-in-1 from BDW Quote #235561.
-                      </p>
-                    </div>
-                  </SidebarSection>
-
-                </>)}
-                {roomType === "kitchen" && (<>
+                )}
+                {roomType === "kitchen" && (
                   <StyleLibrary looks={KITCHEN_STYLES} activeId={kitchenSelections.designStyle} onSelect={handleStyle} />
-                  <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
-                </>)}
-                {roomType === "bedroom" && (<>
+                )}
+                {roomType === "bedroom" && (
                   <StyleLibrary looks={BEDROOM_STYLES} activeId={bedroomSelections.designStyle} onSelect={handleStyle} />
-                  <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
-                </>)}
-              </StepCard>
+                )}
 
-              <Panel title={`${roomName} size & budget`}>
+                {/* Scope first: the big cost drivers (size, layout and plumbing, strip-out or refresh,
+                    structural work) come straight after the style, before any finishes */}
+                <GroupHeading title="Scope & layout" hint="Set the big-ticket items first. They drive most of the cost and shape your builder brief." />
                 {roomType === "bathroom" && (<>
                   {/* 0. Bathroom Size */}
                   <SidebarSection icon={SlidersHorizontal} title="Bathroom Size">
@@ -2189,6 +2065,151 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   </>)}
                 </div>
 
+                <GroupHeading title="Finishes" hint="Now pick the surfaces and fittings. Tap a card to choose its colour." />
+                {roomType === "bathroom" && (<>
+                  {/* Floor tiles — style first, tone second */}
+                  <SidebarSection icon={Layers} title="Floor Tiles">
+                  <KeepExistingToggle room="bathroom" thing="floor tiles" active={isKept(keepExisting, "floor")} onToggle={(on) => setBathroomKeep("floor", on)} />
+                    <StylePicker
+                      styles={FLOOR_FORMATS}
+                      value={floorFormat}
+                      tone={floorTile?.id ?? null}
+                      toneLabel={floorTile?.name ?? (customFloorColor ? `Custom ${customFloorColor}` : null)}
+                      tonesFor={(id) => SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => tone ? surfaceSwatch(id, tone) : FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      popularLabel="Popular floor tiles"
+                      moreLabel="View More Floor Styles"
+                      drawerTitle="Floor tiles"
+                      onPick={(id, tone) => { setFloorFormat(id as FloorFormat); setFloorTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setCustomFloorColor(null); }}
+                      onClear={() => { setFloorFormat(null); setFloorTile(null); setCustomFloorColor(null); }}
+                      custom={{
+                        label:    "Custom floor colour",
+                        value:    customFloorColor,
+                        onChange: (id, hex) => { setFloorFormat(id as FloorFormat); if (hex) setFloorTile(null); setCustomFloorColor(hex); },
+                      }}
+                    />
+                  </SidebarSection>
+
+                  {/* Wall tiles — style first, tone second (same tones as the floor, so they coordinate).
+                      The budget option keeps the walls as they are and only repaints them, so its
+                      drawer offers paint colours instead of tile tones. */}
+                  <SidebarSection icon={Layers} title="Wall Tiles">
+                  <KeepExistingToggle room="bathroom" thing="wall tiles" active={isKept(keepExisting, "walls")} onToggle={(on) => setBathroomKeep("walls", on)} />
+                    <StylePicker
+                      styles={WALL_FORMATS}
+                      value={wallFormat}
+                      tone={wallFormat === KEEP_WALLS_PAINT ? paintToneFor(null, wallPaintColor)?.id ?? null : wallTile?.id ?? null}
+                      toneLabel={wallFormat === KEEP_WALLS_PAINT
+                        ? paintToneFor(null, wallPaintColor)?.name ?? (wallPaintColor ? `Custom ${wallPaintColor}` : null)
+                        : wallTile?.name ?? (customWallColor ? `Custom ${customWallColor}` : null)}
+                      tonesFor={(id) => id === KEEP_WALLS_PAINT
+                        ? PAINT_TONES.map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: t.color }))
+                        : SURFACE_TONES.map((t) => ({ id: t.id, label: t.name, swatch: surfaceSwatch(id, t.id) }))}
+                      thumbFor={(id, tone) => id === KEEP_WALLS_PAINT
+                        ? PAINT_TONES.find((t) => t.id === tone)?.color ?? ((wallFormat === KEEP_WALLS_PAINT && wallPaintColor) || "#F1EEE6")
+                        : tone ? surfaceSwatch(id, tone) : WALL_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+                      popularLabel="Popular wall tiles"
+                      moreLabel="View More Wall Styles"
+                      drawerTitle="Wall tiles"
+                      onPick={(id, tone) => {
+                        setWallFormat(id as WallFormat); setCustomWallColor(null);
+                        if (id === KEEP_WALLS_PAINT) { setWallTile(null); setWallPaint(null, PAINT_TONES.find((t) => t.id === tone)?.color ?? null); }
+                        else { setWallTile(SURFACE_TONES.find((t) => t.id === tone) ?? null); setWallPaint(null, null); }
+                      }}
+                      onClear={() => { setWallFormat(null); setWallTile(null); setCustomWallColor(null); setWallPaint(null, null); }}
+                      custom={{
+                        label:    "Custom colour",
+                        value:    wallFormat === KEEP_WALLS_PAINT ? (wallPaintColor && !paintToneFor(null, wallPaintColor) ? wallPaintColor : null) : customWallColor,
+                        onChange: (id, hex) => {
+                          setWallFormat(id as WallFormat);
+                          if (id === KEEP_WALLS_PAINT) { setWallTile(null); setCustomWallColor(null); setWallPaint(null, hex); }
+                          else { if (hex) setWallTile(null); setCustomWallColor(hex); setWallPaint(null, null); }
+                        },
+                      }}
+                    />
+                  </SidebarSection>
+
+                  {/* 5. Vanity */}
+                  <SidebarSection icon={Layers} title="Vanity Style">
+                    <div className="grid grid-cols-2 gap-3">
+                      {VANITY_OPTIONS.map((opt) => (
+                        <button key={opt.id} onClick={() => setVanity(vanity === opt.id ? null : opt.id as VanityType)} aria-pressed={vanity === opt.id}
+                          className={cn(
+                            "flex flex-col gap-2 p-4 rounded-2xl text-left border-2 transition-all duration-200 outline-none",
+                            vanity === opt.id ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                          )}>
+                          <div className={cn("w-9 h-5 rounded-md", vanity === opt.id ? "bg-terracotta/20" : "bg-sand-200", opt.id === "floating" && "mt-3")} />
+                          <p className={cn("text-sm font-bold", vanity === opt.id ? "text-terracotta" : "text-charcoal")}>{opt.label}</p>
+                          <p className="text-[11px] text-charcoal/50 leading-snug">{opt.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </SidebarSection>
+
+                  {/* 6. Tapware */}
+                  <SidebarSection icon={Droplets} title="Tapware Finish">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {TAPWARE_OPTIONS.map((opt) => (
+                        <button key={opt.id} onClick={() => setTapware(tapware === opt.id ? null : opt.id as TapwareFinish)} aria-pressed={tapware === opt.id}
+                          className={cn(
+                            "flex flex-col items-center gap-2.5 p-3 rounded-2xl border-2 transition-all duration-200 outline-none",
+                            tapware === opt.id ? "border-terracotta bg-terracotta/5" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                          )}>
+                          <div className="w-10 h-10 rounded-full shadow-warm-sm ring-1 ring-black/10" style={{ background: opt.swatchBg }} />
+                          <p className={cn("text-[11px] font-bold", tapware === opt.id ? "text-terracotta" : "text-charcoal/70")}>{opt.label}</p>
+                          {opt.premium && (
+                            <span className="text-[9px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.5 rounded-full -mt-1">{opt.premium}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </SidebarSection>
+                  {/* 8. Lighting & Electrical */}
+                  <SidebarSection icon={Lightbulb} title="Lighting & Electrical">
+                    <div className="flex flex-col gap-2">
+                      {LIGHTING_OPTIONS.map((opt) => {
+                        const active = lightingOption === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => setLightingOption(opt.id as LightingOption)}
+                            className={cn(
+                              "flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-200",
+                              active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/40",
+                            )}
+                          >
+                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors",
+                              active ? "bg-terracotta/15" : "bg-sand-100")}>
+                              <Lightbulb size={15} className={active ? "text-terracotta" : "text-charcoal/40"} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-semibold", active ? "text-terracotta" : "text-charcoal/80")}>{opt.label}</p>
+                              <p className="text-[11px] text-charcoal/45 mt-0.5 leading-snug">{opt.sub}</p>
+                            </div>
+                            {opt.cost > 0 && (
+                              <p className={cn("text-xs font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/40")}>
+                                +${opt.cost.toLocaleString()}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                      <p className="text-[10px] text-charcoal/35 leading-snug">
+                        Prices include supply + estimated electrician labour. Marvel 3-in-1 from BDW Quote #235561.
+                      </p>
+                    </div>
+                  </SidebarSection>
+
+                </>)}
+                {roomType === "kitchen" && (<>
+                  <KitchenSidebar part="finishes" selections={kitchenSelections} onChange={setKitchenSelections} />
+                </>)}
+                {roomType === "bedroom" && (<>
+                  <BedroomSidebar part="finishes" selections={bedroomSelections} onChange={setBedroomSelections} />
+                </>)}
+              </StepCard>
+
+              <Panel title="Your budget">
                 {roomType === "kitchen" && (
                   <KitchenSidebar part="budget" selections={kitchenSelections} onChange={setKitchenSelections} />
                 )}

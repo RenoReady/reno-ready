@@ -327,7 +327,7 @@ export function StylePicker({
   return (
     <div>
       <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-charcoal/45">{popularLabel}</p>
-      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{top.map(card)}</div>
+      <div className={cn("grid grid-cols-2 gap-2.5", top.length === 3 ? "md:grid-cols-3" : "md:grid-cols-4")}>{top.map(card)}</div>
       {budget.map(budgetCard)}
       {rest.length > 0 && (
         <>

@@ -32,6 +32,8 @@ import {
   type SavedRoom,
   KITCHEN_BUDGET_DEFAULT,
   BEDROOM_BUDGET_DEFAULT,
+  WALL_TREATMENT_OPTIONS,
+  OLD_WALL_TREATMENT,
 } from "./roomTypes";
 
 // ── OAuth state persistence ────────────────────────────────────────
@@ -171,6 +173,21 @@ function sanitiseRoom<T extends { ceilingStyle?: unknown; designStyle?: unknown 
     if (!FLOOR_FORMATS.some((f) => f.id === out.floorFormat)) out.floorFormat = null;
     if (!SURFACE_TONES.some((t) => t.id === out.floorTone)) out.floorTone = null;
   }
+  // cabinetry used to combine profile + colour; split the old values
+  const OLD_CAB: Record<string, [string, string | null]> = {
+    "shaker-sage": ["shaker", "#8FAF8A"], "matte-black": ["flat-panel", "#2B2B2B"], "flat-panel-beige": ["flat-panel", "#D8CEBC"],
+  };
+  if ("cabinetry" in out && typeof out.cabinetry === "string" && OLD_CAB[out.cabinetry]) {
+    const [style, colour] = OLD_CAB[out.cabinetry];
+    out.cabinetry = style; out.cabinetColor = out.cabinetColor ?? colour;
+  }
+  if ("cabinetry" in out && !("cabinetColor" in out)) out.cabinetColor = null;
+  if ("benchtop" in out && !("benchtopTone" in out)) out.benchtopTone = null;
+  // bedroom walls were cut to four finishes
+  if ("wallTreatment" in out && typeof out.wallTreatment === "string") {
+    const w = OLD_WALL_TREATMENT[out.wallTreatment] ?? out.wallTreatment;
+    out.wallTreatment = WALL_TREATMENT_OPTIONS.some((o) => o.id === w) ? w : null;
+  }
   if ("wallFinish" in out && typeof out.wallFinish === "string") {
     out.wallFinish = findPaintFinish(OLD_WALL_FINISH[out.wallFinish] ?? out.wallFinish)?.id ?? null;
   }
@@ -184,6 +201,8 @@ const defaultKitchenSelections: KitchenSelections = {
   customWidth:         0,
   cabinetry:           null,
   benchtop:            null,
+  cabinetColor:        null,
+  benchtopTone:        null,
   mixer:               null,
   splashback:          null,
   floorFormat:         null,

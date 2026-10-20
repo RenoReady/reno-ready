@@ -41,6 +41,8 @@ import {
   kitchenFloorLabel,
   bedroomFloorLabel,
   bedroomWallLabel,
+  cabinetryLabel,
+  benchtopLabel,
 } from "@/lib/roomTypes";
 import { cn, formatAUD } from "@/lib/utils";
 import { TriangleAlert } from "lucide-react";
@@ -278,7 +280,7 @@ export default function PreviewPage() {
                   ))}
                   {roomType === "kitchen" && kitchenSelections.cabinetry && (
                     <span className="bg-charcoal/70 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-xs font-semibold">
-                      Cabinetry: {kitchenSelections.cabinetry}
+                      Cabinetry: {cabinetryLabel(kitchenSelections)}
                     </span>
                   )}
                   {roomType === "bedroom" && bedroomFloorLabel(bedroomSelections) && (
@@ -471,8 +473,8 @@ export default function PreviewPage() {
               <div className="grid grid-cols-2 gap-2">
                 {(
                   roomType === "kitchen" ? [
-                    { label: "Cabinetry",  value: selectionText(kitchenSelections.cabinetry,  isKept(kitchenSelections.keepExisting, "cabinetry")) },
-                    { label: "Benchtop",   value: selectionText(kitchenSelections.benchtop,   isKept(kitchenSelections.keepExisting, "benchtop")) },
+                    { label: "Cabinetry",  value: selectionText(cabinetryLabel(kitchenSelections),  isKept(kitchenSelections.keepExisting, "cabinetry")) },
+                    { label: "Benchtop",   value: selectionText(benchtopLabel(kitchenSelections),   isKept(kitchenSelections.keepExisting, "benchtop")) },
                     { label: "Splashback", value: selectionText(kitchenSelections.splashback, isKept(kitchenSelections.keepExisting, "splashback")) },
                     { label: "Floor",      value: selectionText(kitchenFloorLabel(kitchenSelections), isKept(kitchenSelections.keepExisting, "floor")) },
                   ] : roomType === "bedroom" ? [

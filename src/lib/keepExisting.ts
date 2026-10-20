@@ -18,8 +18,8 @@ export const BATHROOM_KEEP_FIELDS: Record<BathroomKeepKey, string[]> = {
 };
 
 export const KITCHEN_KEEP_FIELDS: Record<KitchenKeepKey, string[]> = {
-  cabinetry:  ["cabinetry"],
-  benchtop:   ["benchtop"],
+  cabinetry:  ["cabinetry", "cabinetColor"],
+  benchtop:   ["benchtop", "benchtopTone"],
   mixer:      ["mixer"],
   splashback: ["splashback"],
   floor:      ["floorFormat", "floorTone", "floorColor"],

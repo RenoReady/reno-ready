@@ -16,10 +16,12 @@ import {
   type BedroomSelections,
   type BedroomRoomSize,
   type BedroomFloorFormat,
+  type WallTreatment,
+  wallTreatmentLabel,
+  wallTreatmentSwatch,
   BEDROOM_SIZE_OPTIONS,
   BEDROOM_FLOOR_FORMATS,
   BEDROOM_FLOOR_TONES,
-  KITCHEN_WALL_OPTIONS,
   WALL_TREATMENT_OPTIONS,
   BEDROOM_LIGHTING_OPTIONS,
   STORAGE_OPTIONS,
@@ -29,11 +31,10 @@ import {
   BEDROOM_BUDGET_STEP,
 } from "@/lib/roomTypes";
 import { Ruler, SlidersHorizontal } from "lucide-react";
-import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, BEDROOM_KEEP_FIELDS, type BedroomKeepKey } from "@/lib/keepExisting";
 import { tonesFor } from "@/lib/types";
-import { StepLabel, FormatGrid, ToneGrid, CeilingPicker } from "@/components/builder/SurfacePicker";
+import { StylePicker, CeilingPicker } from "@/components/builder/SurfacePicker";
 
 // ── Section label ─────────────────────────────────────────────────────────────
 
@@ -61,82 +62,52 @@ export default function BedroomSidebar({ selections, onChange, part }: BedroomSi
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Flooring — format, then tone */}
+      {/* Flooring — format first, colour in the drawer (same flow as the bathroom) */}
       <div>
         <SectionLabel>Flooring</SectionLabel>
         <KeepExistingToggle room="bedroom" thing="flooring" className="mb-3" active={isKept(selections.keepExisting, "flooring")} onToggle={(on) => keep("flooring", on)} />
-        <StepLabel n={1} hint="Priced for a 16m² room">Choose a format</StepLabel>
-        <FormatGrid
-          options={BEDROOM_FLOOR_FORMATS.map((f) => ({ id: f.id, label: f.label, sub: f.sub, swatch: f.swatch, cost: f.cost }))}
+        <StylePicker
+          styles={BEDROOM_FLOOR_FORMATS}
           value={selections.flooringFormat}
-          onChange={(id) => {
-            const fmt = BEDROOM_FLOOR_FORMATS.find((f) => f.id === id);
-            onChange({ flooringFormat: id as BedroomFloorFormat | null, flooringTone: fmt?.tones.includes(selections.flooringTone ?? "") ? selections.flooringTone : null });
+          tone={selections.flooringTone}
+          toneLabel={BEDROOM_FLOOR_TONES.find((t) => t.id === selections.flooringTone)?.name ?? (selections.flooringColor ? `Custom ${selections.flooringColor}` : null)}
+          tonesFor={(id) => tonesFor(BEDROOM_FLOOR_TONES, BEDROOM_FLOOR_FORMATS.find((f) => f.id === id)).map((t) => ({ id: t.id, label: t.name, swatch: t.id }))}
+          thumbFor={(id, tone) => tone ?? BEDROOM_FLOOR_FORMATS.find((f) => f.id === id)?.swatch ?? ""}
+          popularLabel="Flooring type · priced for a 16m² room"
+          moreLabel="View More Flooring"
+          drawerTitle="Flooring colour"
+          onPick={(id, tone) => onChange({ flooringFormat: id as BedroomFloorFormat, flooringTone: tone, flooringColor: null })}
+          onClear={() => onChange({ flooringFormat: null, flooringTone: null, flooringColor: null })}
+          custom={{
+            label:    "Custom flooring colour",
+            value:    selections.flooringColor,
+            onChange: (id, hex) => onChange({ flooringFormat: id as BedroomFloorFormat, flooringColor: hex, flooringTone: hex ? null : selections.flooringTone }),
           }}
         />
-        {selections.flooringFormat && (
-          <div className="mt-4">
-            <StepLabel n={2}>Choose a colour or tone</StepLabel>
-            <ToneGrid
-              tones={tonesFor(BEDROOM_FLOOR_TONES, BEDROOM_FLOOR_FORMATS.find((f) => f.id === selections.flooringFormat)).map((t) => ({ id: t.id, label: t.name, swatch: t.id }))}
-              value={selections.flooringColor ? null : selections.flooringTone}
-              onChange={(id) => onChange({ flooringTone: id, flooringColor: null })}
-            >
-              <ColourPickerSwatch
-                label="Custom Flooring Colour"
-                value={selections.flooringColor ?? null}
-                onChange={(hex) => onChange({ flooringColor: hex, flooringTone: hex ? null : selections.flooringTone })}
-                variant="square"
-              />
-            </ToneGrid>
-          </div>
-        )}
       </div>
 
-      {/* Wall Treatment */}
+      {/* Walls — four finishes, colour in the drawer */}
       <div>
         <SectionLabel>Walls</SectionLabel>
         <KeepExistingToggle room="bedroom" thing="wall finish" className="mb-3" active={isKept(selections.keepExisting, "walls")} onToggle={(on) => keep("walls", on)} />
-        <StepLabel n={1}>Choose a material or finish</StepLabel>
-        <div className="flex flex-col gap-2">
-          {WALL_TREATMENT_OPTIONS.map((opt) => {
-            const active = selections.wallTreatment === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ wallTreatment: selections.wallTreatment === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5">{opt.sub}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={cn("text-[10px] font-bold tabular-nums", active ? "text-terracotta" : "text-charcoal/30")}>
-                    ~${(opt.cost / 1000).toFixed(1)}k
-                  </span>
-                  <div className={cn("w-4 h-4 rounded-full border-2", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-                </div>
-              </button>
-            );
-          })}
-
-        </div>
-        {selections.wallTreatment && (
-          <div className="mt-4">
-            <StepLabel n={2}>Choose a colour</StepLabel>
-            <ToneGrid
-              tones={KITCHEN_WALL_OPTIONS.map((o) => ({ id: o.color, label: o.label, color: o.color }))}
-              value={selections.wallColor}
-              onChange={(c) => onChange({ wallColor: c })}
-            >
-              <ColourPickerSwatch label="Custom Wall Colour" value={selections.wallColor ?? null} onChange={(hex) => onChange({ wallColor: hex })} variant="square" />
-            </ToneGrid>
-          </div>
-        )}
+        <StylePicker
+          styles={WALL_TREATMENT_OPTIONS}
+          value={selections.wallTreatment}
+          tone={WALL_TREATMENT_OPTIONS.find((o) => o.id === selections.wallTreatment)?.tones.find((t) => t.color.toLowerCase() === selections.wallColor?.toLowerCase())?.id ?? null}
+          toneLabel={wallTreatmentLabel(selections)?.split(" · ").slice(0, -1).join(" · ") || null}
+          tonesFor={(id) => (WALL_TREATMENT_OPTIONS.find((o) => o.id === id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: wallTreatmentSwatch(id, t.id) }))}
+          thumbFor={(id, tone) => wallTreatmentSwatch(id, tone ?? WALL_TREATMENT_OPTIONS.find((o) => o.id === id)?.defaultTone ?? "")}
+          popularLabel="Wall finish"
+          moreLabel=""
+          drawerTitle="Wall colour"
+          onPick={(id, tone) => onChange({ wallTreatment: id as WallTreatment, wallColor: WALL_TREATMENT_OPTIONS.find((o) => o.id === id)?.tones.find((t) => t.id === tone)?.color ?? null })}
+          onClear={() => onChange({ wallTreatment: null, wallColor: null })}
+          custom={{
+            label:    "Custom wall colour",
+            value:    selections.wallColor && !WALL_TREATMENT_OPTIONS.find((o) => o.id === selections.wallTreatment)?.tones.some((t) => t.color.toLowerCase() === selections.wallColor!.toLowerCase()) ? selections.wallColor : null,
+            onChange: (id, hex) => onChange({ wallTreatment: id as WallTreatment, wallColor: hex }),
+          }}
+        />
       </div>
 
       {/* Ceiling */}

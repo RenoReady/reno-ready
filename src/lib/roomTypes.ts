@@ -11,7 +11,7 @@
 
 import { isKept, type KitchenKeepKey, type BedroomKeepKey } from "./keepExisting";
 import {
-  FLOOR_TILES, FLOOR_FORMATS, STONE_TIMBER_TONES, PAINT_FINISHES,
+  FLOOR_TILES, FLOOR_FORMATS, STONE_TIMBER_TONES, PAINT_FINISHES, PAINT_TONES,
   surfaceLabel, surfacePrompt, paintLabel, paintPrompt,
   type TileOption, type FloorFormat, type SurfaceFormat, type WallPaintFinish, type PaintFinish,
 } from "./types";
@@ -58,7 +58,8 @@ export function ceilingLabel(style: CeilingStyle | string | null | undefined, co
 // ── Kitchen types ─────────────────────────────────────────────────────────────
 
 export type KitchenRoomSize  = "galley" | "standard" | "large" | "custom";
-export type CabinetryStyle   = "shaker" | "shaker-sage" | "matte-black" | "flat-panel" | "flat-panel-beige" | "natural-timber";
+/** Cabinetry door profile — the colour is chosen separately (cabinetColor) */
+export type CabinetryStyle   = "shaker" | "flat-panel" | "natural-timber";
 export type BenchtopMaterial = "engineered-stone" | "porcelain-slab" | "timber";
 export type MixerFinish      = "brushed-brass" | "matte-black" | "chrome" | "white";
 export type SplashbackStyle  = "white-subway" | "grey-subway" | "calacatta-slab" | "mirrored" | "vj-panel" | "slab-match";
@@ -95,6 +96,10 @@ export interface KitchenSelections {
   customWidth:          number;
   cabinetry:            CabinetryStyle   | null;  // null = deselected
   benchtop:             BenchtopMaterial | null;
+  /** Cabinet colour (hex), chosen in the cabinetry drawer */
+  cabinetColor:         string | null;
+  /** Benchtop tone id (e.g. "white-calacatta"), or a custom "#hex" */
+  benchtopTone:         string | null;
   mixer:                MixerFinish      | null;
   splashback:           SplashbackStyle  | null;
   /** Floor Step A — the format; Step B is floorTone (or a custom floorColor) */
@@ -123,74 +128,91 @@ export interface KitchenSelections {
 
 // ── Kitchen options ───────────────────────────────────────────────────────────
 
-export const CABINETRY_OPTIONS: { id: CabinetryStyle; label: string; sub: string; palette: string[]; costAdj: number }[] = [
-  {
-    id:      "shaker",
-    label:   "Shaker White",
-    sub:     "Classic recessed-panel in white — timeless and universally versatile",
-    palette: ["#F5F0E8", "#E8E0D5", "#C8C0B8"],
-    costAdj: 0,
-  },
-  {
-    id:      "shaker-sage",
-    label:   "Shaker Sage Green",
-    sub:     "Recessed-panel in sage — on-trend coastal colour palette",
-    palette: ["#8FAF8A", "#7A9E73", "#65885D"],
-    costAdj: 500,
-  },
-  {
-    id:      "matte-black",
-    label:   "Matte Black",
-    sub:     "Bold, flat-panel matte black — dramatic and architectural",
-    palette: ["#2C2C2C", "#1A1A1A", "#3A3A3A"],
-    costAdj: 2_000,
-  },
-  {
-    id:      "flat-panel",
-    label:   "Flat-Panel Minimalist",
-    sub:     "Handleless, seamless fronts — clean European aesthetic",
-    palette: ["#E8E8E8", "#D0D0D0", "#B0B0B0"],
-    costAdj: 1_500,
-  },
-  {
-    id:      "flat-panel-beige",
-    label:   "Flat-Panel Beige",
-    sub:     "Warm neutral handleless fronts — soft and contemporary",
-    palette: ["#D8CEBC", "#C8BCA8", "#B8AC98"],
-    costAdj: 1_500,
-  },
-  {
-    id:      "natural-timber",
-    label:   "Natural Timber",
-    sub:     "Warm grain veneer doors — brings organic texture indoors",
-    palette: ["#C4956A", "#A87850", "#8B6040"],
-    costAdj: 3_000,
-  },
+/** A colour or tone in a style-first picker; `color` is the hex used for paint-like finishes and custom matching */
+export interface FinishTone { id: string; name: string; color: string; sub?: string }
+
+/** Cabinetry: pick a door profile, then its colour (stored as a hex in cabinetColor) */
+const CABINET_PAINT: FinishTone[] = [
+  { id: "pure-white",  name: "Pure White",  color: "#F5F2EC", sub: "Clean and bright" },
+  { id: "sage-green",  name: "Sage Green",  color: "#8FAF8A", sub: "Soft, earthy green" },
+  { id: "matte-black", name: "Matte Black", color: "#2B2B2B", sub: "Bold and architectural" },
+  { id: "cream-beige", name: "Cream Beige", color: "#D8CEBC", sub: "Warm neutral" },
+];
+const CABINET_TIMBER: FinishTone[] = [
+  { id: "light-oak",   name: "Light Oak",   color: "#D6B88E", sub: "Pale, Scandi warmth" },
+  { id: "natural-oak", name: "Natural Oak", color: "#B8865A", sub: "Classic mid-tone oak" },
+  { id: "walnut",      name: "Walnut",      color: "#5C3D2A", sub: "Rich and dark" },
+  { id: "smoked-oak",  name: "Smoked Oak",  color: "#6E5642", sub: "Deep, moody oak" },
 ];
 
-export const BENCHTOP_OPTIONS: { id: BenchtopMaterial; label: string; sub: string; palette: string[]; costAdj: number }[] = [
-  {
-    id:      "engineered-stone",
-    label:   "Engineered Stone",
-    sub:     "20mm Calacatta-style — durable, stain-resistant, premium look",
-    palette: ["#F0EDE8", "#E8E0D8", "#C8C0B8"],
-    costAdj: 0,
-  },
-  {
-    id:      "porcelain-slab",
-    label:   "Porcelain Slab",
-    sub:     "Ultra-thin large-format slab — heatproof and hygienic",
-    palette: ["#E8E8E8", "#D8D8D8", "#C8C8C8"],
-    costAdj: 1_200,
-  },
-  {
-    id:      "timber",
-    label:   "Solid Timber",
-    sub:     "Oiled hardwood — warm and unique, needs regular care",
-    palette: ["#B8906A", "#9A7050", "#7C5835"],
-    costAdj: 2_500,
-  },
+export const CABINETRY_OPTIONS: { id: CabinetryStyle; label: string; sub: string; costAdj: number; swatch: string; tones: FinishTone[]; defaultTone: string }[] = [
+  { id: "shaker",         label: "Shaker Profile",        sub: "Classic recessed-panel doors", costAdj: 0,     swatch: "cab-shaker--pure-white",  tones: CABINET_PAINT,  defaultTone: "pure-white" },
+  { id: "flat-panel",     label: "Flat-Panel Minimalist", sub: "Handleless, seamless fronts",  costAdj: 1_500, swatch: "cab-flat--matte-black",   tones: CABINET_PAINT,  defaultTone: "matte-black" },
+  { id: "natural-timber", label: "Natural Timber",        sub: "Real timber veneer doors",     costAdj: 3_000, swatch: "cab-timber--natural-oak", tones: CABINET_TIMBER, defaultTone: "natural-oak" },
 ];
+export const cabinetSwatch = (style: string, tone: string) => `cab-${style === "natural-timber" ? "timber" : style === "flat-panel" ? "flat" : "shaker"}--${tone}`;
+
+/** Benchtops: pick a material, then a tone or veining (benchtopTone: tone id, or a custom "#hex") */
+const BENCH_STONE: FinishTone[] = [
+  { id: "white-calacatta", name: "White Calacatta", color: "#F2F0EC", sub: "Bold grey-gold veins" },
+  { id: "grey-veined",     name: "Grey Veined",     color: "#C9CACB", sub: "Soft grey marble look" },
+  { id: "black",           name: "Black",           color: "#2A2A2C", sub: "Dramatic, fine white veins" },
+  { id: "terrazzo",        name: "Terrazzo",        color: "#ECE7DF", sub: "Speckled stone chips" },
+];
+const BENCH_TIMBER: FinishTone[] = [
+  { id: "blackbutt",   name: "Blackbutt",   color: "#C9A57A", sub: "Light Australian hardwood" },
+  { id: "spotted-gum", name: "Spotted Gum", color: "#9A6B47", sub: "Warm, varied grain" },
+  { id: "oak",         name: "Oak",         color: "#B98E5E", sub: "Classic oiled oak" },
+];
+
+export const BENCHTOP_OPTIONS: { id: BenchtopMaterial; label: string; sub: string; costAdj: number; swatch: string; tones: FinishTone[]; defaultTone: string }[] = [
+  { id: "engineered-stone", label: "Engineered Stone", sub: "20mm, durable and stain-resistant", costAdj: 0,     swatch: "bench--white-calacatta", tones: BENCH_STONE,  defaultTone: "white-calacatta" },
+  { id: "porcelain-slab",   label: "Porcelain Slab",   sub: "Ultra-thin, heatproof, hygienic",   costAdj: 1_200, swatch: "bench--grey-veined",     tones: BENCH_STONE,  defaultTone: "grey-veined" },
+  { id: "timber",           label: "Solid Timber",     sub: "Oiled hardwood, warm and unique",   costAdj: 2_500, swatch: "bench--blackbutt",       tones: BENCH_TIMBER, defaultTone: "blackbutt" },
+];
+export const benchSwatch = (tone: string) => `bench--${tone}`;
+
+/** "Sage Green · Shaker Profile" */
+export function cabinetryLabel(sel: Pick<KitchenSelections, "cabinetry" | "cabinetColor">): string | null {
+  const opt = CABINETRY_OPTIONS.find((o) => o.id === sel.cabinetry);
+  if (!opt) return null;
+  const tone = sel.cabinetColor ? opt.tones.find((t) => t.color.toLowerCase() === sel.cabinetColor!.toLowerCase()) : undefined;
+  const colour = tone?.name ?? (sel.cabinetColor ? `Custom ${sel.cabinetColor}` : null);
+  return [colour, opt.label].filter(Boolean).join(" · ");
+}
+/** "White Calacatta · Engineered Stone" */
+export function benchtopLabel(sel: Pick<KitchenSelections, "benchtop" | "benchtopTone">): string | null {
+  const opt = BENCHTOP_OPTIONS.find((o) => o.id === sel.benchtop);
+  if (!opt) return null;
+  const t = sel.benchtopTone;
+  const tone = t?.startsWith("#") ? `Custom ${t}` : opt.tones.find((x) => x.id === t)?.name ?? null;
+  return [tone, opt.label].filter(Boolean).join(" · ");
+}
+/** Prompt phrases, e.g. "sage green (#8FAF8A) shaker-profile cabinetry" */
+export function cabinetryPrompt(sel: Pick<KitchenSelections, "cabinetry" | "cabinetColor">): string | null {
+  const opt = CABINETRY_OPTIONS.find((o) => o.id === sel.cabinetry);
+  if (!opt) return null;
+  const tone = sel.cabinetColor ? opt.tones.find((t) => t.color.toLowerCase() === sel.cabinetColor!.toLowerCase()) : undefined;
+  const colour = sel.cabinetColor ? `${tone ? tone.name.toLowerCase() : "custom-coloured"} (exact colour ${sel.cabinetColor}) ` : "";
+  return `${colour}${opt.label.toLowerCase()} cabinetry`;
+}
+export function benchtopPrompt(sel: Pick<KitchenSelections, "benchtop" | "benchtopTone">): string | null {
+  const opt = BENCHTOP_OPTIONS.find((o) => o.id === sel.benchtop);
+  if (!opt) return null;
+  const t = sel.benchtopTone;
+  const tone = t?.startsWith("#") ? `custom-coloured (exact colour ${t})` : opt.tones.find((x) => x.id === t)?.name.toLowerCase();
+  return `${tone ? `${tone} ` : ""}${opt.label.toLowerCase()} benchtop`;
+}
+/** Product-finder tags for the chosen cabinetry (older products are tagged by the old combined styles) */
+export function cabinetryTags(sel: Pick<KitchenSelections, "cabinetry" | "cabinetColor">): string[] {
+  if (!sel.cabinetry) return [];
+  const tone = CABINETRY_OPTIONS.find((o) => o.id === sel.cabinetry)?.tones.find((t) => t.color.toLowerCase() === sel.cabinetColor?.toLowerCase())?.id;
+  const tags: string[] = [sel.cabinetry];
+  if (tone === "sage-green") tags.push("shaker-sage");
+  if (tone === "matte-black") tags.push("matte-black");
+  if (tone === "cream-beige") tags.push("flat-panel-beige");
+  return tags;
+}
 
 export const MIXER_OPTIONS: { id: MixerFinish; label: string; sub: string }[] = [
   { id: "brushed-brass", label: "Brushed Brass",  sub: "Warm gold — pairs beautifully with timber or white cabinetry" },
@@ -219,15 +241,6 @@ export const KITCHEN_FLOOR_FORMATS: SurfaceFormat<FloorFormat>[] =
 /** Kitchen wall colour finishes: the shared paint finishes, priced for all the kitchen's painted walls */
 export const KITCHEN_WALL_FINISHES: PaintFinish[] = PAINT_FINISHES.map((f) => ({ ...f, cost: f.kitchenCost }));
 
-/** Paint colours offered for bedroom walls */
-export const KITCHEN_WALL_OPTIONS: { id: string; label: string; sub: string; color: string }[] = [
-  { id: "wall-warm-white",  label: "Warm White",   sub: "Soft white with warm undertones",        color: "#F8F5F0" },
-  { id: "wall-soft-grey",   label: "Soft Grey",    sub: "Cool neutral — pairs with any cabinet",  color: "#D4D8DC" },
-  { id: "wall-sage-green",  label: "Sage Green",   sub: "Muted earthy green — organic & fresh",   color: "#9EB89A" },
-  { id: "wall-warm-taupe",  label: "Warm Taupe",   sub: "Sandy neutral — timeless and versatile", color: "#C4A882" },
-  { id: "wall-navy",        label: "Deep Navy",    sub: "Bold dark blue — dramatic feature wall",  color: "#2C3E5A" },
-  { id: "wall-terracotta",  label: "Terracotta",   sub: "Warm Australian earthy red-orange",       color: "#C87848" },
-];
 
 // ── Kitchen cost engine (mid-range QLD 2026) ─────────────────────────────────
 
@@ -253,14 +266,14 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
 
   if (sel.cabinetry && cabinetryOpt) {
     materialItems.push({
-      label:  `Cabinetry — ${cabinetryOpt.label}`,
+      label:  `Cabinetry — ${cabinetryLabel(sel)}`,
       amount: 8_000 + cabinetryOpt.costAdj,
       detail: cabinetryOpt.label + " doors + carcasses, floor-to-ceiling",
     });
   }
   if (sel.benchtop && benchtopOpt) {
     materialItems.push({
-      label:  `Benchtop — ${benchtopOpt.label}`,
+      label:  `Benchtop — ${benchtopLabel(sel)}`,
       amount: 3_200 + benchtopOpt.costAdj,
       detail: benchtopOpt.label,
     });
@@ -347,17 +360,7 @@ export function calcKitchenCost(sel: KitchenSelections): { items: RoomCostItem[]
 
 export type BedroomRoomSize    = "standard" | "master" | "large" | "custom";
 export type BedroomFloorFormat = "timber-boards" | "herringbone" | "hybrid-plank" | "polished-concrete" | "carpet";
-export type WallTreatment      =
-  | "feature-paint"
-  | "limewash-paint"
-  | "microcement"
-  | "venetian-plaster"
-  | "vj-paneling"
-  | "shiplap-paneling"
-  | "timber-battens"
-  | "designer-wallpaper"
-  | "botanical-wallpaper"
-  | "stone-veneer";
+export type WallTreatment      = "paint-refresh" | "vj-paneling" | "timber-battens" | "feature-wallpaper";
 export type BedroomLighting    = "led-cove" | "architectural-downlights" | "statement-pendant";
 export type StorageOption      = "built-in-mirror-sliders" | "custom-wir";
 export type WindowTreatment    = "floor-ceiling-sheers" | "blockout-roller";
@@ -413,12 +416,13 @@ export interface BedroomSelections {
 
 // ── Bedroom options ───────────────────────────────────────────────────────────
 
-const OAK = ["natural-oak", "blonde-oak", "smoked-oak"];
+const OAK = ["natural-oak", "blonde-oak", "smoked-oak", "bleached-oak"];
 
 export const CARPET_TONES: TileOption[] = [
   { id: "carpet-oatmeal",  name: "Oatmeal",   bgClass: "bg-honed-limestone", description: "Warm oatmeal loop pile — soft and forgiving." },
   { id: "carpet-dove",     name: "Dove Grey", bgClass: "bg-smoked-concrete", description: "Cool dove grey loop pile." },
   { id: "carpet-charcoal", name: "Charcoal",  bgClass: "bg-charcoal-slate",  textLight: true, description: "Deep charcoal loop pile — hides wear well." },
+  { id: "carpet-ivory",    name: "Soft Ivory", bgClass: "bg-marble-blanc",   description: "Soft white-ivory loop pile — light and calm." },
 ];
 export const BEDROOM_FLOOR_TONES: TileOption[] = [...STONE_TIMBER_TONES, ...CARPET_TONES];
 
@@ -430,74 +434,61 @@ export const BEDROOM_FLOOR_FORMATS: SurfaceFormat<BedroomFloorFormat>[] = [
     prompt: "laid in a classic herringbone pattern", tones: [...OAK, "honed-limestone", "matte-slate-lg"] },
   { id: "hybrid-plank",      label: "Hybrid Plank",      sub: "Waterproof, great value",       swatch: "blonde-oak",     cost: 3_800,
     prompt: "hybrid planks with a realistic timber look", tones: OAK },
-  { id: "polished-concrete", label: "Polished Concrete", sub: "Grind and seal the slab",       swatch: "concrete-pale",  cost: 4_500,
-    prompt: "seamless polished concrete with a sealed satin finish", tones: ["concrete-pale", "smoked-concrete", "concrete-charcoal"] },
+  { id: "polished-concrete", label: "Polished Concrete", sub: "Grind and seal the slab",       swatch: "concrete-pale",  cost: 4_500, more: true,
+    prompt: "seamless polished concrete with a sealed satin finish", tones: ["concrete-pale", "smoked-concrete", "concrete-charcoal", "concrete-white"] },
   { id: "carpet",            label: "Carpet",            sub: "Soft wool-blend loop pile",     swatch: "carpet-oatmeal", cost: 4_200,
-    prompt: "soft wool-blend loop-pile carpet, wall to wall", tones: ["carpet-oatmeal", "carpet-dove", "carpet-charcoal"] },
+    prompt: "soft wool-blend loop-pile carpet, wall to wall", tones: ["carpet-oatmeal", "carpet-dove", "carpet-charcoal", "carpet-ivory"] },
 ];
 
-export const WALL_TREATMENT_OPTIONS: { id: WallTreatment; label: string; sub: string; cost: number }[] = [
-  {
-    id:    "feature-paint",
-    label: "Feature Wall Paint",
-    sub:   "Bold statement colour on one or all walls — most budget-friendly impact",
-    cost:  850,
-  },
-  {
-    id:    "limewash-paint",
-    label: "Limewash Paint",
-    sub:   "Textured matte wash — organic, aged patina; popular in coastal & Mediterranean styles",
-    cost:  1_400,
-  },
-  {
-    id:    "microcement",
-    label: "Microcement / Concrete Finish",
-    sub:   "Seamless poured look — contemporary, industrial-luxe, no grout lines",
-    cost:  4_200,
-  },
-  {
-    id:    "venetian-plaster",
-    label: "Venetian Plaster",
-    sub:   "Artisanal Italian plaster — luminous marble-like depth, applied in multiple layers",
-    cost:  5_500,
-  },
-  {
-    id:    "vj-paneling",
-    label: "VJ Paneling (Vertical Joint)",
-    sub:   "Tongue-and-groove vertical boards — coastal, hamptons or contemporary",
-    cost:  3_500,
-  },
-  {
-    id:    "shiplap-paneling",
-    label: "Shiplap / Horizontal Boards",
-    sub:   "Overlapping horizontal timber panels — rustic, Hamptons, or industrial depending on finish",
-    cost:  3_200,
-  },
-  {
-    id:    "timber-battens",
-    label: "Timber Batten Feature Wall",
-    sub:   "Vertical raw timber battens on a dark backing — warm, architectural, three-dimensional",
-    cost:  2_800,
-  },
-  {
-    id:    "designer-wallpaper",
-    label: "Designer Wallpaper — Textured",
-    sub:   "Woven, grasscloth or embossed wallpaper — subtle texture for a refined, tactile finish",
-    cost:  2_200,
-  },
-  {
-    id:    "botanical-wallpaper",
-    label: "Botanical / Mural Wallpaper",
-    sub:   "Large-format printed mural or botanical print — bold, artistic focal point",
-    cost:  2_800,
-  },
-  {
-    id:    "stone-veneer",
-    label: "Stone Feature Wall",
-    sub:   "Thin-set travertine, slate or marble tile feature — luxury hotel aesthetic",
-    cost:  6_500,
-  },
+/** Bedroom walls: four finishes, each with its own colour drawer (the colour is stored as a hex in wallColor) */
+const BATTEN_TONES: FinishTone[] = [
+  { id: "natural-oak",   name: "Natural Oak",   color: "#B8865A", sub: "Warm mid-tone timber" },
+  { id: "blonde-oak",    name: "Blonde Oak",    color: "#D9B98F", sub: "Light and airy" },
+  { id: "walnut",        name: "Walnut",        color: "#5C3D2A", sub: "Rich, dark timber" },
+  { id: "black-stained", name: "Black Stained", color: "#2E2B28", sub: "Moody and modern" },
+  { id: "white-painted", name: "White Painted", color: "#EDEBE6", sub: "Soft, coastal" },
 ];
+const WALLPAPER_TONES: FinishTone[] = [
+  { id: "soft-linen",          name: "Soft Linen",          color: "#DCD3C4", sub: "Woven neutral texture" },
+  { id: "sage-botanical",      name: "Sage Botanical",      color: "#9DAE94", sub: "Leafy botanical print" },
+  { id: "navy-geometric",      name: "Navy Geometric",      color: "#2F3A4A", sub: "Bold geometric pattern" },
+  { id: "terracotta-print",    name: "Terracotta Print",    color: "#C07A57", sub: "Warm arches print" },
+  { id: "charcoal-grasscloth", name: "Charcoal Grasscloth", color: "#4A4A48", sub: "Natural fibre texture" },
+];
+const WALL_PAINT_TONES: FinishTone[] = PAINT_TONES.map((t) => ({ id: t.id, name: t.name, color: t.color, sub: t.sub }));
+
+export const WALL_TREATMENT_OPTIONS: { id: WallTreatment; label: string; sub: string; cost: number; prompt: string; swatch: string; tones: FinishTone[]; defaultTone: string }[] = [
+  { id: "paint-refresh",     label: "Standard Paint Refresh",       sub: "Low-sheen paint, all walls",          cost: 850,
+    prompt: "freshly painted walls in a low-sheen finish",                       swatch: "paint-crisp-neutral--natural-white", tones: WALL_PAINT_TONES, defaultTone: "natural-white" },
+  { id: "vj-paneling",       label: "VJ Paneling (Vertical Joint)", sub: "Painted V-joint boards, bedhead wall", cost: 3_500,
+    prompt: "vertical VJ (V-joint) panelling on the bedhead wall, painted",       swatch: "paint-vj-panelling--natural-white",  tones: WALL_PAINT_TONES, defaultTone: "natural-white" },
+  { id: "timber-battens",    label: "Timber Batten Accent Wall",    sub: "Vertical battens behind the bed",     cost: 2_800,
+    prompt: "a vertical timber batten accent wall behind the bed",               swatch: "batten--natural-oak",                 tones: BATTEN_TONES,     defaultTone: "natural-oak" },
+  { id: "feature-wallpaper", label: "Feature Wallpaper",            sub: "One statement wall",                  cost: 2_200,
+    prompt: "a feature wallpaper on the bedhead wall",                           swatch: "wallpaper--sage-botanical",           tones: WALLPAPER_TONES,  defaultTone: "sage-botanical" },
+];
+export const wallTreatmentSwatch = (id: string, tone: string) =>
+  id === "timber-battens" ? `batten--${tone}` : id === "feature-wallpaper" ? `wallpaper--${tone}`
+  : id === "vj-paneling" ? `paint-vj-panelling--${tone}` : `paint-crisp-neutral--${tone}`;
+
+/** Older bedroom wall choices map onto the four that remain */
+export const OLD_WALL_TREATMENT: Record<string, WallTreatment> = {
+  "feature-paint": "paint-refresh", "limewash-paint": "paint-refresh", "shiplap-paneling": "vj-paneling",
+  "designer-wallpaper": "feature-wallpaper", "botanical-wallpaper": "feature-wallpaper",
+};
+/** Product-finder tags for a bedroom wall finish (older products use the old ids) */
+export function wallTreatmentTags(id: string | null | undefined): string[] {
+  if (!id) return [];
+  return [id, ...Object.entries(OLD_WALL_TREATMENT).filter(([, v]) => v === id).map(([k]) => k)];
+}
+/** "Sage Botanical · Feature Wallpaper" */
+export function wallTreatmentLabel(sel: Pick<BedroomSelections, "wallTreatment" | "wallColor">): string | null {
+  const opt = WALL_TREATMENT_OPTIONS.find((o) => o.id === sel.wallTreatment);
+  const tone = sel.wallColor ? (opt?.tones ?? []).find((t) => t.color.toLowerCase() === sel.wallColor!.toLowerCase()) : undefined;
+  const colour = tone?.name ?? (sel.wallColor ? `Custom ${sel.wallColor}` : null);
+  const parts = [colour, opt?.label].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
 
 export const BEDROOM_LIGHTING_OPTIONS: { id: BedroomLighting; label: string; sub: string; cost: number; triggerElectrical?: boolean }[] = [
   {
@@ -576,10 +567,7 @@ export function bedroomFloorLabel(sel: BedroomSelections): string | null {
   return surfaceLabel(BEDROOM_FLOOR_FORMATS.find((f) => f.id === sel.flooringFormat), BEDROOM_FLOOR_TONES.find((t) => t.id === sel.flooringTone), sel.flooringColor);
 }
 export function bedroomWallLabel(sel: BedroomSelections): string | null {
-  const wall = WALL_TREATMENT_OPTIONS.find((o) => o.id === sel.wallTreatment)?.label;
-  const colour = KITCHEN_WALL_OPTIONS.find((o) => o.color === sel.wallColor)?.label ?? sel.wallColor;
-  const parts = [colour, wall].filter(Boolean);
-  return parts.length ? parts.join(" · ") : null;
+  return wallTreatmentLabel(sel);
 }
 
 // ── Bedroom cost engine ────────────────────────────────────────────────────────
@@ -611,7 +599,7 @@ export function calcBedroomCost(sel: BedroomSelections): { items: RoomCostItem[]
     materialItems.push({ label: `Flooring — ${surfaceLabel(floorFmt, floorTone, sel.flooringColor) ?? "Flooring"}`, amount: flooringCost, detail: `Supply + lay, ${sqmLabel}` });
   }
   if (wallOpt) {
-    materialItems.push({ label: `Wall — ${wallOpt.label}`, amount: wallOpt.cost, detail: wallOpt.sub });
+    materialItems.push({ label: `Wall — ${wallTreatmentLabel(sel)}`, amount: wallOpt.cost, detail: wallOpt.sub });
   }
   if (lightOpt) {
     materialItems.push({ label: `Lighting — ${lightOpt.label}`, amount: lightOpt.cost, detail: lightOpt.sub });
@@ -752,8 +740,8 @@ const SPATIAL_REMINDER = [
 ].join("\n");
 
 export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): string {
-  const cabinet  = sel.cabinetry  ? (CABINETRY_OPTIONS.find((o)      => o.id === sel.cabinetry)?.label   ?? sel.cabinetry)  : null;
-  const benchtop = sel.benchtop   ? (BENCHTOP_OPTIONS.find((o)       => o.id === sel.benchtop)?.label    ?? sel.benchtop)   : null;
+  const cabinet  = cabinetryPrompt(sel);
+  const benchtop = benchtopPrompt(sel);
   const mixer    = sel.mixer      ? (MIXER_OPTIONS.find((o)          => o.id === sel.mixer)?.label       ?? sel.mixer)      : null;
   const splash   = sel.splashback ? (SPLASHBACK_OPTIONS.find((o)     => o.id === sel.splashback)?.label  ?? sel.splashback) : null;
   const floorFmt = KITCHEN_FLOOR_FORMATS.find((f) => f.id === sel.floorFormat);
@@ -783,7 +771,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
       `Compose ${sizeDesc} from a slightly elevated angle showing cabinetry, benchtop, splashback and appliances.`,
       "Remove all clutter. Produce a high-end architectural photography result at 2K resolution.",
       "",
-      kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", false)          : cabinet  ? `Cabinetry: ${cabinet} style cabinet doors, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
+      kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", false)          : cabinet  ? `Cabinetry: ${cabinet}, floor-to-ceiling where possible.` : "Cabinetry: choose a style that suits the space — designer's choice.",
       kept("benchtop")   ? keepLine("Benchtop", "benchtop", false)            : benchtop ? `Benchtop: ${benchtop} — 20mm thick, waterfall edge on island if present.`   : "Benchtop: select a premium material appropriate to the style.",
       kept("mixer")      ? keepLine("Sink & Mixer", "sink and mixer tap", false) : mixer ? `Sink & Mixer: Under-mount sink with ${mixer} gooseneck mixer.`              : "Sink & Mixer: under-mount sink with a quality gooseneck mixer.",
       kept("splashback") ? keepLine("Splashback", "splashback", false)        : splash   ? `Splashback: ${splash}.`                                                            : "Splashback: select a material that complements the cabinetry.",
@@ -806,7 +794,7 @@ export function buildKitchenPrompt(sel: KitchenSelections, hasPhoto: boolean): s
   const materials = [
     "",
     "─── MATERIAL CHANGES TO APPLY (within the existing spatial layout) ───",
-    kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", true)              : cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} style doors.`                : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
+    kept("cabinetry")  ? keepLine("Cabinetry", "cabinetry", true)              : cabinet  ? `Cabinetry: Replace all cabinet door faces with ${cabinet} doors.`                : "Cabinetry: retain existing layout — apply a designer finish of your choice.",
     kept("benchtop")   ? keepLine("Benchtop", "benchtop", true)                : benchtop ? `Benchtop: Re-texture existing benchtop surfaces to ${benchtop}, 20mm thick.`          : "Benchtop: apply a premium material that complements the cabinetry.",
     kept("mixer")      ? keepLine("Sink & Mixer", "sink and mixer tap", true)  : mixer    ? `Sink & Mixer: Replace visible mixer tap with a ${mixer} gooseneck model.`              : "Sink & Mixer: replace with a quality gooseneck mixer.",
     kept("splashback") ? keepLine("Splashback", "splashback", true)            : splash   ? `Splashback: Re-surface the splashback with ${splash}.`                                 : "Splashback: choose a finish that suits the cabinetry.",
@@ -851,8 +839,9 @@ export function buildBedroomPrompt(sel: BedroomSelections, hasPhoto: boolean): s
     ? `${floorTn?.name ?? (sel.flooringColor ? "custom-coloured" : "neutral")} ${floorFmt?.prompt ?? "flooring"}${sel.flooringColor ? ` in the exact colour ${sel.flooringColor}` : ""}`
     : null;
   const wallOpt  = WALL_TREATMENT_OPTIONS.find((o) => o.id === sel.wallTreatment);
+  const wallTone = sel.wallColor ? (wallOpt?.tones ?? []).find((t) => t.color.toLowerCase() === sel.wallColor!.toLowerCase()) : undefined;
   const wall     = wallOpt || sel.wallColor
-    ? `${wallOpt?.label ?? "Painted walls"}${sel.wallColor ? ` in the exact colour ${sel.wallColor}` : ""}`
+    ? `${wallOpt?.prompt ?? "painted walls"}${sel.wallColor ? ` in ${wallTone ? `${wallTone.name.toLowerCase()} (exact colour ${sel.wallColor})` : `the exact colour ${sel.wallColor}`}` : ""}`
     : null;
   const light    = sel.lighting        ? (BEDROOM_LIGHTING_OPTIONS.find((o)  => o.id === sel.lighting)?.label        ?? sel.lighting)        : null;
   const storage  = sel.storage         ? (STORAGE_OPTIONS.find((o)           => o.id === sel.storage)?.label         ?? sel.storage)         : null;

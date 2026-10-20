@@ -42,8 +42,8 @@ import { DESIGN_STYLES, isDesignStyle } from "@/lib/designStyles";
 import {
   calcKitchenCost,
   calcBedroomCost,
-  CABINETRY_OPTIONS,
-  BENCHTOP_OPTIONS,
+  cabinetryLabel,
+  benchtopLabel,
   SPLASHBACK_OPTIONS,
   MIXER_OPTIONS,
   BEDROOM_LIGHTING_OPTIONS,
@@ -189,8 +189,8 @@ export default function ConnectPage() {
   // ── Room-aware selection rows for "What gets sent" ───────────────────────
   const selectionRows = useMemo(() => {
     if (roomType === "kitchen") {
-      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : null;
-      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : null;
+      const cabinet  = cabinetryLabel(kitchenSelections);
+      const benchtop = benchtopLabel(kitchenSelections);
       const splash   = kitchenSelections.splashback ? SPLASHBACK_OPTIONS.find((o) => o.id === kitchenSelections.splashback)?.label ?? kitchenSelections.splashback : null;
       const mixer    = kitchenSelections.mixer      ? MIXER_OPTIONS.find((o)      => o.id === kitchenSelections.mixer)?.label      ?? kitchenSelections.mixer      : null;
       const sizeOpt  = KITCHEN_SIZE_OPTIONS.find((o) => o.id === kitchenSelections.roomSize);
@@ -278,8 +278,8 @@ export default function ConnectPage() {
   // ── Right-panel brief rows ────────────────────────────────────────────────
   const briefRows = useMemo(() => {
     if (roomType === "kitchen") {
-      const cabinet  = kitchenSelections.cabinetry  ? CABINETRY_OPTIONS.find((o)  => o.id === kitchenSelections.cabinetry)?.label  ?? kitchenSelections.cabinetry  : selectionText(null, isKept(kitchenSelections.keepExisting, "cabinetry"));
-      const benchtop = kitchenSelections.benchtop   ? BENCHTOP_OPTIONS.find((o)   => o.id === kitchenSelections.benchtop)?.label   ?? kitchenSelections.benchtop   : selectionText(null, isKept(kitchenSelections.keepExisting, "benchtop"));
+      const cabinet  = selectionText(cabinetryLabel(kitchenSelections), isKept(kitchenSelections.keepExisting, "cabinetry"));
+      const benchtop = selectionText(benchtopLabel(kitchenSelections),  isKept(kitchenSelections.keepExisting, "benchtop"));
       return [
         { icon: Layers,     label: "Cabinetry",     value: cabinet  },
         { icon: Layers,     label: "Benchtop",      value: benchtop },

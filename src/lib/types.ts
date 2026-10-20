@@ -406,6 +406,8 @@ export const STONE_TIMBER_TONES: TileOption[] = [
   { id: "concrete-pale",     name: "Pale Concrete",      bgClass: "bg-smoked-concrete",             description: "Soft pale-grey concrete with a subtle cloudy finish." },
   { id: "smoked-concrete",   name: "Warm Grey Concrete", bgClass: "bg-smoked-concrete", textLight: true, description: "Mid warm-grey concrete with natural pinholes." },
   { id: "concrete-charcoal", name: "Charcoal Concrete",  bgClass: "bg-charcoal-slate",  textLight: true, description: "Dark charcoal concrete — moody and modern." },
+  { id: "bleached-oak",      name: "Bleached Oak",       bgClass: "bg-natural-oak",                 description: "White limewashed oak — soft, light and coastal." },
+  { id: "concrete-white",    name: "Bleached Concrete",  bgClass: "bg-marble-blanc",                description: "Off-white polished concrete with a soft terrazzo-like fleck." },
 ];
 
 export const VANITY_OPTIONS: {

@@ -14,6 +14,12 @@ import {
   type KitchenSelections,
   type KitchenRoomSize,
   type KitchenWallFinish,
+  type CabinetryStyle,
+  type BenchtopMaterial,
+  cabinetryLabel,
+  benchtopLabel,
+  cabinetSwatch,
+  benchSwatch,
   KITCHEN_SIZE_OPTIONS,
   KITCHEN_FLOOR_FORMATS,
   KITCHEN_WALL_FINISHES,
@@ -26,7 +32,6 @@ import {
   KITCHEN_BUDGET_STEP,
 } from "@/lib/roomTypes";
 import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } from "lucide-react";
-import ColourPickerSwatch from "@/components/ui/ColourPickerSwatch";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, KITCHEN_KEEP_FIELDS, type KitchenKeepKey } from "@/lib/keepExisting";
 import { SURFACE_TONES, surfaceSwatch, paintSwatch, findPaintFinish, paintToneFor, type FloorFormat } from "@/lib/types";
@@ -55,79 +60,52 @@ export default function KitchenSidebar({ selections, onChange, part }: KitchenSi
   return (
     <div className="flex flex-col gap-6">
 
-      {/* Cabinetry Style */}
+      {/* Cabinetry — door profile first, colour in the drawer */}
       <div>
-        <SectionLabel>Cabinetry Style</SectionLabel>
+        <SectionLabel>Cabinetry</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="cabinetry" className="mb-2" active={isKept(selections.keepExisting, "cabinetry")} onToggle={(on) => keep("cabinetry", on)} />
-        <div className="flex flex-col gap-2">
-          {CABINETRY_OPTIONS.map((opt) => {
-            const active = selections.cabinetry === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ cabinetry: selections.cabinetry === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                {/* Palette swatch */}
-                <div className="flex rounded-xl overflow-hidden w-9 h-9 flex-shrink-0">
-                  <div className="grid grid-cols-3 w-full h-full">
-                    {opt.palette.map((col, i) => <div key={i} style={{ background: col }} />)}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5 leading-snug truncate">{opt.sub}</p>
-                </div>
-                {opt.costAdj > 0 && (
-                  <span className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/30")}>
-                    +${(opt.costAdj / 1000).toFixed(1)}k
-                  </span>
-                )}
-                <div className={cn("w-4 h-4 rounded-full border-2 flex-shrink-0", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-              </button>
-            );
-          })}
-        </div>
+        <StylePicker
+          styles={CABINETRY_OPTIONS.map((o) => ({ id: o.id, label: o.label, sub: o.sub, cost: 8_000 + o.costAdj }))}
+          value={selections.cabinetry}
+          tone={CABINETRY_OPTIONS.find((o) => o.id === selections.cabinetry)?.tones.find((t) => t.color.toLowerCase() === selections.cabinetColor?.toLowerCase())?.id ?? null}
+          toneLabel={cabinetryLabel(selections)?.split(" · ")[0] ?? null}
+          tonesFor={(id) => (CABINETRY_OPTIONS.find((o) => o.id === id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: cabinetSwatch(id, t.id) }))}
+          thumbFor={(id, tone) => cabinetSwatch(id, tone ?? CABINETRY_OPTIONS.find((o) => o.id === id)?.defaultTone ?? "")}
+          popularLabel="Door style"
+          moreLabel=""
+          drawerTitle="Cabinetry colour"
+          onPick={(id, tone) => onChange({ cabinetry: id as CabinetryStyle, cabinetColor: CABINETRY_OPTIONS.find((o) => o.id === id)?.tones.find((t) => t.id === tone)?.color ?? null })}
+          onClear={() => onChange({ cabinetry: null, cabinetColor: null })}
+          custom={{
+            label:    "Custom cabinet colour",
+            value:    selections.cabinetColor && !CABINETRY_OPTIONS.find((o) => o.id === selections.cabinetry)?.tones.some((t) => t.color.toLowerCase() === selections.cabinetColor!.toLowerCase()) ? selections.cabinetColor : null,
+            onChange: (id, hex) => onChange({ cabinetry: id as CabinetryStyle, cabinetColor: hex }),
+          }}
+        />
       </div>
 
-      {/* Benchtop Material */}
+      {/* Benchtop — material first, tone or veining in the drawer */}
       <div>
-        <SectionLabel>Benchtop Material</SectionLabel>
+        <SectionLabel>Benchtop</SectionLabel>
         <KeepExistingToggle room="kitchen" thing="benchtop" className="mb-2" active={isKept(selections.keepExisting, "benchtop")} onToggle={(on) => keep("benchtop", on)} />
-        <div className="flex flex-col gap-2">
-          {BENCHTOP_OPTIONS.map((opt) => {
-            const active = selections.benchtop === opt.id;
-            return (
-              <button
-                key={opt.id}
-                onClick={() => onChange({ benchtop: selections.benchtop === opt.id ? null : opt.id })}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-2xl border-2 text-left transition-all duration-200",
-                  active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/50 hover:border-terracotta/30",
-                )}
-              >
-                <div className="flex rounded-xl overflow-hidden w-9 h-9 flex-shrink-0">
-                  <div className="grid grid-cols-3 w-full h-full">
-                    {opt.palette.map((col, i) => <div key={i} style={{ background: col }} />)}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={cn("text-xs font-bold", active ? "text-charcoal" : "text-charcoal/70")}>{opt.label}</p>
-                  <p className="text-[10px] text-charcoal/40 mt-0.5">{opt.sub}</p>
-                </div>
-                {opt.costAdj > 0 && (
-                  <span className={cn("text-[10px] font-bold tabular-nums flex-shrink-0", active ? "text-terracotta" : "text-charcoal/30")}>
-                    +${(opt.costAdj / 1000).toFixed(1)}k
-                  </span>
-                )}
-                <div className={cn("w-4 h-4 rounded-full border-2 flex-shrink-0", active ? "border-terracotta bg-terracotta" : "border-charcoal/20")} />
-              </button>
-            );
-          })}
-        </div>
+        <StylePicker
+          styles={BENCHTOP_OPTIONS.map((o) => ({ id: o.id, label: o.label, sub: o.sub, cost: 3_200 + o.costAdj }))}
+          value={selections.benchtop}
+          tone={selections.benchtopTone?.startsWith("#") ? null : selections.benchtopTone}
+          toneLabel={benchtopLabel(selections)?.split(" · ")[0] ?? null}
+          tonesFor={(id) => (BENCHTOP_OPTIONS.find((o) => o.id === id)?.tones ?? []).map((t) => ({ id: t.id, label: t.name, sub: t.sub, swatch: benchSwatch(t.id) }))}
+          thumbFor={(id, tone) => benchSwatch(tone ?? BENCHTOP_OPTIONS.find((o) => o.id === id)?.defaultTone ?? "")}
+          popularLabel="Material"
+          moreLabel=""
+          drawerTitle="Benchtop tone"
+          onPick={(id, tone) => onChange({ benchtop: id as BenchtopMaterial, benchtopTone: tone })}
+          onClear={() => onChange({ benchtop: null, benchtopTone: null })}
+          custom={{
+            label:    "Custom benchtop colour",
+            value:    selections.benchtopTone?.startsWith("#") ? selections.benchtopTone : null,
+            onChange: (id, hex) => onChange({ benchtop: id as BenchtopMaterial, benchtopTone: hex }),
+          }}
+        />
       </div>
 
       {/* Work Triangle Finishes */}

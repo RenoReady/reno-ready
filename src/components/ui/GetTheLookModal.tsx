@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { TileOption, VanityType, TapwareFinish } from "@/lib/types";
 import type { KitchenSelections, BedroomSelections } from "@/lib/roomTypes";
 import type { RoomType } from "@/lib/roomTypes";
-import { flooringProductTags } from "@/lib/roomTypes";
+import { flooringProductTags, cabinetryTags, wallTreatmentTags } from "@/lib/roomTypes";
 
 // ── Product catalogue ─────────────────────────────────────────────────────────
 
@@ -654,7 +654,7 @@ function BathroomSections({
 }
 
 function KitchenSections({ sel }: { sel: KitchenSelections }) {
-  const cabinetryProducts  = filterProducts(CABINETRY_PRODUCTS,       sel.cabinetry  ? [sel.cabinetry]  : []);
+  const cabinetryProducts  = filterProducts(CABINETRY_PRODUCTS,       cabinetryTags(sel));
   const benchtopProducts   = filterProducts(BENCHTOP_PRODUCTS,         sel.benchtop   ? [sel.benchtop]   : []);
   const mixerProducts      = filterProducts(KITCHEN_MIXER_PRODUCTS,    sel.mixer      ? [sel.mixer]      : []);
   const splashbackProducts = filterProducts(SPLASHBACK_PRODUCTS,       sel.splashback ? [sel.splashback] : []);
@@ -670,7 +670,7 @@ function KitchenSections({ sel }: { sel: KitchenSelections }) {
 
 function BedroomSections({ sel }: { sel: BedroomSelections }) {
   const flooringProducts = filterProducts(BEDROOM_FLOORING_PRODUCTS,  flooringProductTags(sel));
-  const wallProducts     = filterProducts(WALL_TREATMENT_PRODUCTS,     sel.wallTreatment ? [sel.wallTreatment] : []);
+  const wallProducts     = filterProducts(WALL_TREATMENT_PRODUCTS,     wallTreatmentTags(sel.wallTreatment));
   const lightingProducts = filterProducts(BEDROOM_LIGHTING_PRODUCTS,   sel.lighting      ? [sel.lighting]      : []);
   const storageProducts  = filterProducts(STORAGE_PRODUCTS,            sel.storage       ? [sel.storage]       : []);
   return (

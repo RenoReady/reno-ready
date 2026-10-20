@@ -715,6 +715,154 @@ for (const [style, paint] of [...Object.entries(FLOOR_STYLE_PAINTERS), ...Object
 for (const [finish, tones] of Object.entries(PAINT_FINISH_TONES))
   for (const tone of tones) { const seed = nextSeed(); M[`paint-${finish}--${tone}`] = (ctx) => PAINT_PAINTERS[finish](ctx, PAINT_TONE_HEX[tone], seed); }
 
+/* ── kitchen cabinetry + benchtops, bedroom walls and white floors ─────
+ * Fixed seeds (not nextSeed) so these never shift the swatches above.
+ * Keep in step with CABINETRY_OPTIONS / BENCHTOP_OPTIONS / WALL_TREATMENT_OPTIONS in src/lib/roomTypes.ts.
+ */
+function vPlank(N, w, h, seed, base, dark) {   // a plank with its grain running vertically
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.save(); ctx.translate(w, 0); ctx.rotate(Math.PI / 2);
+  ctx.drawImage(plank(N, h, w, seed, base, dark), 0, 0);
+  ctx.restore();
+  return c;
+}
+function cabinetDoors(ctx, style, rgb, seed) {
+  const N = makeNoise(seed), gap = 6, cols = 2, rows = 2;
+  ctx.fillStyle = toHex(scale(rgb, isDark(rgb) ? 0.55 : 0.68)); ctx.fillRect(0, 0, S, S);
+  const dw = Math.round((S - gap * (cols + 1)) / cols), dh = Math.round((S - gap * (rows + 1)) / rows);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = gap + c * (dw + gap), y = gap + r * (dh + gap);
+    if (style === "timber") {
+      ctx.drawImage(vPlank(N, dw, dh, seed + r * 2 + c, rgb, scale(rgb, 0.72)), x, y);
+    } else {
+      const img = ctx.createImageData(dw, dh), d = img.data;
+      for (let yy = 0; yy < dh; yy++) for (let xx = 0; xx < dw; xx++) {
+        const v = (N.n((x + xx) * 0.6, (y + yy) * 0.6) - 0.5) * 5 + (N.fbm((x + xx) * 0.01, (y + yy) * 0.01, 3) - 0.5) * 6, i = (yy * dw + xx) * 4;
+        d[i] = rgb[0] + v; d[i + 1] = rgb[1] + v; d[i + 2] = rgb[2] + v; d[i + 3] = 255;
+      }
+      ctx.putImageData(img, x, y);
+      if (style === "shaker") {   // recessed centre panel: lit top/left edges, shaded bottom/right
+        const m = 26;
+        ctx.fillStyle = "rgba(0,0,0,0.10)"; ctx.fillRect(x + m, y + m, dw - 2 * m, 3); ctx.fillRect(x + m, y + m, 3, dh - 2 * m);
+        ctx.fillStyle = "rgba(255,255,255,0.22)"; ctx.fillRect(x + m, y + dh - m - 2, dw - 2 * m, 2); ctx.fillRect(x + dw - m - 2, y + m, 2, dh - 2 * m);
+        ctx.fillStyle = "rgba(0,0,0,0.04)"; ctx.fillRect(x + m + 3, y + m + 3, dw - 2 * m - 5, dh - 2 * m - 5);
+        ctx.fillStyle = "#B8954C"; ctx.beginPath(); ctx.arc(c === 0 ? x + dw - 14 : x + 14, y + dh / 2, 4.5, 0, 7); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.arc((c === 0 ? x + dw - 14 : x + 14) - 1.3, y + dh / 2 - 1.3, 1.5, 0, 7); ctx.fill();
+      }
+    }
+    // soft door-edge light and the shadow line of a handleless finger pull
+    const g = ctx.createLinearGradient(x, y, x + dw, y + dh);
+    g.addColorStop(0, "rgba(255,255,255,0.10)"); g.addColorStop(1, "rgba(0,0,0,0.10)");
+    ctx.fillStyle = g; ctx.fillRect(x, y, dw, dh);
+    if (style === "flat") { ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(x, y, dw, 3); }
+  }
+  studio(ctx, 0.75);
+}
+const CAB_TONES = {
+  "pure-white": "#F5F2EC", "sage-green": "#8FAF8A", "matte-black": "#2B2B2B", "cream-beige": "#D8CEBC",
+  "light-oak": "#D6B88E", "natural-oak": "#B8865A", "walnut": "#5C3D2A", "smoked-oak": "#6E5642",
+};
+[["shaker", ["pure-white", "sage-green", "matte-black", "cream-beige"]], ["flat", ["pure-white", "sage-green", "matte-black", "cream-beige"]], ["timber", ["light-oak", "natural-oak", "walnut", "smoked-oak"]]]
+  .forEach(([style, tones], si) => tones.forEach((t, ti) => { M[`cab-${style}--${t}`] = (ctx) => cabinetDoors(ctx, style, hex(CAB_TONES[t]), 3000 + si * 10 + ti); }));
+
+function stoneSlab(ctx, seed, base, vein, strength) {
+  const N = makeNoise(seed);
+  tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, gloss: 0.05, noise: N }, marbleFace(N, hex(base), hex(vein), { scale: 1.3, strength, tone: 4 }));
+  polish(ctx, 0.24); studio(ctx, 0.6);
+}
+function timberBench(ctx, seed, base) {
+  const N = makeNoise(seed), rgb = hex(base), h = 50;
+  for (let r = 0; r < S / h; r++) ctx.drawImage(plank(N, S, h, seed + r * 7, rgb, scale(rgb, 0.7)), 0, r * h);
+  polish(ctx, 0.12); studio(ctx, 0.8);
+}
+M["bench--white-calacatta"] = (ctx) => stoneSlab(ctx, 3101, "#F2F0EC", "#9C8A6E", 1);
+M["bench--grey-veined"]     = (ctx) => stoneSlab(ctx, 3102, "#CFCFCF", "#6E7074", 0.9);
+M["bench--black"]           = (ctx) => stoneSlab(ctx, 3103, "#2A2A2C", "#D9D9D6", 0.7);
+M["bench--terrazzo"]        = (ctx) => {
+  const N = makeNoise(3104), base = hex("#ECE7DF");
+  tiled(ctx, { tw: 400, th: 400, gap: 0, bevel: 0, noise: N }, stoneFace(N, base, { mottle: 4, fine: 4 }));
+  chipsLayer(ctx, N, 3105, ["#8D9196", "#B7BABD", "#C7957F", "#9FB29E", "#2F3033", "#D8CBB6"], { count: 240 });
+  polish(ctx, 0.2); studio(ctx, 0.7);
+};
+M["bench--blackbutt"]   = (ctx) => timberBench(ctx, 3111, "#C9A57A");
+M["bench--spotted-gum"] = (ctx) => timberBench(ctx, 3112, "#9A6B47");
+M["bench--oak"]         = (ctx) => timberBench(ctx, 3113, "#B98E5E");
+
+function battenWall(ctx, seed, base, painted) {
+  const N = makeNoise(seed), rgb = hex(base), w = 26, gap = 10;
+  ctx.fillStyle = toHex(isDark(rgb) ? scale(rgb, 0.55) : scale(rgb, 0.42)); ctx.fillRect(0, 0, S, S);
+  for (let x = 4, i = 0; x < S; x += w + gap, i++) {
+    if (painted) {
+      ctx.fillStyle = toHex(rgb); ctx.fillRect(x, 0, w, S);
+      const v = (N.n(i * 3.1, 1) - 0.5) * 8; ctx.fillStyle = v > 0 ? `rgba(255,255,255,${v / 60})` : `rgba(0,0,0,${-v / 60})`; ctx.fillRect(x, 0, w, S);
+    } else {
+      ctx.drawImage(vPlank(N, w, S, seed + i, rgb, scale(rgb, 0.72)), x, 0);
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(x, 0, 2, S);       // lit edge
+    ctx.fillStyle = "rgba(0,0,0,0.30)"; ctx.fillRect(x + w, 0, 4, S);          // cast shadow
+  }
+  studio(ctx, 0.8);
+}
+M["batten--natural-oak"]   = (ctx) => battenWall(ctx, 3201, "#B8865A", false);
+M["batten--blonde-oak"]    = (ctx) => battenWall(ctx, 3202, "#D9B98F", false);
+M["batten--walnut"]        = (ctx) => battenWall(ctx, 3203, "#5C3D2A", false);
+M["batten--black-stained"] = (ctx) => battenWall(ctx, 3204, "#2E2B28", true);
+M["batten--white-painted"] = (ctx) => battenWall(ctx, 3205, "#EDEBE6", true);
+
+function paperGround(ctx, seed, baseHex, weave = 0) {
+  const N = makeNoise(seed), base = hex(baseHex), img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const v = (N.fbm(x * 0.01, y * 0.01, 3) - 0.5) * 6 + (weave ? ((x % 4 < 2) !== (y % 4 < 2) ? weave : -weave) + (N.n(x * 0.9, y * 0.2) - 0.5) * weave * 2 : 0);
+    const i = (y * S + x) * 4; d[i] = base[0] + v; d[i + 1] = base[1] + v; d[i + 2] = base[2] + v; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+M["wallpaper--soft-linen"] = (ctx) => { paperGround(ctx, 3301, "#DCD3C4", 5); studio(ctx, 0.6); };
+M["wallpaper--sage-botanical"] = (ctx) => {
+  paperGround(ctx, 3302, "#ECEEE7");
+  const R = mulberry(3303);
+  for (let k = 0; k < 70; k++) {
+    const x = R() * S, y = R() * S, a = R() * Math.PI, l = 16 + R() * 18;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = R() < 0.5 ? "#9DAE94" : "#7F9577";
+    ctx.beginPath(); ctx.ellipse(0, 0, l, l * 0.38, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(60,80,60,0.45)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-l, 0); ctx.lineTo(l, 0); ctx.stroke();
+    ctx.restore();
+  }
+  studio(ctx, 0.5);
+};
+M["wallpaper--navy-geometric"] = (ctx) => {
+  paperGround(ctx, 3304, "#2F3A4A");
+  ctx.strokeStyle = "#C9A96A"; ctx.lineWidth = 2;
+  for (let i = -S; i < 2 * S; i += 50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + S, S); ctx.stroke(); ctx.beginPath(); ctx.moveTo(i, S); ctx.lineTo(i + S, 0); ctx.stroke(); }
+  ctx.fillStyle = "#C9A96A";
+  for (let y = 0; y <= S; y += 50) for (let x = (y / 50) % 2 ? 25 : 0; x <= S; x += 50) { ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill(); }
+  studio(ctx, 0.5);
+};
+M["wallpaper--terracotta-print"] = (ctx) => {
+  paperGround(ctx, 3305, "#EADCCB");
+  ctx.strokeStyle = "#C07A57"; ctx.lineWidth = 7;
+  for (let y = 40, row = 0; y < S + 40; y += 64, row++) for (let x = row % 2 ? 32 : 0; x < S + 40; x += 64) {
+    ctx.beginPath(); ctx.arc(x, y, 20, Math.PI, 0); ctx.stroke();
+  }
+  studio(ctx, 0.5);
+};
+M["wallpaper--charcoal-grasscloth"] = (ctx) => {
+  const N = makeNoise(3306), base = hex("#4A4A48"), img = ctx.createImageData(S, S), d = img.data;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const v = (N.n(x * 0.8, y * 0.03) - 0.5) * 34 + (N.n(x * 2.2, y * 0.08) - 0.5) * 14, i = (y * S + x) * 4;
+    d[i] = base[0] + v; d[i + 1] = base[1] + v; d[i + 2] = base[2] + v * 0.95; d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(199, 0, 2, S);   // panel seam
+  studio(ctx, 0.6);
+};
+
+M["bleached-oak"]   = (ctx) => oakFloor(ctx, 3401, [228, 220, 204], [196, 184, 164]);
+M["concrete-white"] = (ctx) => concrete(ctx, 3402, "#E4E1DA");
+M["carpet-ivory"]   = (ctx) => carpet(ctx, 3403, "#E9E3D6");
+
 window.TILE_IDS = Object.keys(M);
 window.render = (id) => {
   const c = document.createElement("canvas"); c.width = c.height = S;

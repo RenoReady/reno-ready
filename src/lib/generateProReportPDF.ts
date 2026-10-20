@@ -19,7 +19,7 @@ import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WAL
 import { DESIGN_STYLES, isDesignStyle } from "./designStyles";
 import {
   calcKitchenCost, calcBedroomCost,
-  CABINETRY_OPTIONS, BENCHTOP_OPTIONS, SPLASHBACK_OPTIONS, MIXER_OPTIONS,
+  CABINETRY_OPTIONS, BENCHTOP_OPTIONS, SPLASHBACK_OPTIONS, MIXER_OPTIONS, cabinetryLabel, benchtopLabel,
   KITCHEN_SIZE_OPTIONS, BEDROOM_SIZE_OPTIONS,
   BEDROOM_LIGHTING_OPTIONS, STORAGE_OPTIONS, WINDOW_TREATMENT_OPTIONS,
   kitchenFloorLabel, kitchenWallLabel, bedroomFloorLabel, bedroomWallLabel, ceilingLabel,
@@ -189,8 +189,8 @@ function buildMatRows(
 
     const rows: MatRow[] = [
       { label: "Kitchen Size",     value: sizeLabel },
-      { label: "Cabinetry Style",  value: selectionText(cabinetOpt?.label,  isKept(kitchen.keepExisting, "cabinetry")) },
-      { label: "Benchtop",         value: selectionText(benchtopOpt?.label, isKept(kitchen.keepExisting, "benchtop")) },
+      { label: "Cabinetry",        value: selectionText(cabinetOpt ? cabinetryLabel(kitchen) : null,  isKept(kitchen.keepExisting, "cabinetry")) },
+      { label: "Benchtop",         value: selectionText(benchtopOpt ? benchtopLabel(kitchen) : null, isKept(kitchen.keepExisting, "benchtop")) },
       { label: "Splashback",       value: selectionText(splashOpt?.label,   isKept(kitchen.keepExisting, "splashback")) },
       { label: "Mixer & Sink",     value: selectionText(mixerOpt?.label,    isKept(kitchen.keepExisting, "mixer")) },
       { label: "Cooktop",          value: kitchen.cooktop ? (kitchen.cooktop === "induction" ? "Induction" : "Gas") : selectionText(null, isKept(kitchen.keepExisting, "appliances")) },
@@ -422,7 +422,7 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   if (placeImage(aiImageData, rx)) {
     drawRect(pdf, rx, y + imgH - 7, imgW, 7, TERRACOTTA);
     sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
-    pdf.text("AI FUTURE VISION", rx + imgW / 2, y + imgH - 2.5, { align: "center" });
+    pdf.text("CLIENT'S REQUESTED VISION", rx + imgW / 2, y + imgH - 2.5, { align: "center" });
   } else {
     drawRect(pdf, rx, y, imgW, imgH, [230, 222, 212] as [number, number, number], 3);
     sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);

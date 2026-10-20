@@ -57,6 +57,7 @@ import {
 } from "@/lib/roomTypes";
 import { buildGeminiPrompt } from "@/lib/buildPrompt";
 import { calcBriefCostItems } from "@/lib/projectBrief";
+import type { ProReportInput } from "@/lib/generateProReportPDF";
 import { submitConnectForm } from "@/app/actions/contact";
 import { cn, formatAUD } from "@/lib/utils";
 
@@ -321,39 +322,44 @@ export default function ConnectPage() {
     }
     setLoading(true);
     try {
-      // The same Pro Report the client can download, attached to the email so it can go straight to builders.
-      // If it can't be built (or is too big to send) the brief still goes through without it.
+      // The Pro Report is built on the server and attached to the lead email, so it doesn't depend on the
+      // client's browser. Here we only shrink the two photos and send the design as plain data.
       const s = useBuilderStore.getState();
       const roomBudget = s.roomType === "kitchen" ? s.kitchenSelections.budget : s.roomType === "bedroom" ? s.bedroomSelections.budget : s.budget;
       const roomNote   = s.roomType === "kitchen" ? s.kitchenSelections.customNote : s.roomType === "bedroom" ? s.bedroomSelections.customNote : s.customNote;
       const briefItems = s.projectBrief ? calcBriefCostItems(s.projectBrief, s.roomType) : [];
       const briefTotal = briefItems.reduce((n, i) => n + i.amount, 0);
 
-      let report: { filename: string; base64: string } | undefined;
+      let reportInput: ProReportInput | undefined;
       let reportError: string | undefined;
       try {
-        const { proReportBase64, REPORT_MAX_BASE64 } = await import("@/lib/generateProReportPDF");
-        const base64 = await proReportBase64({
-          selections:        { ...s, budget: roomBudget },
+        const { compactImageForReport } = await import("@/lib/generateProReportPDF");
+        const [roomPhoto, aiImage] = await Promise.all([
+          s.roomPhotoUrl      ? compactImageForReport(s.roomPhotoUrl)      : Promise.resolve(null),
+          s.generatedImageUrl ? compactImageForReport(s.generatedImageUrl) : Promise.resolve(null),
+        ]);
+        // plain data only: no store functions, no saved rooms, and the big original images swapped for the small copies
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { savedRooms, roomPhotoUrl, generatedImageUrl, ...rest } = s;
+        const selections = JSON.parse(JSON.stringify({ ...rest, budget: roomBudget, roomPhotoUrl: null, generatedImageUrl: null })) as ProReportInput["selections"];   // photos travel once, below
+        reportInput = {
+          selections,
           projectBrief:      s.projectBrief,
-          generatedImageUrl: s.generatedImageUrl,
-          roomPhotoUrl:      s.roomPhotoUrl,
+          generatedImageUrl: aiImage,
+          roomPhotoUrl:      roomPhoto,
           grandTotal:        estimatedCost + briefTotal,
           estimatedCost,
           roomType:          s.roomType,
-          kitchenSelections: s.kitchenSelections,
-          bedroomSelections: s.bedroomSelections,
-        });
-        const who = form.name.trim().replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "Client";
-        if (base64.length < REPORT_MAX_BASE64) report = { filename: `Reno-Ready-${roomLabel}-Report-${who}.pdf`, base64 };
-        else reportError = `report too large to email (${(base64.length * 0.75 / 1e6).toFixed(1)} MB)`;
+          kitchenSelections: JSON.parse(JSON.stringify(s.kitchenSelections)),
+          bedroomSelections: JSON.parse(JSON.stringify(s.bedroomSelections)),
+        };
       } catch (err) {
-        console.error("Report attachment failed:", err);
-        reportError = err instanceof Error ? err.message : String(err);
+        console.error("Preparing the report failed:", err);
+        reportError = `browser couldn't prepare the photos: ${err instanceof Error ? err.message : String(err)}`;
       }
 
       const result = await submitConnectForm({
-        report,
+        reportInput,
         reportError,
         name:    form.name.trim(),
         email:   form.email.trim(),

@@ -38,6 +38,10 @@ export const dynamic = "force-dynamic";
 interface GenerateRequest {
   /** Optional base-64 data URL of the uploaded room photo */
   imageBase64?: string | null;
+  /** "refine": a surgical edit of an existing render using the client's prompt (Not quite right?) */
+  mode?: "refine" | null;
+  /** Refine only: the same render with the area to change tinted pink (the highlighter) */
+  maskImageBase64?: string | null;
   /** Optional project brief from the 3-question modal */
   projectBrief?: { yearBuilt: number; budgetTier: string; scope: string } | null;
   /** Which room is being generated */
@@ -98,6 +102,30 @@ const PLACEHOLDER_API_KEY = "your_google_api_key_here";
 function isMockMode(): boolean {
   const key = process.env.GOOGLE_API_KEY;
   return !key || key === PLACEHOLDER_API_KEY || key.trim() === "";
+}
+
+/** The highlight image for a refine, as raw base64 (JPEG only, size-capped) */
+function maskFor(req: GenerateRequest): string | null {
+  const m = req.mode === "refine" ? req.maskImageBase64 : null;
+  if (!m || !m.startsWith("data:image/jpeg;base64,") || m.length > 6_000_000) return null;
+  return m.slice("data:image/jpeg;base64,".length);
+}
+
+const REFINE_MASK_INSTRUCTION = [
+  "",
+  "EDIT REGION: You have two images. The FIRST is the render to edit. The SECOND is the same render with",
+  "the area to change tinted in translucent pink. Change ONLY that tinted area, as requested above.",
+  "Every pixel outside the tinted area must stay exactly as it is in the first image.",
+  "Your output is the first image with that one area edited. It must NOT contain any pink tint or highlight.",
+].join("\n");
+
+/** Refines use the client's surgical prompt; everything else is built from the selections */
+function promptFor(req: GenerateRequest): string {
+  if (req.mode === "refine" && typeof req.prompt === "string" && req.prompt.trim()) {
+    return req.prompt.trim().slice(0, 2_000) + (maskFor(req) ? REFINE_MASK_INSTRUCTION : "") +
+      "\nOutput: the same photo, same framing and camera, photorealistic, no text or labels.";
+  }
+  return buildGeminiPrompt(req);
 }
 
 /** Build the system instruction + user prompt from structured selections */
@@ -206,7 +234,7 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
 
   // v1beta exposes preview image-gen models
   const genAI  = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!, { apiVersion: "v1beta" });
-  const prompt = buildGeminiPrompt(req);
+  const prompt = promptFor(req);
 
   // Build content parts — image first (if provided), then the text prompt
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -221,6 +249,9 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
     const size = imageSize(Buffer.from(rawBase64, "base64"));
     if (size && size.w > 0 && size.h > 0) aspectRatio = closestAspectRatio(size.w, size.h);
   }
+  // Refine with a highlight: the second image marks the area to change
+  const mask = maskFor(req);
+  if (mask) parts.push({ inlineData: { mimeType: "image/jpeg", data: mask } });
   parts.push({ text: prompt });
 
   // Try each model; on a 503 retry once after 3 s before moving on
@@ -383,7 +414,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
             userId:   user.id,
             roomType: body.roomType ?? "bathroom",
             dataUrl:  imageUrl,
-            prompt:   buildGeminiPrompt(body),
+            prompt:   promptFor(body),
             hadPhoto: !!body.imageBase64,
           });
         }

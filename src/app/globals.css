@@ -89,6 +89,20 @@
     background-color: var(--color-sand-light);
   }
 
+  /* "I'm happy with the look" → the builder button pops so the last step is obvious */
+  @keyframes cta-attention {
+    0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(210, 125, 94, 0); }
+    20%      { transform: scale(1.05); box-shadow: 0 0 0 0 rgba(210, 125, 94, 0.55); }
+    45%      { transform: scale(1);    box-shadow: 0 0 0 14px rgba(210, 125, 94, 0); }
+    65%      { transform: scale(1.03); }
+  }
+  .cta-attention {
+    animation: cta-attention 1.1s ease-in-out 0.35s 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cta-attention { animation: none; outline: 3px solid #D27D5E; outline-offset: 3px; }
+  }
+
   /* Subtle grain overlay for premium feel */
   .grain {
     position: relative;

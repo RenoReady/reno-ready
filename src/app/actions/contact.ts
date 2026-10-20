@@ -15,6 +15,7 @@
 
 import { Resend } from "resend";
 import { LEAD_NOTIFICATION_DESTINATION, RESEND_FROM } from "@/lib/config";
+import type { ProReportInput } from "@/lib/generateProReportPDF";
 
 // ── Inbound payload from the Connect form ──────────────────────────
 export interface ConnectSubmission {
@@ -22,8 +23,8 @@ export interface ConnectSubmission {
   email:    string;
   phone?:   string;
   message?: string;
-  /** The client's Pro Report PDF (base64), attached to the notification email */
-  report?:  { filename: string; base64: string };
+  /** Everything needed to build the client's Pro Report PDF here on the server (photos as small JPEG data URLs) */
+  reportInput?: ProReportInput;
   /** Why the report couldn't be attached, when it couldn't */
   reportError?: string;
 
@@ -162,7 +163,7 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
               <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;"></span>
               Submitted just now ·  ${escape(s.email)}
             </p>
-            <p style="margin:4px 0 0 0;font-size:11px;color:#6B7480;">${hasReport ? "Pro Report PDF attached — ready to forward to builders." : `No report attached${s.reportError ? ` (${escape(s.reportError.slice(0, 160))})` : ""}.`}</p>
+            <p style="margin:4px 0 0 0;font-size:11px;color:#6B7480;">${hasReport ? `Pro Report PDF attached — ready to forward to builders.${s.reportError ? ` Note: ${escape(s.reportError.slice(0, 160))}.` : ""}` : `No report attached — ${escape((s.reportError ?? "unknown reason").slice(0, 200))}.`}</p>
           </td>
           <td align="right">
             <a href="${replyMailto}" style="background:#D27D5E;color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:8px 14px;border-radius:10px;display:inline-block;">Reply →</a>
@@ -217,6 +218,31 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
 </html>`;
 }
 
+// ── Pro Report attachment ──────────────────────────────────────────
+async function buildReportAttachment(payload: ConnectSubmission): Promise<{ attachment?: { filename: string; content: Buffer }[]; reportProblem?: string }> {
+  const input = payload.reportInput;
+  if (!input) {
+    return { reportProblem: payload.reportError ?? "the page didn't send the design for the report (it may have been opened before an update — refresh and try again)" };
+  }
+  try {
+    // photos must be small JPEG data URLs (the browser shrinks them); anything else is left out of the report
+    const okImage = (u: unknown) => typeof u === "string" && u.startsWith("data:image/jpeg;base64,") && u.length < 2_500_000 ? u : null;
+    const safe: ProReportInput = { ...input, roomPhotoUrl: okImage(input.roomPhotoUrl), generatedImageUrl: okImage(input.generatedImageUrl) };
+    safe.selections = { ...safe.selections, roomPhotoUrl: safe.roomPhotoUrl, generatedImageUrl: safe.generatedImageUrl };
+    const { proReportPdfBytes } = await import("@/lib/generateProReportPDF");
+    const bytes = await proReportPdfBytes(safe);
+    const who = payload.name.trim().replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "Client";
+    const room = (payload.design.room ?? "Bathroom").replace(/[^A-Za-z]/g, "");
+    const note = payload.reportError ? ` (${payload.reportError})` : "";
+    return {
+      attachment: [{ filename: `Reno-Ready-${room}-Report-${who}.pdf`, content: Buffer.from(bytes) }],
+      reportProblem: note ? `attached, but without photos${note}` : undefined,
+    };
+  } catch (err) {
+    return { reportProblem: `the server couldn't build the report: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
 // ── Server Action ──────────────────────────────────────────────────
 export async function submitConnectForm(payload: ConnectSubmission): Promise<ConnectResult> {
   // Basic input validation — the server is the source of truth
@@ -239,11 +265,9 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
   const destination = LEAD_NOTIFICATION_DESTINATION;
   const fromAddress = RESEND_FROM;
 
-  // Only attach a well-formed PDF of a sensible size (base64 of ~2.8 MB max)
-  const report = payload.report;
-  const attachment = report && /^[w.-]{1,80}.pdf$/.test(report.filename) && report.base64.length < 3_800_000 && report.base64.startsWith("JVBER")
-    ? [{ filename: report.filename, content: Buffer.from(report.base64, "base64") }]
-    : undefined;
+  // Build the Pro Report here so the attachment never depends on the client's browser
+  const { attachment, reportProblem } = await buildReportAttachment(payload);
+  if (reportProblem) console.error("[connect] report:", reportProblem);
 
   try {
     const { error } = await resend.emails.send({
@@ -251,7 +275,7 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
       to:       destination,
       replyTo:  payload.email,
       subject:  `New ${payload.design.room ?? "Bathroom"} Lead — ${payload.name} · ${fmtAUD(payload.design.estimatedCost)} reno brief`,
-      html:     renderEmailHtml(payload, !!attachment),
+      html:     renderEmailHtml({ ...payload, reportError: reportProblem }, !!attachment),
       attachments: attachment,
     });
 

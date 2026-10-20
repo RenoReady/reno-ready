@@ -264,19 +264,27 @@ export async function generateProReportPDF(input: ProReportInput): Promise<void>
   (await buildProReportPDF(input)).save(REPORT_FILENAME);
 }
 
-/** The same report as base64, for attaching to the builder-brief email */
-export async function proReportBase64(input: ProReportInput): Promise<string> {
-  const encode = (pdf: jsPDF) => (pdf.output("datauristring") as string).split(",")[1];
-  const first = encode(await buildProReportPDF(input));
-  if (first.length < REPORT_MAX_BASE64) return first;
-  // Unusually large (big photos): rebuild with smaller, lighter images
-  return encode(await buildProReportPDF(input, { maxW: 900, quality: 0.7 }));
+/**
+ * Browser side of the builder-brief email: shrink a photo to a small JPEG data URL so it can be
+ * sent to the server with the brief. Returns null if the browser can't read the image.
+ */
+export async function compactImageForReport(url: string, maxW = 1100, quality = 0.8): Promise<string | null> {
+  return loadImageAsDataUrl(url, maxW, quality);
 }
 
-/** Largest report (as base64) the lead email will carry — keeps the upload well under Vercel's 4.5 MB limit */
-export const REPORT_MAX_BASE64 = 3_500_000;
+/**
+ * Server side: build the report from already-compacted JPEG data URLs (see compactImageForReport)
+ * and return the PDF bytes, for attaching to the lead email. Runs in Node — no DOM needed.
+ */
+export async function proReportPdfBytes(input: ProReportInput): Promise<Uint8Array> {
+  const pdf = await buildProReportPDF(input, { maxW: 0, quality: 0 }, true);
+  return new Uint8Array(pdf.output("arraybuffer"));
+}
 
-async function buildProReportPDF(input: ProReportInput, img: { maxW: number; quality: number } = { maxW: 1400, quality: 0.85 }): Promise<jsPDF> {
+/** Only JPEG data URLs go into a server-built report */
+const isJpegDataUrl = (u: string | null | undefined): u is string => !!u && u.startsWith("data:image/jpeg;base64,");
+
+async function buildProReportPDF(input: ProReportInput, img: { maxW: number; quality: number } = { maxW: 1400, quality: 0.85 }, imagesReady = false): Promise<jsPDF> {
   const {
     selections, projectBrief, generatedImageUrl, roomPhotoUrl,
     grandTotal, estimatedCost, roomType, kitchenSelections, bedroomSelections,
@@ -289,14 +297,16 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   const IW     = PW - MARGIN * 2;                    // inner width
 
   const rl = roomLabel(roomType);
-  const dateStr = new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric" });
+  const dateStr = new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric", timeZone: "Australia/Brisbane" });
 
   const matRows   = buildMatRows(roomType, selections, kitchenSelections, bedroomSelections);
   const costItems = buildCostItems(roomType, selections, kitchenSelections, bedroomSelections);
   const briefItems = projectBrief ? calcBriefCostItems(projectBrief, roomType) : [];
 
   // Pre-load images
-  const [aiImageData, roomImageData] = await Promise.all([
+  const [aiImageData, roomImageData] = imagesReady
+    ? [isJpegDataUrl(generatedImageUrl) ? generatedImageUrl : null, isJpegDataUrl(roomPhotoUrl) ? roomPhotoUrl : null]
+    : await Promise.all([
     generatedImageUrl ? loadImageAsDataUrl(generatedImageUrl, img.maxW, img.quality) : Promise.resolve(null),
     roomPhotoUrl      ? loadImageAsDataUrl(roomPhotoUrl, img.maxW, img.quality)      : Promise.resolve(null),
   ]);

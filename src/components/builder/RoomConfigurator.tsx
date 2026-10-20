@@ -8,7 +8,7 @@ import {
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
-  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft,
+  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -31,7 +31,8 @@ import StyleLibrary from "@/components/ui/StyleLibrary";
 import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES } from "@/lib/stylePresets";
 import { isDesignStyle } from "@/lib/designStyles";
 import { StylePicker } from "@/components/builder/SurfacePicker";
-import ZoneSwapOverlay, { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
+import { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
+import BrushMask, { BRUSH_SIZES, type BrushMaskHandle, type BrushSize } from "@/components/builder/BrushMask";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
@@ -591,8 +592,12 @@ function getRegionLabel(xPct: number, yPct: number): string {
 function ArchitectViewport({
   onGenerate, onRegionClick, onZoneClick, isGenerating,
   viewportState, generateDescription, generateError, activeZone, refinementMode,
-  historyLength, historyIdx, onNavigateHistory,
+  historyLength, historyIdx, onNavigateHistory, brushRef, brushSize = "M", onMaskChange,
 }: {
+  /** "Not quite right?" highlighter */
+  brushRef?:         React.Ref<BrushMaskHandle>;
+  brushSize?:        BrushSize;
+  onMaskChange?:     (strokes: number) => void;
   onGenerate:        () => void;
   onRegionClick:     (region: string) => void;
   onZoneClick?:      (zone: ZoneId) => void;
@@ -775,7 +780,7 @@ function ArchitectViewport({
         {/* Floating button removed — actions now live below the viewport */}
 
         {/* Click-to-focus overlay — shown on the AI image when not in before/after mode */}
-        {hasGenerated && generatedImageUrl && !beforeAfterMode && !isGenerating && (
+        {hasGenerated && generatedImageUrl && !beforeAfterMode && !isGenerating && !refinementMode && (
           <div
             className="absolute inset-0 z-10 cursor-crosshair"
             title="Click to focus on a specific area"
@@ -856,9 +861,9 @@ function ArchitectViewport({
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={generatedImageUrl} alt="AI Preview" className="w-full h-full object-cover" />
-                {/* Zone swap overlay — only in refinement mode to keep image clean by default */}
-                {refinementMode && !isGenerating && onZoneClick && (
-                  <ZoneSwapOverlay onZoneClick={onZoneClick} activeZone={activeZone} />
+                {/* "Not quite right?": paint the area to change with a see-through highlighter */}
+                {refinementMode && !isGenerating && (
+                  <BrushMask ref={brushRef} imageUrl={generatedImageUrl} size={brushSize} onChange={onMaskChange} />
                 )}
                 {/* ── In-canvas history navigation ── */}
                 {historyLength > 1 && !isGenerating && (
@@ -1239,11 +1244,22 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [showHygieneModal,   setShowHygieneModal]   = useState(false);
   const [activeZone,         setActiveZone]         = useState<ZoneId | null>(null);
   const [refinementNote,     setRefinementNote]     = useState("");
+  // highlighter for "Not quite right?"
+  const brushRef = useRef<BrushMaskHandle>(null);
+  const [brushSize,   setBrushSize]   = useState<BrushSize>("M");
+  const [maskStrokes, setMaskStrokes] = useState(0);
   const [isRefining,         setIsRefining]         = useState(false);
   const [selectedRegion,     setSelectedRegion]     = useState<string | null>(null);
   // Controls whether the "Not quite right?" refinement UI is shown.
   // Starts false (before/after comparison shown); toggled by the orange button.
   const [refinementMode,     setRefinementMode]     = useState(false);
+  // "I'm happy with the look" → scroll to the builder button and make it pulse
+  const builderCtaRef = useRef<HTMLButtonElement>(null);
+  const [ctaPulse, setCtaPulse] = useState(0);
+  const happyWithLook = useCallback(() => {
+    builderCtaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setCtaPulse((n) => n + 1);   // a new key restarts the animation on every click
+  }, []);
   const [showGetTheLook,     setShowGetTheLook]     = useState(false);
 
   // ── Generation history — lets the user step back/forward through renders ──
@@ -1501,6 +1517,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
     // Need a generated image to refine; fall back to original photo if somehow missing
     const seedImage = store.generatedImageUrl ?? store.roomPhotoUrl;
+    // the painted area, captured before the render is cleared for the new one
+    const highlighted = maskStrokes > 0 ? await brushRef.current?.highlighted().catch(() => null) ?? null : null;
+    const roomWord = store.roomType;
 
     setIsRefining(true);
     setIsGenerating(true);
@@ -1511,14 +1530,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setSelectedRegion(null);
 
     try {
-      const regionPrefix = selectedRegion ? `Focus on the ${selectedRegion}. ` : "";
+      const regionPrefix = highlighted ? "In the highlighted area only: " : selectedRegion ? `Focus on the ${selectedRegion}. ` : "";
 
       // Surgical prompt — DO NOT re-declare material selections.
       // Gemini should see the image as ground truth and apply only the requested change.
       const prompt =
-        `You are making a single surgical edit to this bathroom render. ` +
-        `Keep the bathroom layout, walls, plumbing locations, tile patterns, ` +
-        `vanity position, toilet, shower screen, and all structural elements ` +
+        `You are making a single surgical edit to this ${roomWord} render. ` +
+        `Keep the ${roomWord} layout, walls, fixtures, finishes and all structural elements ` +
         `EXACTLY as they appear in this image. ` +
         `Do not change anything that is not explicitly requested below. ` +
         `${regionPrefix}` +
@@ -1529,6 +1547,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: seedImage,   // ← generated render as seed (img2img)
+          mode:        "refine",
+          roomType:    store.roomType,
+          maskImageBase64: highlighted,   // same render, area to change tinted pink
           prompt,
           selections: {
             // Minimal selections — just enough for logging; prompt does the work
@@ -1552,6 +1573,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setGenerateError(null);
       setViewportState("ready");
       if (data.imageUrl) pushToHistory(data.imageUrl);
+      setMaskStrokes(0);
       bustUserStatusCache();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1562,7 +1584,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setIsRefining(false);
       setIsGenerating(false);
     }
-  }, [refinementNote, selectedRegion, setGeneratedImageUrl, setGenerateDescription, pushToHistory]);
+  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setGenerateDescription, pushToHistory]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -2266,6 +2288,20 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         {stage === "estimate" && (
           <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
             <div ref={canvasRef} className="flex flex-col gap-4 min-w-0 scroll-mt-28">
+              {/* Happy already? Take them straight to the last step */}
+              {hasPreview && viewportState === "ready" && !isGenerating && !refinementMode && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-emerald-900">Love how it looks? Send it to a builder in one step.</p>
+                  <button
+                    type="button"
+                    onClick={happyWithLook}
+                    className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-[0_8px_20px_rgba(5,150,105,0.3)] transition-all duration-200 hover:bg-emerald-700 hover:scale-[1.02] active:scale-100"
+                  >
+                    <ThumbsUp size={16} />
+                    I&apos;m happy with the look
+                  </button>
+                </div>
+              )}
               <ArchitectViewport
                 onGenerate={handleGenerate}
                 onRegionClick={(region) => setSelectedRegion(region)}
@@ -2276,6 +2312,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 generateDescription={generateDescription}
                 generateError={generateError}
                 refinementMode={refinementMode}
+                brushRef={brushRef}
+                brushSize={brushSize}
+                onMaskChange={setMaskStrokes}
                 historyLength={genHistory.length}
                 historyIdx={historyIdx}
                 onNavigateHistory={navigateHistory}
@@ -2337,14 +2376,34 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Refine your design</p>
                       <div className="flex items-center gap-3">
-                        <p className="text-[10px] text-charcoal/30">Click the image to focus on an area</p>
                         <button
-                          onClick={() => { setRefinementMode(false); setSelectedRegion(null); }}
+                          onClick={() => { setRefinementMode(false); setSelectedRegion(null); setMaskStrokes(0); }}
                           className="flex items-center gap-1 text-[10px] font-bold text-charcoal/40 hover:text-charcoal/70 transition-colors"
                         >
                           <ArrowLeft size={11} />
                           Back
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Highlighter: paint over the area to change, then describe the change */}
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-sand-50 px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-charcoal/70">
+                        <span className="h-3 w-3 rounded-full" style={{ background: "#FF2D95", opacity: 0.6 }} />
+                        {maskStrokes > 0 ? "Area highlighted" : "Paint over the area you want changed"}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1" role="group" aria-label="Brush size">
+                        {(Object.keys(BRUSH_SIZES) as BrushSize[]).map((s) => (
+                          <button key={s} type="button" onClick={() => setBrushSize(s)} aria-pressed={brushSize === s} title={`${s === "S" ? "Small" : s === "M" ? "Medium" : "Large"} brush`}
+                            className={cn("flex h-7 w-7 items-center justify-center rounded-lg border transition-colors",
+                              brushSize === s ? "border-terracotta bg-terracotta/10" : "border-sand-200 bg-white hover:border-terracotta/40")}>
+                            <span className="rounded-full bg-[#FF2D95]/60" style={{ width: BRUSH_SIZES[s] / 3 + 3, height: BRUSH_SIZES[s] / 3 + 3 }} />
+                          </button>
+                        ))}
+                        <button type="button" onClick={() => brushRef.current?.undo()} disabled={maskStrokes === 0}
+                          className="ml-1 rounded-lg border border-sand-200 bg-white px-2 py-1 text-[11px] font-semibold text-charcoal/60 hover:text-charcoal disabled:opacity-40">Undo</button>
+                        <button type="button" onClick={() => brushRef.current?.clear()} disabled={maskStrokes === 0}
+                          className="rounded-lg border border-sand-200 bg-white px-2 py-1 text-[11px] font-semibold text-charcoal/60 hover:text-charcoal disabled:opacity-40">Clear</button>
                       </div>
                     </div>
 
@@ -2363,7 +2422,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                         value={refinementNote}
                         onChange={(e) => setRefinementNote(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleRefine(); } }}
-                        placeholder="e.g. make the tiles darker, change tapware to matte black, add a window…"
+                        placeholder={maskStrokes > 0 ? "What should change in the highlighted area? e.g. make it matte black" : "e.g. make the tiles darker, change tapware to matte black, add a window…"}
                         rows={2}
                         autoFocus
                         className="flex-1 resize-none rounded-xl px-3 py-2.5 text-sm border-2 border-sand-200 bg-white/50 focus:outline-none focus:border-terracotta/60 text-charcoal/80 placeholder:text-charcoal/30"
@@ -2381,7 +2440,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                         {isRefining ? "Refining…" : "Apply"}
                       </button>
                     </div>
-                    <p className="text-[10px] text-charcoal/30">Uses the current render as a starting point — surgical changes only</p>
+                    <p className="text-[10px] text-charcoal/40">Uses the current render as a starting point. {maskStrokes > 0 ? "Only the highlighted area will change." : "Tip: highlight an area first so only that part changes."}</p>
                   </div>
                 )}
 
@@ -2496,8 +2555,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
               {viewportState === "ready" && !isGenerating && (
                 <button
+                  ref={builderCtaRef}
+                  key={ctaPulse}
                   onClick={() => router.push("/connect")}
-                  className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-charcoal text-white text-base font-bold shadow-warm-lg hover:bg-charcoal/90 transition-all duration-200"
+                  className={cn(
+                    "flex items-center justify-center gap-2 w-full py-4 rounded-2xl text-white text-base font-bold shadow-warm-lg transition-colors duration-200 scroll-mt-32",
+                    ctaPulse ? "bg-terracotta hover:bg-terracotta/90 cta-attention" : "bg-charcoal hover:bg-charcoal/90",
+                  )}
                 >
                   <MessageSquare size={18} />
                   Send my brief to a builder

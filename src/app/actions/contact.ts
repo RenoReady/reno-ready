@@ -23,6 +23,10 @@ export interface ConnectSubmission {
   email:    string;
   phone?:   string;
   message?: string;
+  /** Property address or suburb */
+  address?:  string;
+  /** Preferred timeline label, e.g. "1 to 3 Months" */
+  timeline?: string;
   /** Everything needed to build the client's Pro Report PDF here on the server (photos as small JPEG data URLs) */
   reportInput?: ProReportInput;
   /** Why the report couldn't be attached, when it couldn't */
@@ -143,6 +147,8 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
             <p style="margin:6px 0 0 0;font-size:13px;color:rgba(255,255,255,0.7);">
               <a href="mailto:${escape(s.email)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.email)}</a>${s.phone ? `  ·  <a href="tel:${escape(s.phone)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.phone)}</a>` : ""}
             </p>
+            ${s.address ? `<p style="margin:4px 0 0 0;font-size:13px;color:rgba(255,255,255,0.7);">${escape(s.address)}</p>` : ""}
+            ${s.timeline ? `<p style="margin:10px 0 0 0;"><span style="display:inline-block;background:#D27D5E;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;">Timeline: ${escape(s.timeline)}</span></p>` : ""}
           </td>
           <td align="right" valign="top" style="padding-left:16px;">
             <div style="background:rgba(210,125,94,0.18);border:1px solid rgba(210,125,94,0.4);border-radius:12px;padding:10px 14px;text-align:center;">
@@ -228,6 +234,15 @@ async function buildReportAttachment(payload: ConnectSubmission): Promise<{ atta
     // photos must be small JPEG data URLs (the browser shrinks them); anything else is left out of the report
     const okImage = (u: unknown) => typeof u === "string" && u.startsWith("data:image/jpeg;base64,") && u.length < 2_500_000 ? u : null;
     const safe: ProReportInput = { ...input, roomPhotoUrl: okImage(input.roomPhotoUrl), generatedImageUrl: okImage(input.generatedImageUrl) };
+    // contact details come from the form fields here, not from the browser-built design data
+    safe.client = {
+      name:     payload.name.trim(),
+      email:    payload.email.trim(),
+      phone:    payload.phone?.trim() || null,
+      address:  payload.address?.trim().slice(0, 160) || null,
+      timeline: payload.timeline?.slice(0, 60) || null,
+      message:  payload.message?.trim().slice(0, 1_500) || null,
+    };
     safe.selections = { ...safe.selections, roomPhotoUrl: safe.roomPhotoUrl, generatedImageUrl: safe.generatedImageUrl };
     const { proReportPdfBytes } = await import("@/lib/generateProReportPDF");
     const bytes = await proReportPdfBytes(safe);

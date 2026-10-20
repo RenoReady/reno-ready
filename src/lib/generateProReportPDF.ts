@@ -44,6 +44,19 @@ export interface ProReportInput {
   roomType:          RoomType;
   kitchenSelections: KitchenSelections | null;
   bedroomSelections: BedroomSelections | null;
+  /** Lead details — only on the copy emailed to Reno Ready (filled in on the server from the connect form) */
+  client?:           ReportClient | null;
+}
+
+export interface ReportClient {
+  name:      string;
+  email:     string;
+  phone?:    string | null;
+  address?:  string | null;
+  /** e.g. "ASAP / Ready to Start" */
+  timeline?: string | null;
+  /** The "Additional Notes" the client wrote for the builder */
+  message?:  string | null;
 }
 
 // ── Brand constants ──────────────────────────────────────────────────────────
@@ -84,7 +97,16 @@ function addHeader(pdf: jsPDF, PW: number, title: string, pageNum: number) {
   pdf.setTextColor(180, 190, 200);
   pdf.text(title.toUpperCase(), PW / 2, 11.5, { align: "center" });
   pdf.setTextColor(...WHITE);
-  pdf.text(`${pageNum} / 2`, PW - 12, 11.5, { align: "right" });
+  pdf.text(`Page ${pageNum}`, PW - 12, 11.5, { align: "right" });
+}
+
+/** Small amber warning triangle at (x, baseline y). Replaces the ⚠ glyph, which Helvetica can't draw. */
+function warnIcon(pdf: jsPDF, x: number, y: number, size = 3) {
+  pdf.setFillColor(...AMBER);
+  pdf.triangle(x, y, x + size, y, x + size / 2, y - size * 0.9, "F");
+  pdf.setFillColor(...WHITE);
+  pdf.rect(x + size / 2 - 0.18, y - size * 0.62, 0.36, size * 0.34, "F");
+  pdf.rect(x + size / 2 - 0.18, y - size * 0.2, 0.36, 0.36, "F");
 }
 
 function addFooter(pdf: jsPDF, PW: number, PH: number) {
@@ -183,7 +205,6 @@ function buildMatRows(
     if (kitchen.hasSinkRoughin)      rows.push({ label: "Sink Rough-in",      value: "Drain & water supply relocation", highlight: true });
     if (kitchen.hasWallChange)       rows.push({ label: "Wall Removal",        value: "Open-plan conversion — engineer required", highlight: true });
     if (kitchen.hasButlersPantry)    rows.push({ label: "Butler's Pantry",     value: "Integrated scullery with matching cabinetry" });
-    if (kitchen.customNote?.trim())  rows.push({ label: "Client Request",      value: kitchen.customNote.trim() });
     return rows;
   }
 
@@ -209,7 +230,6 @@ function buildMatRows(
     if (bedroom.hasVJWall)         rows.push({ label: "VJ Feature Wall",    value: "Floor-to-ceiling tongue-and-groove boards" });
     if (bedroom.hasMediaJoinery)   rows.push({ label: "Media Joinery",      value: "Built-in TV unit with integrated shelving" });
     if (bedroom.hasPendantRoughin) rows.push({ label: "Pendant Rough-ins",  value: "New electrical circuit for bedside sconces", highlight: true });
-    if (bedroom.customNote?.trim()) rows.push({ label: "Client Request",    value: bedroom.customNote.trim() });
     return rows;
   }
 
@@ -225,7 +245,6 @@ function buildMatRows(
   ];
   if (sel.tileStyle && !sel.floorFormat && !sel.wallFormat)  rows.push({ label: "Tile Pattern",     value: sel.tileStyle });
   if (sel.lightingOption && sel.lightingOption !== "standard") rows.push({ label: "Lighting Upgrade", value: sel.lightingOption });
-  if (sel.customNote?.trim())                                rows.push({ label: "Client Request",   value: sel.customNote.trim() });
   const sc = sel.structuralChanges;
   if (sc?.removeBathtub)   rows.push({ label: "Structural", value: "Bathtub removal",           highlight: true });
   if (sc?.addWalkinShower) rows.push({ label: "Structural", value: "Walk-in shower conversion",  highlight: true });
@@ -287,7 +306,7 @@ const isJpegDataUrl = (u: string | null | undefined): u is string => !!u && u.st
 async function buildProReportPDF(input: ProReportInput, img: { maxW: number; quality: number } = { maxW: 1400, quality: 0.85 }, imagesReady = false): Promise<jsPDF> {
   const {
     selections, projectBrief, generatedImageUrl, roomPhotoUrl,
-    grandTotal, estimatedCost, roomType, kitchenSelections, bedroomSelections,
+    grandTotal, estimatedCost, roomType, kitchenSelections, bedroomSelections, client,
   } = input;
 
   const pdf    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
@@ -311,6 +330,35 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
     roomPhotoUrl      ? loadImageAsDataUrl(roomPhotoUrl, img.maxW, img.quality)      : Promise.resolve(null),
   ]);
 
+  // Client requests & site notes — the client's own words, for the builder
+  const designNote = (roomType === "kitchen" ? kitchenSelections?.customNote : roomType === "bedroom" ? bedroomSelections?.customNote : selections.customNote)?.trim();
+  const requests: { label: string; text: string; quote?: boolean }[] = [
+    ...(designNote ? [{ label: "Design request", text: designNote, quote: true }] : []),
+    ...(client?.message?.trim() ? [{ label: "Note to the builder", text: client.message.trim(), quote: true }] : []),
+    ...(roomType === "bathroom" && projectBrief?.bathroomCount === 1
+      ? [{ label: "Site note", text: "This is the only bathroom in the home: plan toilet and shower access (or a mobile ensuite) for the build." }] : []),
+  ];
+  pdf.setFont("helvetica", "normal"); pdf.setFontSize(8);
+  const reqBlocks = requests.map((r) => ({ ...r, lines: (pdf.splitTextToSize(r.quote ? `"${r.text}"` : r.text, IW - 12) as string[]).slice(0, 6) }));
+  const requestsH = reqBlocks.length ? 9 + reqBlocks.reduce((n, b) => n + 5 + b.lines.length * 4.4 + 2, 0) : 0;
+  const drawRequests = (top: number) => {
+    const x = MARGIN + 3;
+    drawRect(pdf, MARGIN, top, IW, requestsH, WHITE, 3);
+    pdf.setDrawColor(...TERRACOTTA); pdf.setLineWidth(0.4);
+    pdf.roundedRect(MARGIN, top, IW, requestsH, 3, 3, "S");
+    sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...TERRACOTTA);
+    pdf.text("CLIENT REQUESTS & SITE NOTES", x, top + 6.5);
+    let ry = top + 12;
+    reqBlocks.forEach((b) => {
+      sf(pdf, "bold"); pdf.setFontSize(7); pdf.setTextColor(...GREY_TEXT);
+      pdf.text(b.label.toUpperCase(), x, ry); ry += 4.6;
+      sf(pdf, "normal"); pdf.setFontSize(8); pdf.setTextColor(...CHARCOAL);
+      b.lines.forEach((l) => { pdf.text(l, x, ry); ry += 4.4; });
+      ry += 2;
+    });
+  };
+  let requestsOnPage1 = false;
+
   // ══════════════════════════════════════════════════════════════════
   //  PAGE 1 — Design Preview + Materials Specification
   // ══════════════════════════════════════════════════════════════════
@@ -328,6 +376,28 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   pdf.setTextColor(...GREY_TEXT);
   pdf.text(`Prepared ${dateStr} · Reno Ready AI Design Platform`, MARGIN + 7, y + 12);
   y += 18;
+
+  // Client contact — first thing a builder needs
+  if (client) {
+    const cardH = 22;
+    drawRect(pdf, MARGIN, y, IW, cardH, LIGHT_SAND, 3);
+    drawRect(pdf, MARGIN, y, 2.2, cardH, TERRACOTTA);
+    const col1 = MARGIN + 7, col2 = MARGIN + IW / 2 + 2;
+    sf(pdf, "bold"); pdf.setFontSize(6); pdf.setTextColor(...TERRACOTTA);
+    pdf.text("CLIENT", col1, y + 5.5);
+    if (client.timeline) pdf.text("TIMELINE", col2, y + 5.5);
+    sf(pdf, "bold"); pdf.setFontSize(11); pdf.setTextColor(...CHARCOAL);
+    pdf.text(client.name.slice(0, 48), col1, y + 11.5);
+    if (client.timeline) { pdf.setFontSize(9.5); pdf.text(client.timeline, col2, y + 11.5); }
+    sf(pdf, "normal"); pdf.setFontSize(8); pdf.setTextColor(...CHARCOAL);
+    pdf.text([client.phone, client.email].filter(Boolean).join("   ·   ").slice(0, 70), col1, y + 17);
+    if (client.address) {
+      sf(pdf, "normal"); pdf.setFontSize(8);
+      const addr = pdf.splitTextToSize(client.address, IW / 2 - 9) as string[];
+      addr.slice(0, 1).forEach((l) => pdf.text(l, col2, y + 17));
+    }
+    y += cardH + 5;
+  }
 
   // Before / After images
   const imgH = 58;
@@ -410,6 +480,12 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
     y += rowH;
   });
 
+  // Client requests on page 1, under the spec, when they fit
+  if (requestsH && y + 5 + requestsH <= PH - 14) {
+    drawRequests(y + 5);
+    requestsOnPage1 = true;
+  }
+
   addFooter(pdf, PW, PH);
 
   // ══════════════════════════════════════════════════════════════════
@@ -480,7 +556,8 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
       drawRect(pdf, MARGIN, y, IW, itemH, bg);
       sf(pdf, "normal"); pdf.setFontSize(7.5);
       pdf.setTextColor(item.warning ? AMBER[0] : CHARCOAL[0], item.warning ? AMBER[1] : CHARCOAL[1], item.warning ? AMBER[2] : CHARCOAL[2]);
-      pdf.text(`${item.warning ? "⚠  " : ""}${item.label}`, labelX, y + 6);
+      if (item.warning) warnIcon(pdf, labelX, y + 6.2);
+      pdf.text(item.label, labelX + (item.warning ? 4.5 : 0), y + 6);
       sf(pdf, "bold"); pdf.setFontSize(7.5);
       pdf.text(`+${formatAUD(item.amount)}`, amtX, y + 6, { align: "right" });
       y += itemH;
@@ -507,7 +584,8 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   if (roomType === "bathroom" && projectBrief?.bathroomCount === 1) {
     drawRect(pdf, MARGIN, y, IW, 22, [255, 251, 235] as [number, number, number], 3);
     sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...AMBER);
-    pdf.text("⚠  SINGLE BATHROOM — HYGIENE ADVISORY", labelX, y + 6);
+    warnIcon(pdf, labelX, y + 6.3);
+    pdf.text("SINGLE BATHROOM — HYGIENE ADVISORY", labelX + 4.5, y + 6);
     sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...CHARCOAL);
     const hygText = pdf.splitTextToSize(
       "This is the only bathroom in the home. Most clients arrange a Mobile Ensuite (self-contained trailer) for $150–$300/week during the 2–4 week build. Confirm toilet and shower access with your builder before works commence.",
@@ -517,26 +595,54 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
     y += 28;
   }
 
-  // Project Brief summary box
-  if (projectBrief) {
-    y += 2;
-    const briefLines = [
-      `Year of Construction: ${projectBrief.yearBuilt > 0 ? projectBrief.yearBuilt : "Not given"}`,
-      `Renovation Scope: ${projectBrief.scope === "full-stripout" ? "Full Strip-out & Rebuild" : projectBrief.scope === "cosmetic-refresh" ? "Cosmetic Refresh" : "Not specified"}`,
-      `Plumbing: ${projectBrief.plumbingLayout === "keep-layout" ? "Keeping existing layout" : "Moving plumbing / walls"}`,
-      `Bathrooms in home: ${projectBrief.bathroomCount === 3 ? "3 or more" : String(projectBrief.bathroomCount)}${projectBrief.bathroomCount === 1 ? " (sole bathroom — access plan required)" : ""}`,
-      ...(needsAsbestosCheck(projectBrief) ? ["⚠  Asbestos risk flagged — testing & removal included in estimate above"] : []),
-    ];
+  // a new page when the next block won't fit above the disclaimer
+  const ensureRoom = (h: number) => {
+    if (y + h <= PH - 40) return;
+    addFooter(pdf, PW, PH);
+    pdf.addPage();
+    addHeader(pdf, PW, "Detailed Cost Breakdown (continued)", pdf.getNumberOfPages());
+    y = 26;
+  };
+
+  // Project Brief summary box (timeline and address first)
+  const briefLines: { text: string; warn?: boolean }[] = [
+    ...(client?.timeline ? [{ text: `Preferred timeline: ${client.timeline}` }] : []),
+    ...(client?.address  ? [{ text: `Property: ${client.address}` }] : []),
+    ...(projectBrief ? [
+      { text: `Year of Construction: ${projectBrief.yearBuilt > 0 ? projectBrief.yearBuilt : "Not given"}` },
+      { text: `Renovation Scope: ${projectBrief.scope === "full-stripout" ? "Full Strip-out & Rebuild" : projectBrief.scope === "cosmetic-refresh" ? "Cosmetic Refresh" : "Not specified"}` },
+      { text: `Plumbing: ${projectBrief.plumbingLayout === "keep-layout" ? "Keeping existing layout" : "Moving plumbing / walls"}` },
+      ...(roomType === "bathroom" ? [{ text: `Bathrooms in home: ${projectBrief.bathroomCount === 3 ? "3 or more" : String(projectBrief.bathroomCount)}${projectBrief.bathroomCount === 1 ? " (sole bathroom — access plan required)" : ""}` }] : []),
+      ...(needsAsbestosCheck(projectBrief) ? [{ text: "Asbestos risk flagged — testing and removal included in the estimate above", warn: true }] : []),
+    ] : []),
+  ];
+  if (briefLines.length) {
     const briefH = 9 + briefLines.length * 5.2;
+    ensureRoom(briefH + 6);
+    y += 2;
     drawRect(pdf, MARGIN, y, IW, briefH, SAND, 3);
     sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...TERRACOTTA);
     pdf.text("PROJECT BRIEF SUMMARY", labelX, y + 6.5);
     sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...CHARCOAL);
-    briefLines.forEach((line, li) => pdf.text(line, labelX, y + 12 + li * 5.2));
+    briefLines.forEach((line, li) => {
+      const ly = y + 12 + li * 5.2;
+      if (line.warn) { warnIcon(pdf, labelX, ly + 0.2); pdf.setTextColor(...AMBER); }
+      pdf.text(line.text.slice(0, 120), labelX + (line.warn ? 4.5 : 0), ly);
+      pdf.setTextColor(...CHARCOAL);
+    });
     y += briefH + 4;
   }
 
-  // Disclaimer block
+  // Client requests (if they didn't fit on page 1)
+  if (requestsH && !requestsOnPage1) {
+    ensureRoom(requestsH + 6);
+    y += 2;
+    drawRequests(y);
+    y += requestsH + 4;
+  }
+
+  // Disclaimer block (continue on a new page if there's no room left above it)
+  if (y > PH - 37) ensureRoom(PH);
   y = Math.max(y, PH - 35);
   drawRect(pdf, MARGIN, y, IW, 20, LIGHT_SAND, 3);
   sf(pdf, "bold"); pdf.setFontSize(6); pdf.setTextColor(...GREY_TEXT);

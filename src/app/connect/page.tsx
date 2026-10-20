@@ -19,6 +19,8 @@ import {
   ImageOff,
   Info,
   Ruler,
+  MapPin,
+  CalendarClock,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
@@ -62,17 +64,28 @@ import { submitConnectForm } from "@/app/actions/contact";
 import { cn, formatAUD } from "@/lib/utils";
 
 interface FormState {
-  name:    string;
-  email:   string;
-  phone:   string;
-  message: string;
+  name:     string;
+  email:    string;
+  phone:    string;
+  address:  string;
+  timeline: string;
+  message:  string;
 }
 
 interface FormErrors {
-  name?:  string;
-  email?: string;
-  phone?: string;
+  name?:     string;
+  email?:    string;
+  phone?:    string;
+  address?:  string;
+  timeline?: string;
 }
+
+/** The homeowner's preferred timeline — shown to the builder on the report and email */
+const TIMELINE_OPTIONS = [
+  { id: "asap",      label: "ASAP / Ready to Start",      sub: "Keen to get going" },
+  { id: "1-3-months", label: "1 to 3 Months",             sub: "Planning ahead" },
+  { id: "exploring", label: "Just Exploring / Budgeting", sub: "Getting a feel for costs" },
+] as const;
 
 function validate(form: FormState): FormErrors {
   const errors: FormErrors = {};
@@ -82,6 +95,8 @@ function validate(form: FormState): FormErrors {
                            errors.email = "Please enter a valid email.";
   if (form.phone && !/^[\d\s()+\-]{8,}$/.test(form.phone))
                            errors.phone = "Please enter a valid phone number.";
+  if (form.address.trim().length < 3) errors.address = "Please add the property address or suburb.";
+  if (!form.timeline)      errors.timeline = "Please choose a timeline.";
   return errors;
 }
 
@@ -297,7 +312,7 @@ export default function ConnectPage() {
     : roomType === "bedroom" ? "Bedroom"
     : "Bathroom";
 
-  const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", message: "" });
+  const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", address: "", timeline: "", message: "" });
   const [errors, setErrors]       = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);
@@ -365,6 +380,8 @@ export default function ConnectPage() {
         email:   form.email.trim(),
         phone:   form.phone.trim() || undefined,
         message: form.message.trim() || undefined,
+        address:  form.address.trim(),
+        timeline: TIMELINE_OPTIONS.find((t) => t.id === form.timeline)?.label,
         design: {
           floorTile:        floorLabel ? { id: floorTile?.id ?? floorFormat ?? "custom", name: floorLabel } : null,
           wallTile:         wallLabel  ? { id: wallTile?.id  ?? wallFormat  ?? "custom", name: wallLabel  } : null,
@@ -529,14 +546,54 @@ export default function ConnectPage() {
                     hint="Optional — faster response from builders."
                     autoComplete="tel"
                   />
+                  <FormInput
+                    label="Property Address"
+                    placeholder="e.g. 12 Smith St, Paddington QLD 4064"
+                    leftIcon={<MapPin size={16} />}
+                    value={form.address}
+                    onChange={handleChange("address")}
+                    error={errors.address}
+                    hint="Street address or suburb, so builders know where the job is."
+                    autoComplete="street-address"
+                  />
                   <FormTextarea
                     label="Additional Notes"
-                    placeholder="Anything else the builder should know? e.g. specific timeline, access requirements, or questions about your design…"
+                    placeholder="Anything else the builder should know? e.g. access or parking, pets, working hours, or questions about your design…"
                     leftIcon={<MessageSquare size={16} />}
                     value={form.message}
                     onChange={handleChange("message")}
                     hint="Optional — include any specific requirements or questions."
                   />
+
+                  {/* Preferred timeline — builders prioritise ready-to-start jobs */}
+                  <fieldset>
+                    <legend className="mb-2 flex items-center gap-2 text-sm font-semibold text-charcoal">
+                      <CalendarClock size={16} className="text-charcoal/50" />
+                      When are you hoping to start?
+                    </legend>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Preferred timeline">
+                      {TIMELINE_OPTIONS.map((t) => {
+                        const active = form.timeline === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => { setForm((f) => ({ ...f, timeline: t.id })); setErrors((e) => ({ ...e, timeline: undefined })); }}
+                            className={cn(
+                              "flex flex-col items-start rounded-2xl border-2 px-3.5 py-3 text-left transition-all duration-200",
+                              active ? "border-terracotta bg-terracotta/5 shadow-warm-sm" : "border-sand-200 bg-white/60 hover:border-terracotta/40",
+                            )}
+                          >
+                            <span className={cn("text-sm font-bold", active ? "text-terracotta" : "text-charcoal")}>{t.label}</span>
+                            <span className="text-[11px] text-charcoal/50">{t.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {errors.timeline && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.timeline}</p>}
+                  </fieldset>
                 </div>
               </Card>
 

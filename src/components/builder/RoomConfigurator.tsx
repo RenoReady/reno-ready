@@ -27,6 +27,11 @@ import {
 import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
 import { downloadImage, toJpeg } from "@/lib/watermark";
+import ResumeDraftModal, { type ResumeOffer } from "@/components/builder/ResumeDraftModal";
+import {
+  useDraftAutosave, loadLocalDraft, isResumable, applyDraft, startNewDraft,
+  fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, type LocalDraft,
+} from "@/lib/drafts";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
@@ -1140,6 +1145,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   // Set to true when returning from OAuth with a pending generate request
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
+  // A draft to load without asking (sign-in / payment return, My Account link)
+  const [pendingResume, setPendingResume] = useState<{ draft: LocalDraft; generate: boolean } | null>(null);
+  // "Pick up where you left off?" — a local draft, or the newest account draft (fetched on Continue)
+  const [resumeOffer, setResumeOffer] = useState<{ offer: ResumeOffer; local?: LocalDraft; accountId?: string } | null>(null);
+  const [resumeBusy,  setResumeBusy]  = useState(false);
   // Incremented to force useUserStatus to re-fetch after payment
   const [statusRefreshKey,     setStatusRefreshKey]     = useState(0);
   const [paymentBanner,        setPaymentBanner]         = useState(false);
@@ -1157,9 +1167,17 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       // Restore builder state saved before the OAuth redirect
       const pending = restoreBuilderStateFromAuth();
       const restored = useBuilderStore.getState();
-      if (restored.roomPhotoUrl) setStage("design");
-      // Only resume the generation if their photo survived the redirect
-      if (pending && restored.roomPhotoUrl) setShouldAutoGenerate(true);
+      if (restored.roomPhotoUrl) {
+        setStage("design");
+        // Only resume the generation if their photo survived the redirect
+        if (pending) setShouldAutoGenerate(true);
+      } else {
+        // The hand-off came back without the photo: use this device's autosaved draft
+        loadLocalDraft().then((d) => {
+          if (!isResumable(d)) return;
+          setPendingResume({ draft: d, generate: pending });
+        });
+      }
     }
 
     if (params.get("payment_success") === "true") {
@@ -1171,6 +1189,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       bustUserStatusCache();
       setStatusRefreshKey((k) => k + 1);
       setPaymentBanner(true);
+      // Checkout was a full page visit, so reload the design they were working on
+      if (!useBuilderStore.getState().roomPhotoUrl) {
+        loadLocalDraft().then((d) => { if (isResumable(d)) setPendingResume({ draft: d, generate: false }); });
+      }
       setTimeout(() => setPaymentBanner(false), 6_000);
     }
   }, []);
@@ -1301,6 +1323,94 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const goTo = useCallback((next: Stage) => {
     setStage(next);
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, []);
+
+  // ── Drafts ────────────────────────────────────────────────────────
+  /** Loads a draft into the builder, moving to that room's page if needed */
+  const resumeDraft = useCallback((d: LocalDraft, generate = false, accountId?: string) => {
+    if (room && d.roomType !== room) {
+      // the room page owns its room, so load it there
+      setDraftHandoff(accountId ? { accountId } : { local: true });
+      router.push(`${ROOM_PAGES[d.roomType].path}?${accountId ? `draft=${accountId}` : "resume=local"}`);
+      return;
+    }
+    applyDraft(d);
+    if (d.render) {
+      pushToHistory(d.render);
+      setViewportState("ready");
+      setStage("estimate");
+    } else {
+      setStage(d.photo ? "design" : "upload");
+      if (generate && d.photo) setShouldAutoGenerate(true);
+    }
+  }, [room, router, pushToHistory]);
+
+  useEffect(() => {
+    if (!pendingResume) return;
+    setPendingResume(null);
+    resumeDraft(pendingResume.draft, pendingResume.generate);
+  }, [pendingResume, resumeDraft]);
+
+  // On arrival: open a draft from My Account (?draft=id), finish a room hop
+  // (?resume=local), or offer the last draft if they're starting fresh
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("authed") || params.has("payment_success")) return;   // handled above
+    const clean = (key: string) => {
+      const u = new URL(window.location.href);
+      u.searchParams.delete(key);
+      window.history.replaceState({}, "", u.toString());
+    };
+    // a hop from another room's page, or a link from My Account
+    const handoff = peekDraftHandoff();
+    const wanted = handoff && "accountId" in handoff ? handoff.accountId : params.get("draft");
+    if (params.has("draft")) clean("draft");
+    if (params.has("resume")) clean("resume");
+    if (wanted) {
+      fetchAccountDraft(wanted).then((d) => { if (d) resumeDraft(d, false, wanted); });
+      return;
+    }
+    if (handoff || params.get("resume") === "local") {
+      loadLocalDraft().then((d) => { if (isResumable(d)) resumeDraft(d); });
+      return;
+    }
+    if (useBuilderStore.getState().roomPhotoUrl) return;   // already designing (e.g. back from /preview)
+    let cancelled = false;
+    (async () => {
+      const local = await loadLocalDraft();
+      if (cancelled) return;
+      if (isResumable(local)) {
+        setResumeOffer({ local, offer: {
+          roomType: local.roomType, updatedAt: local.updatedAt, thumbUrl: local.render ?? local.photo,
+          hasRender: !!local.render, estimate: local.estimate,
+        } });
+        return;
+      }
+      // Nothing on this device: offer the newest draft saved to their account
+      if (!isAuthed()) return;
+      const latest = (await listAccountDrafts())?.[0];
+      if (cancelled || !latest || (!latest.hasPhoto && !latest.hasRender)) return;
+      setResumeOffer({ accountId: latest.id, offer: {
+        roomType: latest.roomType, updatedAt: Date.parse(latest.updatedAt), thumbUrl: latest.thumbUrl,
+        hasRender: latest.hasRender, estimate: latest.estimate,
+      } });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const continueOffer = useCallback(async () => {
+    if (!resumeOffer) return;
+    setResumeBusy(true);
+    const d = resumeOffer.local ?? (resumeOffer.accountId ? await fetchAccountDraft(resumeOffer.accountId) : null);
+    setResumeBusy(false);
+    setResumeOffer(null);
+    if (d) resumeDraft(d, false, resumeOffer.accountId);
+  }, [resumeOffer, resumeDraft]);
+
+  const startNewFromOffer = useCallback(async () => {
+    setResumeOffer(null);
+    await startNewDraft();
   }, []);
 
   /** Reads a photo (or the sample), downsizes it to 1280px JPEG and moves on to Step 2 */
@@ -1633,6 +1743,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     const lo = Math.round((est * 0.88 + brief) / 500) * 500, hi = Math.round((est * 1.12 + brief) / 500) * 500;
     return lo === hi ? formatAUD(lo) : `${formatAUD(lo)}–${formatAUD(hi)}`;
   })();
+
+  // Autosave the design: on this device always, to the account once signed in
+  useDraftAutosave(!resumeOffer, !!userStatus.userId, () => ({ estimate: hasPreview ? liveEstimate : null }));
 
   const showFreeCounter = !userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium;
   // Free tier (once we know): watermark on, edits and Pro Reports locked
@@ -2637,6 +2750,16 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         <AuthModal
           onSuccess={() => { setShowAuthModal(false); executeGenerate(); }}
           onClose={() => setShowAuthModal(false)}
+        />
+      )}
+
+      {resumeOffer && (
+        <ResumeDraftModal
+          offer={resumeOffer.offer}
+          signedIn={!!userStatus.userId}
+          busy={resumeBusy}
+          onContinue={continueOffer}
+          onStartNew={startNewFromOffer}
         />
       )}
 

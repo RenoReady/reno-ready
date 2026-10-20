@@ -52,7 +52,26 @@ const PERSIST_KEY = "reno_ready_pending_state";
 export function saveBuilderStateForAuth(pendingGenerate = true): void {
   if (typeof window === "undefined") return;
   const s = useBuilderStore.getState();
-  const snapshot = {
+  const snapshot = { ...builderSnapshot(), pendingGenerate };
+  try {
+    // Try with room photo first; fall back without if sessionStorage is full
+    const withPhoto = { ...snapshot, roomPhotoUrl: s.roomPhotoUrl };
+    sessionStorage.setItem(PERSIST_KEY, JSON.stringify(withPhoto));
+  } catch {
+    try {
+      sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ ...snapshot, roomPhotoUrl: null }));
+    } catch { /* give up gracefully */ }
+  }
+}
+
+/**
+ * Every design choice in the builder as plain JSON, without the photo or the
+ * render (those are large and stored separately). Used for the sign-in
+ * hand-off and for drafts.
+ */
+export function builderSnapshot(): Record<string, unknown> {
+  const s = useBuilderStore.getState();
+  return {
     // ── Room context (must be restored first so the correct room is shown) ──
     roomType:          s.roomType,
     roomConfirmed:     true,          // mark confirmed so RoomRouter doesn't pop up
@@ -82,17 +101,7 @@ export function saveBuilderStateForAuth(pendingGenerate = true): void {
     customWidth:          s.customWidth,
     layoutTemplate:       s.layoutTemplate,
     keepExisting:         s.keepExisting,
-    pendingGenerate,
   };
-  try {
-    // Try with room photo first; fall back without if sessionStorage is full
-    const withPhoto = { ...snapshot, roomPhotoUrl: s.roomPhotoUrl };
-    sessionStorage.setItem(PERSIST_KEY, JSON.stringify(withPhoto));
-  } catch {
-    try {
-      sessionStorage.setItem(PERSIST_KEY, JSON.stringify({ ...snapshot, roomPhotoUrl: null }));
-    } catch { /* give up gracefully */ }
-  }
 }
 
 /**
@@ -107,6 +116,19 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (!raw) return false;
     sessionStorage.removeItem(PERSIST_KEY);
     const saved = JSON.parse(raw) as Record<string, unknown>;
+    applyBuilderSnapshot(saved);
+    return saved.pendingGenerate === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Puts a snapshot (from builderSnapshot, plus an optional roomPhotoUrl) back
+ * into the builder. Older choices that no longer exist are dropped.
+ */
+export function applyBuilderSnapshot(saved: Record<string, unknown>): void {
+  {
     const store = useBuilderStore.getState();
 
     // ── Room context — restore first so everything renders in the right room ──
@@ -147,9 +169,6 @@ export function restoreBuilderStateFromAuth(): boolean {
     if (saved.useCustomDimensions !== undefined) store.setUseCustomDimensions(saved.useCustomDimensions as boolean);
     if (saved.customLength        !== undefined) store.setCustomLength(saved.customLength as number);
     if (saved.customWidth         !== undefined) store.setCustomWidth(saved.customWidth as number);
-    return saved.pendingGenerate === true;
-  } catch {
-    return false;
   }
 }
 

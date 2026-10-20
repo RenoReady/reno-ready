@@ -14,9 +14,10 @@ import { cn } from "@/lib/utils";
 import { PLAN_COPY, type PlanKey } from "@/lib/plans";
 import { useCheckout } from "@/lib/useCheckout";
 
-export type PaywallReason = "limit" | "refine" | "report" | "watermark";
+export type PaywallReason = "limit" | "refine" | "report" | "watermark" | "upgrade";
 
 const REASON_COPY: Record<PaywallReason, string> = {
+  upgrade:   "Unlimited 2K renders, edits and contractor-ready PDF reports. Pick the plan that fits your project.",
   limit:     "You’ve used your free preview. Upgrade to keep designing in full 2K.",
   refine:    "“Not quite right?” edits are included with every paid plan.",
   report:    "The contractor-ready PDF Pro Report is included with every paid plan.",

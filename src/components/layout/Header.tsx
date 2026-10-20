@@ -8,7 +8,7 @@ import ProgressNav from "@/components/ui/ProgressNav";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
-import { LogOut, RefreshCcw, CreditCard, Loader2 } from "lucide-react";
+import { LogOut, RefreshCcw, CreditCard, Loader2, UserRound, History } from "lucide-react";
 import { createBillingPortalSession } from "@/app/actions/stripe";
 
 const APP_ROUTES = ["/builder", "/preview", "/connect"];
@@ -214,6 +214,22 @@ export default function Header() {
 
                   {/* Actions */}
                   <div className="py-1.5">
+                    <Link
+                      href="/account"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm font-semibold text-charcoal hover:bg-sand-50 transition-colors"
+                    >
+                      <UserRound size={14} className="text-terracotta flex-shrink-0" />
+                      My account
+                    </Link>
+                    <Link
+                      href="/account#drafts"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-charcoal/70 hover:bg-sand-50 hover:text-charcoal transition-colors"
+                    >
+                      <History size={14} className="text-charcoal/40 flex-shrink-0" />
+                      My drafts
+                    </Link>
                     <button
                       onClick={handleManageBilling}
                       disabled={billingBusy}

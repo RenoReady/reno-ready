@@ -8,17 +8,16 @@
  *  { isAdmin, isPremium, generationCount, userId, freeLimit }
  *
  * isAdmin    — email matches ADMIN_EMAIL env var; unlimited access
- * isPremium  — active day_pass / monthly / annual subscription
- * freeLimit  — how many free generations are allowed (3)
+ * isPremium  — active 7-Day Project Pass or Pro Monthly (legacy day_pass / annual too)
+ * freeLimit  — how many free generations are allowed (1)
  */
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
+import { FREE_GENERATION_LIMIT, hasActivePlan } from "@/lib/plans";
 
 export const dynamic = "force-dynamic";
-
-export const FREE_GENERATION_LIMIT = 3;
 
 interface UserStatusResponse {
   userId:          string | null;
@@ -55,14 +54,8 @@ export async function GET(): Promise<NextResponse<UserStatusResponse>> {
 
     const generationCount = profile?.generation_count ?? 0;
 
-    // Premium = active non-free plan that hasn't expired
-    const plan           = profile?.subscription_plan ?? "free";
-    const expiresAt      = profile?.subscription_expires_at
-      ? new Date(profile.subscription_expires_at)
-      : null;
-    const isPremiumPlan  = ["day_pass", "paid", "monthly", "annual"].includes(plan);
-    const isNotExpired   = !expiresAt || expiresAt > new Date();
-    const isPremium      = isPremiumPlan && isNotExpired;
+    // Premium = active paid plan that hasn't expired
+    const isPremium = hasActivePlan(profile?.subscription_plan, profile?.subscription_expires_at);
 
     return NextResponse.json({
       userId:          user.id,

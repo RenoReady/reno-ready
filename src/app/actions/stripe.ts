@@ -15,8 +15,8 @@
 
 import Stripe from "stripe";
 import { headers } from "next/headers";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PLANS, type PlanKey } from "@/lib/plans";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -51,25 +51,40 @@ async function getBaseUrl(): Promise<string> {
 
 export async function createCheckoutSession(
   plan: PlanKey,
-): Promise<{ url: string } | { error: string }> {
+): Promise<{ url: string } | { error: string; needsAuth?: true }> {
   try {
+    if (!isPlanKey(plan)) return { error: "Unknown plan" };
     const stripe = getStripe();
     const base   = await getBaseUrl();
-    const { mode, priceId } = PLANS[plan];
+    const { mode, priceId, trialDays } = PLANS[plan];
 
-    // ── Resolve the current user ID so the webhook can attribute the purchase ──
+    // ── Resolve the current user so the webhook can attribute the purchase ──
     let userId: string | undefined;
+    let email:  string | undefined;
     try {
       const supabase = await createSupabaseServerClient();
       const { data: { user } } = await supabase.auth.getUser();
       userId = user?.id;
+      email  = user?.email ?? undefined;
     } catch { /* not signed in — allow anyway, webhook will log */ }
+
+    // Paid access is tied to the account, so buyers sign in first
+    if (!userId) return { error: "Please sign in first so we can attach your plan to your account.", needsAuth: true };
 
     const session = await stripe.checkout.sessions.create({
       mode,
       client_reference_id: userId,   // passed back in checkout.session.completed webhook
+      customer_email:      email,
       metadata: { plan },            // lets the webhook know which plan was purchased
       line_items: [{ price: priceId, quantity: 1 }],
+      // Pro Monthly: 7-day free trial, card collected up front, first charge after the trial
+      ...(mode === "subscription" && {
+        payment_method_collection: "always" as const,
+        subscription_data: {
+          metadata: { plan, userId },
+          ...(trialDays > 0 && { trial_period_days: trialDays }),
+        },
+      }),
       success_url: `${base}/builder?payment_success=true&plan=${plan}`,
       cancel_url:  `${base}/#pricing`,
       billing_address_collection: "auto",
@@ -82,5 +97,38 @@ export async function createCheckoutSession(
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error(`[stripe] createCheckoutSession failed for plan "${plan}":`, message);
     return { error: message };
+  }
+}
+
+// ── Manage / cancel subscription ───────────────────────────────────
+
+/**
+ * Opens Stripe's customer portal so the user can cancel (or update their card)
+ * in one click. Needs the portal turned on once in the Stripe Dashboard:
+ * Settings → Billing → Customer portal.
+ */
+export async function createBillingPortalSession(): Promise<{ url: string } | { error: string }> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Please sign in to manage your plan." };
+
+    const { data: profile } = await createSupabaseServiceRoleClient()
+      .from("profiles")
+      .select("stripe_customer_id")
+      .eq("id", user.id)
+      .single();
+    const customer = profile?.stripe_customer_id as string | null | undefined;
+    if (!customer) return { error: "We couldn't find a subscription on this account." };
+
+    const session = await getStripe().billingPortal.sessions.create({
+      customer,
+      return_url: `${await getBaseUrl()}/builder`,
+    });
+    return { url: session.url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[stripe] createBillingPortalSession failed:", message);
+    return { error: "We couldn't open billing right now. Please try again." };
   }
 }

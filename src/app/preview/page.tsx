@@ -14,7 +14,12 @@ import {
   Eye,
   FileText,
   Loader2,
+  Lock,
 } from "lucide-react";
+import PaywallModal from "@/components/ui/PaywallModal";
+import PreviewWatermark from "@/components/ui/PreviewWatermark";
+import { useUserStatus, hasProAccess } from "@/lib/useUserStatus";
+import { downloadImage } from "@/lib/watermark";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
@@ -132,9 +137,15 @@ export default function PreviewPage() {
 
   const [downloadHover, setDownloadHover] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [paywall, setPaywall] = useState<"report" | "watermark" | null>(null);
+
+  // Free tier: watermark on the render, Pro Report locked
+  const userStatus = useUserStatus();
+  const proLocked  = !userStatus.loading && !hasProAccess(userStatus);
 
   const handleDownloadPDF = async () => {
     if (isGeneratingPDF) return;
+    if (proLocked) { setPaywall("report"); return; }
     setIsGeneratingPDF(true);
     try {
       const { generateProReportPDF } = await import("@/lib/generateProReportPDF");
@@ -187,17 +198,7 @@ export default function PreviewPage() {
   const handleDownload = async () => {
     if (!generatedImageUrl) return;
     try {
-      let href = generatedImageUrl;
-      if (!generatedImageUrl.startsWith("data:")) {
-        const res  = await fetch(generatedImageUrl);
-        const blob = await res.blob();
-        href = URL.createObjectURL(blob);
-      }
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = "My-Reno-Ready-Design.png";
-      a.click();
-      if (!generatedImageUrl.startsWith("data:")) URL.revokeObjectURL(href);
+      await downloadImage(generatedImageUrl, { watermark: proLocked });
     } catch {
       alert("Download failed — try right-clicking the image and saving manually.");
     }
@@ -261,6 +262,7 @@ export default function PreviewPage() {
                   alt={`Your AI-generated ${roomLabel.toLowerCase()} preview`}
                   className="absolute inset-0 w-full h-full object-cover"
                 />
+                {proLocked && <PreviewWatermark onUpgrade={() => setPaywall("watermark")} />}
                 <div className="absolute top-5 left-5">
                   <div className="bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 text-xs font-bold text-terracotta shadow-warm-sm border border-terracotta/20">
                     AI Generated Preview
@@ -518,7 +520,9 @@ export default function PreviewPage() {
             >
               {isGeneratingPDF
                 ? <><Loader2 size={16} className="animate-spin" /> Generating PDF…</>
-                : <><FileText size={16} /> Download Pro Report <span className="text-charcoal/40 font-normal text-xs">(PDF · A4)</span></>
+                : proLocked
+                  ? <><Lock size={15} /> Download Pro Report <span className="rounded-full bg-terracotta/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-terracotta">Pro</span></>
+                  : <><FileText size={16} /> Download Pro Report <span className="text-charcoal/40 font-normal text-xs">(PDF · A4)</span></>
               }
             </button>
 
@@ -587,6 +591,8 @@ export default function PreviewPage() {
           </div>
         </div>
       </div>
+
+      {paywall && <PaywallModal reason={paywall} onClose={() => setPaywall(null)} />}
     </div>
   );
 }

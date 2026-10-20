@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
+import { FREE_GENERATION_LIMIT } from "@/lib/plans";
 
 export interface UserStatus {
   userId:          string | null;
@@ -27,13 +28,18 @@ const DEFAULT: UserStatus = {
   isAdmin:         false,
   isPremium:       false,
   generationCount: 0,
-  freeLimit:       3,
+  freeLimit:       FREE_GENERATION_LIMIT,
   loading:         true,
 };
 
 // Module-level cache so the value persists across re-renders
 let _cache: { data: Omit<UserStatus, "loading">; expiresAt: number } | null = null;
 const CACHE_TTL_MS = 30_000; // 30 seconds
+
+/** Paid features (2K, edits, Pro Reports, no watermark) are unlocked */
+export function hasProAccess(s: Pick<UserStatus, "isAdmin" | "isPremium">): boolean {
+  return s.isAdmin || s.isPremium;
+}
 
 export function useUserStatus(refreshKey?: number): UserStatus {
   const [status, setStatus] = useState<UserStatus>(DEFAULT);

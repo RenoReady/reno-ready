@@ -33,9 +33,8 @@ async function SuccessContent({
     }
   }
 
-  if (plan === "dayPass")  planLabel = "Day Pass — 24hr Unlimited";
-  if (plan === "monthly")  planLabel = "Monthly — Unlimited Access";
-  if (plan === "annual")   planLabel = "Annual — Best Value";
+  if (plan === "projectPass" || plan === "dayPass") planLabel = "7-Day Project Pass";
+  if (plan === "proMonthly" || plan === "monthly") planLabel = "Pro Monthly / Unlimited";
 
   // ── (Optional) Mark user as paid in Supabase ──────────────────
   // Uncomment once Supabase is configured:

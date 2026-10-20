@@ -8,7 +8,7 @@ import {
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
-  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp,
+  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp, Lock,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -24,7 +24,9 @@ import {
   BathroomSize, LightingOption,
   calcEstimatedCost,
 } from "@/lib/types";
-import PaywallModal from "@/components/ui/PaywallModal";
+import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
+import PreviewWatermark from "@/components/ui/PreviewWatermark";
+import { downloadImage, toJpeg } from "@/lib/watermark";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
@@ -43,7 +45,7 @@ import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
 import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
 import SourcingModal from "@/components/ui/SourcingModal";
-import { useUserStatus, bustUserStatusCache } from "@/lib/useUserStatus";
+import { useUserStatus, bustUserStatusCache, hasProAccess } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
 import {
   type ProjectBrief,
@@ -593,7 +595,11 @@ function ArchitectViewport({
   onGenerate, onRegionClick, onZoneClick, isGenerating,
   viewportState, generateDescription, generateError, activeZone, refinementMode,
   historyLength, historyIdx, onNavigateHistory, brushRef, brushSize = "M", onMaskChange,
+  watermark = false, onUpgrade,
 }: {
+  /** Free tier: diagonal watermark on the render, watermarked downloads */
+  watermark?:        boolean;
+  onUpgrade?:        () => void;
   /** "Not quite right?" highlighter */
   brushRef?:         React.Ref<BrushMaskHandle>;
   brushSize?:        BrushSize;
@@ -735,21 +741,12 @@ function ArchitectViewport({
           <button
             onClick={async () => {
               try {
-                let href = generatedImageUrl;
-                if (!generatedImageUrl.startsWith("data:")) {
-                  const res = await fetch(generatedImageUrl);
-                  const blob = await res.blob();
-                  href = URL.createObjectURL(blob);
-                }
-                const a = document.createElement("a");
-                a.href = href;
-                a.download = "My-Reno-Ready-Design.png";
-                a.click();
-                if (!generatedImageUrl.startsWith("data:")) URL.revokeObjectURL(href);
+                await downloadImage(generatedImageUrl, { watermark });
               } catch {
                 alert("Download failed — try right-clicking the image and saving manually.");
               }
             }}
+            title={watermark ? "Free previews download with a watermark" : "Download the full-resolution render"}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold",
               "border border-white/20 text-white/70 hover:text-white hover:border-white/40",
@@ -816,7 +813,7 @@ function ArchitectViewport({
             <div className="text-center max-w-xs px-4">
               <p className="text-sm font-bold text-white/80">Generation failed</p>
               <p className="text-xs text-white/40 mt-1 break-words">{generateError ?? "Something went wrong. Please try again."}</p>
-              <p className="text-xs text-emerald-400/80 mt-2 font-medium"><Check size={12} strokeWidth={3} className="inline -mt-0.5 mr-1" />This didn&apos;t use one of your free previews</p>
+              <p className="text-xs text-emerald-400/80 mt-2 font-medium"><Check size={12} strokeWidth={3} className="inline -mt-0.5 mr-1" />This didn&apos;t use up a preview</p>
             </div>
             <Button variant="outline" size="sm" onClick={onGenerate}
                     className="border-white/20 text-white/70 hover:bg-white/10 hover:border-white/40">
@@ -832,6 +829,7 @@ function ArchitectViewport({
                 ? <img src={generatedImageUrl} alt="AI redesign" className="w-full h-full object-cover" />  // eslint-disable-line
                 : <CSSBathroomScene floorTile={floorTile} wallTile={wallTile} vanity={vanity} tapware={tapware} />
               }
+              {watermark && generatedImageUrl && <PreviewWatermark />}
               <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
                 <div className="bg-terracotta/90 backdrop-blur-sm rounded-lg px-2.5 py-1 text-xs font-bold text-white tracking-wide shadow-warm-sm">AFTER</div>
                 <p className="text-[10px] text-white/70 font-medium bg-black/40 backdrop-blur-sm rounded px-2 py-0.5">AI Redesign — Staged &amp; Decluttered</p>
@@ -853,6 +851,12 @@ function ArchitectViewport({
             <input type="range" min={0} max={100} value={sliderPos}
                    onChange={(e) => setSliderPos(Number(e.target.value))}
                    className="absolute inset-0 w-full h-full opacity-0 cursor-col-resize" />
+            {watermark && generatedImageUrl && onUpgrade && (
+              <button type="button" onClick={onUpgrade}
+                className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md transition-colors hover:bg-black/75">
+                <Lock size={11} /> Remove watermark
+              </button>
+            )}
           </div>
 
         ) : (
@@ -861,6 +865,7 @@ function ArchitectViewport({
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={generatedImageUrl} alt="AI Preview" className="w-full h-full object-cover" />
+                {watermark && !refinementMode && <PreviewWatermark onUpgrade={isGenerating ? undefined : onUpgrade} />}
                 {/* "Not quite right?": paint the area to change with a see-through highlighter */}
                 {refinementMode && !isGenerating && (
                   <BrushMask ref={brushRef} imageUrl={generatedImageUrl} size={brushSize} onChange={onMaskChange} />
@@ -1239,7 +1244,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setRoomConfirmed(true);
   }, [room, setRoomType, setRoomConfirmed]);
   const [showAuthModal,      setShowAuthModal]      = useState(false);
-  const [showPaywallModal,   setShowPaywallModal]   = useState(false);
+  // Which upgrade pop-up is open (null = none)
+  const [paywall,            setPaywall]            = useState<PaywallReason | null>(null);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
   const [showHygieneModal,   setShowHygieneModal]   = useState(false);
   const [activeZone,         setActiveZone]         = useState<ZoneId | null>(null);
@@ -1387,7 +1393,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     if (!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium) {
       const effectiveCount = userStatus.generationCount + localGenerationBump;
       if (effectiveCount >= userStatus.freeLimit) {
-        setShowPaywallModal(true);
+        setPaywall("limit");
         return;
       }
     }
@@ -1453,7 +1459,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
           saveBuilderStateForAuth(true);
           setShowAuthModal(true);
         } else {
-          setShowPaywallModal(true);
+          setPaywall("limit");
         }
         setIsGenerating(false);
         setViewportState("idle");
@@ -1516,7 +1522,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     const store = useBuilderStore.getState();
 
     // Need a generated image to refine; fall back to original photo if somehow missing
-    const seedImage = store.generatedImageUrl ?? store.roomPhotoUrl;
+    const rawSeed = store.generatedImageUrl ?? store.roomPhotoUrl;
+    const seedImage = rawSeed ? await toJpeg(rawSeed).catch(() => rawSeed) : rawSeed;
     // the painted area, captured before the render is cleared for the new one
     const highlighted = maskStrokes > 0 ? await brushRef.current?.highlighted().catch(() => null) ?? null : null;
     const roomWord = store.roomType;
@@ -1565,7 +1572,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       });
 
       const data = await res.json();
-      if (data.upgrade_required) { setShowPaywallModal(true); return; }
+      if (data.upgrade_required) {
+        setPaywall(data.reason === "pro_feature" ? "refine" : "limit");
+        // put the render back so they don't lose it
+        setGeneratedImageUrl(store.generatedImageUrl);
+        setViewportState("ready");
+        return;
+      }
       if (!data.success) throw new Error(data.error ?? "Refinement failed");
 
       setGeneratedImageUrl(data.imageUrl ?? null);
@@ -1622,6 +1635,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   })();
 
   const showFreeCounter = !userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium;
+  // Free tier (once we know): watermark on, edits and Pro Reports locked
+  const proLocked       = !userStatus.loading && !hasProAccess(userStatus);
   const freeUsed        = userStatus.generationCount + localGenerationBump;
   const freeRemaining   = Math.max(0, userStatus.freeLimit - freeUsed);
   const freeExhausted   = freeUsed >= userStatus.freeLimit;
@@ -1631,7 +1646,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   const freeCounter = showFreeCounter && (
     <button
-      onClick={() => setShowPaywallModal(true)}
+      onClick={() => setPaywall("limit")}
       className={cn(
         "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300",
         freeExhausted
@@ -2315,6 +2330,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 brushRef={brushRef}
                 brushSize={brushSize}
                 onMaskChange={setMaskStrokes}
+                watermark={proLocked}
+                onUpgrade={() => setPaywall("watermark")}
                 historyLength={genHistory.length}
                 historyIdx={historyIdx}
                 onNavigateHistory={navigateHistory}
@@ -2328,7 +2345,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     <div className="flex gap-3">
                       {/* Orange — enter refinement mode */}
                       <button
-                        onClick={() => setRefinementMode(true)}
+                        onClick={() => (proLocked ? setPaywall("refine") : setRefinementMode(true))}
                         className={cn(
                           "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
                           "bg-terracotta text-white text-sm font-bold",
@@ -2336,8 +2353,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                           "transition-all duration-200",
                         )}
                       >
-                        <Sparkles size={16} />
+                        {proLocked ? <Lock size={15} /> : <Sparkles size={16} />}
                         Not quite right?
+                        {proLocked && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Pro</span>}
                       </button>
 
                       {/* Blue — proceed to full preview */}
@@ -2611,7 +2629,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       {paymentBanner && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-3 px-6 py-3.5 rounded-2xl bg-emerald-500 text-white shadow-warm-xl animate-fade-in">
           <CheckCircle2 size={18} strokeWidth={2.5} />
-          <span className="text-sm font-bold">Payment successful — unlimited previews unlocked!</span>
+          <span className="text-sm font-bold">Payment successful — 2K renders, edits and Pro Reports unlocked!</span>
         </div>
       )}
 
@@ -2622,11 +2640,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         />
       )}
 
-      {showPaywallModal && (
+      {paywall && (
         <PaywallModal
-          onClose={() => setShowPaywallModal(false)}
-          generationCount={userStatus.generationCount}
-          freeLimit={userStatus.freeLimit}
+          reason={paywall}
+          onClose={() => setPaywall(null)}
         />
       )}
 

@@ -8,7 +8,8 @@ import ProgressNav from "@/components/ui/ProgressNav";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { type AuthChangeEvent, type Session } from "@supabase/supabase-js";
-import { LogOut, RefreshCcw } from "lucide-react";
+import { LogOut, RefreshCcw, CreditCard, Loader2 } from "lucide-react";
+import { createBillingPortalSession } from "@/app/actions/stripe";
 
 const APP_ROUTES = ["/builder", "/preview", "/connect"];
 
@@ -63,6 +64,18 @@ export default function Header() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [menuOpen]);
+
+  // Stripe's customer portal: cancel or update the card in one click
+  const [billingBusy,  setBillingBusy]  = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+  async function handleManageBilling() {
+    setBillingBusy(true);
+    setBillingError(null);
+    const result = await createBillingPortalSession().catch(() => ({ error: "We couldn't open billing right now." }));
+    if ("url" in result) { window.location.href = result.url; return; }
+    setBillingError(result.error);
+    setBillingBusy(false);
+  }
 
   async function handleSignOut() {
     const supabase = createSupabaseBrowserClient();
@@ -201,6 +214,17 @@ export default function Header() {
 
                   {/* Actions */}
                   <div className="py-1.5">
+                    <button
+                      onClick={handleManageBilling}
+                      disabled={billingBusy}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-charcoal/70 hover:bg-sand-50 hover:text-charcoal transition-colors text-left disabled:opacity-60"
+                    >
+                      {billingBusy
+                        ? <Loader2 size={14} className="text-charcoal/40 flex-shrink-0 animate-spin" />
+                        : <CreditCard size={14} className="text-charcoal/40 flex-shrink-0" />}
+                      Manage or cancel subscription
+                    </button>
+                    {billingError && <p className="px-4 pb-2 text-xs text-charcoal/50">{billingError}</p>}
                     <button
                       onClick={handleSwitchAccount}
                       className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-charcoal/70 hover:bg-sand-50 hover:text-charcoal transition-colors text-left"

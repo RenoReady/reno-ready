@@ -26,6 +26,7 @@ import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { saveGeneration } from "@/lib/generations";
+import { FREE_GENERATION_LIMIT, hasActivePlan } from "@/lib/plans";
 
 // Vercel hobby plan caps serverless functions at 60 s.
 // We set 55 s here so we have time to return a clean error rather than a raw 504.
@@ -90,11 +91,10 @@ interface GenerateResponse {
   mock?:             boolean;         // true when running in mock mode
   error?:            string;
   upgrade_required?: boolean;         // true when the user must upgrade
-  reason?:           "auth_required" | "limit_reached";
+  reason?:           "auth_required" | "limit_reached" | "pro_feature";
+  /** Output resolution: 2K for paid plans, 1K for the free preview */
+  resolution?:       "1K" | "2K";
 }
-
-/** Free tier limit */
-const FREE_GENERATION_LIMIT = 3;
 
 // ── Helpers ────────────────────────────────────────────────────────
 const PLACEHOLDER_API_KEY = "your_google_api_key_here";
@@ -165,14 +165,17 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
 }
 
 // ── Models — tried in order ────────────────────────────────────────
-// gemini-3.1-flash-image       Nano Banana 2 — primary, 1K ($0.067/image)
+// gemini-3.1-flash-image       Nano Banana 2 — primary. 1K for the free
+//                              preview ($0.067/image), 2K for paid plans ($0.101)
 // gemini-3.1-flash-lite-image  Nano Banana 2 Lite — backup when the primary
 //                              is busy or failing; 1K only ($0.034/image)
 // gemini-2.5-flash-image was shut down by Google on 2 October 2026.
-const MODELS: { name: string; imageSize?: "1K" }[] = [
-  { name: "gemini-3.1-flash-image", imageSize: "1K" },
-  { name: "gemini-3.1-flash-lite-image" },
-];
+function modelsFor(size: "1K" | "2K"): { name: string; imageSize?: "1K" | "2K" }[] {
+  return [
+    { name: "gemini-3.1-flash-image", imageSize: size },
+    { name: "gemini-3.1-flash-lite-image" },
+  ];
+}
 
 // ── Output shape ───────────────────────────────────────────────────
 // Ask for the aspect ratio closest to the uploaded photo so the render
@@ -228,7 +231,7 @@ function isRetryable(err: unknown): boolean {
 }
 
 // ── Real Gemini handler ────────────────────────────────────────────
-async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
+async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promise<GenerateResponse> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -258,7 +261,7 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
   let lastError = "";
   let allBusy   = true;   // tracks whether every failure was a capacity 503
 
-  for (const { name: modelName, imageSize: size } of MODELS) {
+  for (const { name: modelName, imageSize: size } of modelsFor(resolution)) {
     const imageConfig = {
       ...(aspectRatio && { aspectRatio }),
       ...(size && { imageSize: size }),
@@ -292,6 +295,7 @@ async function handleReal(req: GenerateRequest): Promise<GenerateResponse> {
             success:     true,
             imageUrl:    `data:${mimeType};base64,${data}`,
             description: textPart?.text ?? "Your AI renovation preview is ready.",
+            resolution:  size ?? "1K",
           };
         }
 
@@ -355,6 +359,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     }
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    let hasPro = isAdmin;
 
     if (!isAdmin) {
       // Look up profile for subscription status + count
@@ -365,21 +370,25 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
         .eq("id", user.id)
         .single();
 
-      const plan        = profile?.subscription_plan ?? "free";
-      const expiresAt   = profile?.subscription_expires_at
-        ? new Date(profile.subscription_expires_at)
-        : null;
-      const isPremium   = ["day_pass", "paid", "monthly", "annual"].includes(plan)
-        && (!expiresAt || expiresAt > new Date());
+      hasPro = hasActivePlan(profile?.subscription_plan, profile?.subscription_expires_at);
 
-      if (!isPremium) {
+      if (!hasPro) {
+        // "Not quite right?" edits are a paid feature
+        if (body.mode === "refine") {
+          return NextResponse.json({
+            success:          false,
+            upgrade_required: true,
+            reason:           "pro_feature",
+            error:            "Edits are part of the 7-Day Project Pass and Pro Monthly. Upgrade to refine your design.",
+          });
+        }
         const count = profile?.generation_count ?? 0;
         if (count >= FREE_GENERATION_LIMIT) {
           return NextResponse.json({
             success:          false,
             upgrade_required: true,
             reason:           "limit_reached",
-            error:            `You've used all ${FREE_GENERATION_LIMIT} free previews. Upgrade to continue.`,
+            error:            "You've used your free preview. Upgrade to keep designing.",
           });
         }
       }
@@ -393,7 +402,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       result = await handleMock(body.selections);
     } else {
       console.info("[generate] Calling Gemini API…");
-      result = await handleReal(body);
+      result = await handleReal(body, hasPro ? "2K" : "1K");
     }
 
     // ── After a successful generation ─────────────────────────────

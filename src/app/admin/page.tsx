@@ -29,7 +29,7 @@ interface ProfileRow {
   id:                 string;
   email:              string | null;
   created_at:         string;
-  subscription_plan:  "free" | "paid" | "day_pass" | "monthly" | "annual" | null;
+  subscription_plan:  "free" | "paid" | "project_pass" | "day_pass" | "monthly" | "annual" | null;
   generation_count:   number | null;
 }
 
@@ -352,7 +352,7 @@ function PlanPill({ plan }: { plan: ProfileRow["subscription_plan"] }) {
       </span>
     );
   }
-  const label = plan === "day_pass" ? "Day Pass" : plan === "monthly" ? "Monthly" : plan === "annual" ? "Annual" : "Paid";
+  const label = plan === "project_pass" ? "7-Day Pass" : plan === "day_pass" ? "Day Pass" : plan === "monthly" ? "Monthly" : plan === "annual" ? "Annual" : "Paid";
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-terracotta/12 text-terracotta text-[11px] font-bold uppercase tracking-wider">
       <CreditCard size={9} strokeWidth={3} />

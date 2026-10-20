@@ -41,9 +41,12 @@ export function signOut(): void {
 interface AuthModalProps {
   onSuccess: () => void;
   onClose:   () => void;
+  /** Overrides the headline, e.g. when signing in to buy a plan */
+  title?:    string;
+  message?:  React.ReactNode;
 }
 
-export default function AuthModal({ onSuccess, onClose }: AuthModalProps) {
+export default function AuthModal({ onSuccess, onClose, title, message }: AuthModalProps) {
   const overlayRef          = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -93,7 +96,7 @@ export default function AuthModal({ onSuccess, onClose }: AuthModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[350] flex items-center justify-center p-4"
       style={{ background: "rgba(44,62,80,0.6)", backdropFilter: "blur(8px)" }}
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
@@ -126,10 +129,9 @@ export default function AuthModal({ onSuccess, onClose }: AuthModalProps) {
 
         {/* Headline */}
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-charcoal mb-2">Sign in to generate</h2>
+          <h2 className="text-2xl font-bold text-charcoal mb-2">{title ?? "Sign in to generate"}</h2>
           <p className="text-charcoal/60 text-sm leading-relaxed">
-            Get <strong>3 free AI previews</strong> just for signing in.
-            No credit card required.
+            {message ?? <>Your <strong>first AI preview is free</strong> when you sign in. No credit card required.</>}
           </p>
         </div>
 
@@ -173,7 +175,7 @@ export default function AuthModal({ onSuccess, onClose }: AuthModalProps) {
         </div>
 
         <p className="text-center text-xs text-charcoal/40">
-          After 3 free previews — from <strong className="text-charcoal/60">$19 AUD</strong> for unlimited 24-hour access.
+          Then from <strong className="text-charcoal/60">$19 AUD</strong> for a 7-Day Project Pass with unlimited 2K renders.
         </p>
       </div>
     </div>

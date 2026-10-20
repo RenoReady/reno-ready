@@ -271,7 +271,7 @@ export default function GalleryPage() {
               <ArrowRight size={20} className="ml-1 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
-          <p className="text-white/30 text-sm mt-4">3 free AI previews — no credit card required</p>
+          <p className="text-white/30 text-sm mt-4">Your first AI preview is free — no credit card required</p>
         </div>
       </section>
 

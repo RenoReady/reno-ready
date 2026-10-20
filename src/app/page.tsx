@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
 import ScrollReveal from "@/components/ui/ScrollReveal";
 import BuyButton from "@/components/ui/BuyButton";
+import { PLAN_COPY } from "@/lib/plans";
 import PricingMotion from "@/components/ui/PricingMotion";
 import Marquee from "@/components/ui/Marquee";
 import { type PlanKey } from "@/lib/plans";
@@ -85,8 +86,9 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 // ── Pricing card ───────────────────────────────────────────────────
 function PricingCard({
-  badge, badgeColor, title, price, period, sub, features, cta, featured, plan,
+  badge, badgeColor, title, price, period, sub, features, cta, featured, plan, note,
 }: {
+  note?:       string;
   badge?:      string;
   badgeColor?: string;
   title:       string;
@@ -125,8 +127,9 @@ function PricingCard({
           </li>
         ))}
       </ul>
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col gap-2">
         <BuyButton plan={plan} label={cta} featured={featured} />
+        {note && <p className="text-xs leading-snug text-charcoal/45 text-center">{note}</p>}
       </div>
     </div>
   );
@@ -152,12 +155,11 @@ const jsonLd = {
     "@type": "AggregateOffer",
     "priceCurrency": "AUD",
     "lowPrice": "0",
-    "highPrice": "69",
+    "highPrice": "29",
     "offers": [
-      { "@type": "Offer", "name": "Free",      "price": "0",  "priceCurrency": "AUD", "description": "3 free AI previews, no credit card required" },
-      { "@type": "Offer", "name": "Day Pass",  "price": "19", "priceCurrency": "AUD", "description": "Unlimited AI renders for 24 hours"            },
-      { "@type": "Offer", "name": "Monthly",   "price": "29", "priceCurrency": "AUD", "description": "Unlimited AI renders, cancel anytime"          },
-      { "@type": "Offer", "name": "Annual",    "price": "69", "priceCurrency": "AUD", "description": "Full year of unlimited access"                 },
+      { "@type": "Offer", "name": "Free",                    "price": "0",  "priceCurrency": "AUD", "description": "1 free AI preview, no credit card required" },
+      { "@type": "Offer", "name": "7-Day Project Pass",      "price": "19", "priceCurrency": "AUD", "description": "One-time payment: 7 days of unlimited 2K renders, edits and PDF Pro Reports" },
+      { "@type": "Offer", "name": "Pro Monthly / Unlimited", "price": "29", "priceCurrency": "AUD", "description": "Unlimited access, multi-room PDF reports and contractor lead tools. 7-day free trial" },
     ],
   },
   "featureList": [
@@ -235,7 +237,7 @@ export default function LandingPage() {
 
                 {/* Trust badges */}
                 <div className="flex flex-wrap items-center gap-5 pt-1">
-                  {["3 free previews", "No credit card", "Bathrooms · Kitchens · Bedrooms"].map((b) => (
+                  {["1 free preview", "No credit card", "Bathrooms · Kitchens · Bedrooms"].map((b) => (
                     <div key={b} className="flex items-center gap-2 text-sm font-medium text-charcoal/60">
                       <CheckCircle2 size={15} className="text-terracotta" />
                       {b}
@@ -282,7 +284,7 @@ export default function LandingPage() {
               <span className="text-terracotta/75 font-semibold">one platform</span>
             </p>
             <span className="text-white/20 text-base select-none">◆</span>
-            <p className="text-white/45 text-xs">3 free AI previews — no credit card required</p>
+            <p className="text-white/45 text-xs">Your first AI preview is free — no credit card required</p>
             <span className="text-white/20 text-base select-none">◆</span>
             <p className="text-white/45 text-xs">
               Average saving:{" "}
@@ -605,74 +607,38 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <p className="text-sm font-bold text-terracotta uppercase tracking-widest mb-3">Simple, Transparent Pricing</p>
-            <h2 className="text-4xl font-bold text-charcoal mb-4">Start free. Upgrade when you&apos;re ready.</h2>
-            <p className="text-lg text-charcoal/55">
-              Get 3 free previews on sign-up. Design any room. No contracts, cancel anytime.
+            <h2 className="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Unlock Full 2K Designs &amp; Contractor PDF Reports</h2>
+            <p className="text-base sm:text-lg text-charcoal/55 max-w-2xl mx-auto">
+              Your first preview is free. Upgrade to remove the watermark, edit any detail with &ldquo;Not quite right?&rdquo; and hand your builder a PDF Pro Report.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 items-start mt-8">
-            <PricingMotion index={0}>
-              <PricingCard
-                plan="dayPass"
-                badge="$19 First Access"
-                badgeColor="bg-emerald-500"
-                title="DAY PASS"
-                price="$19"
-                period="AUD · 24 hrs"
-                sub="Unlimited generations for the day"
-                features={[
-                  "Unlimited AI renders for 24 hours",
-                  "All rooms: bathroom, kitchen, bedroom",
-                  "High Definition previews",
-                  "Instant cost estimate per room",
-                  "Download your Reno Brief",
-                ]}
-                cta="Try it today"
-              />
-            </PricingMotion>
-            <PricingMotion index={1}>
-              <PricingCard
-                plan="monthly"
-                badge="Most Popular"
-                title="MONTHLY"
-                price="$29"
-                period="AUD / mo"
-                sub="Unlimited generations, cancel anytime"
-                features={[
-                  "Everything in Day Pass",
-                  "Unlimited AI renders all month",
-                  "Ultra HD previews (2K)",
-                  "Multi-room project PDF reports",
-                  "Priority generation queue",
-                  "Email support",
-                ]}
-                cta="Get Started — Most Popular"
-                featured
-              />
-            </PricingMotion>
-            <PricingMotion index={2}>
-              <PricingCard
-                plan="annual"
-                title="ANNUAL"
-                price="$69"
-                period="AUD / yr"
-                sub="Best value · save 80% vs monthly"
-                features={[
-                  "Everything in Monthly",
-                  "Full year of unlimited access",
-                  "Builder-share links",
-                  "Best per-preview value",
-                  "Dedicated support",
-                ]}
-                cta="Get Annual Access"
-              />
-            </PricingMotion>
+          <div className="grid md:grid-cols-2 gap-6 items-stretch mt-8 max-w-4xl mx-auto">
+            {(["projectPass", "proMonthly"] as const).map((key, i) => {
+              const c = PLAN_COPY[key];
+              return (
+                <PricingMotion key={key} index={i}>
+                  <PricingCard
+                    plan={key}
+                    badge={c.badge}
+                    badgeColor={key === "proMonthly" ? undefined : "bg-charcoal"}
+                    title={c.title.toUpperCase()}
+                    price={c.price}
+                    period={c.period}
+                    sub={c.sub}
+                    features={c.features}
+                    cta={c.cta}
+                    note={c.note}
+                    featured={key === "proMonthly"}
+                  />
+                </PricingMotion>
+              );
+            })}
           </div>
 
           {/* Guarantee strip */}
           <div className="flex flex-wrap items-center justify-center gap-8 mt-10 text-sm text-charcoal/50">
-            {["30-Day Money-Back Guarantee", "No Contracts", "Cancel Anytime"].map((t) => (
+            {["No contracts, cancel anytime in 1-click", "1 free preview, no card needed", "30-Day Money-Back Guarantee"].map((t) => (
               <div key={t} className="flex items-center gap-2">
                 <BadgeCheck size={16} className="text-terracotta/60" />
                 {t}
@@ -706,8 +672,8 @@ export default function LandingPage() {
                 a: "Our estimates use current Australian market averages for materials and labour, including real invoice data from QLD projects. While every home is unique, the estimate gives you a realistic baseline. We also surface hidden costs — like asbestos removal, plumbing relocations, and electrical rough-ins — that most builders don't mention upfront." },
               { q: "Does the AI understand my specific room layout?",
                 a: "Yes. When you upload a photo of your current room, our AI analyses the image to identify plumbing points, walls, windows, and structural elements — ensuring the redesign fits your actual space. Without a photo, we generate a high-quality concept room using your selected materials from scratch." },
-              { q: "What are the 3 free previews?",
-                a: "Every account starts with 3 complimentary AI generation credits — no credit card required. Each credit can be used on any room type. Once used, upgrade to a Day Pass ($19), Monthly ($29/mo), or Annual ($69/yr) plan for unlimited access across all rooms." },
+              { q: "What do I get for free, and what do the paid plans add?",
+                a: "Every account gets 1 free AI preview of any room — no credit card required. Free previews carry a small watermark. The 7-Day Project Pass ($19, one-time) gives you 7 days of unlimited 2K renders, \u201cNot quite right?\u201d edits and downloadable PDF Pro Reports. Pro Monthly ($29/mo) includes everything, plus multi-room reports and contractor lead tools, and starts with a 7-day free trial. Cancel anytime in 1-click." },
             ].map(({ q, a }, i) => (
               <ScrollReveal key={q} delay={i * 0.07}>
                 <FaqItem q={q} a={a} />
@@ -724,7 +690,7 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-terracotta/20 border border-terracotta/30 w-fit mx-auto mb-8">
             <Zap size={14} className="text-terracotta" />
-            <span className="text-sm font-semibold text-terracotta">3 free previews on sign-up · Any room</span>
+            <span className="text-sm font-semibold text-terracotta">1 free preview on sign-up · Any room</span>
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6 text-balance">
             Ready to reimagine your home?

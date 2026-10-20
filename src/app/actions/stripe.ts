@@ -56,7 +56,9 @@ export async function createCheckoutSession(
     if (!isPlanKey(plan)) return { error: "Unknown plan" };
     const stripe = getStripe();
     const base   = await getBaseUrl();
-    const { mode, priceId, trialDays } = PLANS[plan];
+    const { mode, trialDays } = PLANS[plan];
+    // A sandbox (see .env.development.local) brings its own price IDs; live uses the catalogue's
+    const priceId = (plan === "projectPass" ? process.env.STRIPE_PRICE_PROJECT_PASS : process.env.STRIPE_PRICE_PRO_MONTHLY)?.trim() || PLANS[plan].priceId;
 
     // ── Resolve the current user so the webhook can attribute the purchase ──
     let userId: string | undefined;

@@ -34,9 +34,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Slack after a period ends so a renewal a few minutes late doesn't lock anyone out */
 const RENEWAL_GRACE_MS = DAY_MS;
 
-/** profiles.subscription_plan value for each plan (legacy checkouts included) */
+/**
+ * profiles.subscription_plan value for each plan (legacy checkouts included).
+ * The column's check constraint only allows free/paid/day_pass/monthly/annual,
+ * so the 7-Day Project Pass is stored as "day_pass"; its 7-day expiry date is
+ * what sets the length.
+ */
 function planValue(plan: string): string {
-  if (plan === "projectPass" || plan === "dayPass") return "project_pass";
+  if (plan === "projectPass" || plan === "dayPass") return "day_pass";
   if (plan === "proMonthly"  || plan === "monthly") return "monthly";
   if (plan === "annual") return "annual";
   return "paid";

@@ -74,7 +74,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 export const FormTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, hint, error, className, id, ...props }, ref) => {
+  ({ label, hint, error, leftIcon, className, id, ...props }, ref) => {
     const uid = useId();
     const inputId = id ?? uid;
 
@@ -88,12 +88,19 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             {label}
           </label>
         )}
+        <div className="relative">
+        {leftIcon && (
+          <span className="absolute left-4 top-3.5 text-charcoal/40 pointer-events-none">
+            {leftIcon}
+          </span>
+        )}
         <textarea
           ref={ref}
           id={inputId}
           rows={4}
           className={cn(
             "w-full rounded-xl border bg-white/80 px-4 py-3 text-charcoal",
+            !!leftIcon && "pl-11",
             "placeholder:text-charcoal/30 text-base resize-none",
             "transition-all duration-150 outline-none",
             "border-sand-300",
@@ -103,6 +110,7 @@ export const FormTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           )}
           {...props}
         />
+        </div>
         {hint && !error && <p className="text-xs text-charcoal/50">{hint}</p>}
         {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       </div>

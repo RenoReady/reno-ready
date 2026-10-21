@@ -55,7 +55,7 @@ export default function PrivacyPage() {
               <><strong>Drafts.</strong> While you design, your choices, room photo and latest preview are saved automatically so you can pick up where you left off. On your device they&apos;re kept in your browser&apos;s storage. Once you&apos;re signed in, they&apos;re also saved privately to your account and listed under My Account, where you can delete any draft at any time. We keep your 12 most recent drafts.</>,
               <><strong>Usage of free previews.</strong> How many previews you&apos;ve generated, so we can apply the free limit.</>,
               <><strong>Payments.</strong> Your plan and when it expires. Card details are entered directly with Stripe, our payment processor; we never see or store your full card number.</>,
-              <><strong>Builder enquiries.</strong> If you ask to be connected with a builder, the name, email, phone number and message you enter, together with your design and estimate.</>,
+              <><strong>Builder enquiries.</strong> If you ask to be connected with a builder, the name, email, phone number, property address, preferred timeline and message you enter, together with your design, estimate and the PDF report made from them. We keep each brief so we can follow it up, and if you were signed in, you can see the briefs you&apos;ve sent under My Account.</>,
               <><strong>Technical information.</strong> Standard server logs from our hosting provider (such as IP address, browser type and pages visited), used to keep the site running and secure.</>,
             ]} />
           </Section>

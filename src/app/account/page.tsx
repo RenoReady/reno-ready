@@ -12,7 +12,7 @@ import Link from "next/link";
 import {
   Sparkles, History, Image as ImageIcon, Lock, Check, CreditCard, Loader2, Trash2,
   ArrowRight, Download, X, Bath, ChefHat, BedDouble, MessageSquare, Crown, CalendarClock,
-  Link2, Copy, ExternalLink, Palette,
+  Link2, Copy, ExternalLink, Palette, Hammer, FileText,
 } from "lucide-react";
 import BrandForm from "@/components/account/BrandForm";
 import AuthModal from "@/components/auth/AuthModal";
@@ -27,7 +27,8 @@ import type { RoomType } from "@/lib/roomTypes";
 import type { AccountResponse } from "@/app/api/account/route";
 
 interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null }
-import { cn } from "@/lib/utils";
+interface BriefSummary { id: string; createdAt: string; room: string; estimate: number; timeline: string | null; address: string | null; reportUrl: string | null; renderUrl: string | null }
+import { cn, formatAUD } from "@/lib/utils";
 
 const ROOM_ICON: Record<RoomType, typeof Bath> = { bathroom: Bath, kitchen: ChefHat, bedroom: BedDouble };
 const roomName = (r: string) => r[0].toUpperCase() + r.slice(1);
@@ -78,6 +79,7 @@ export default function AccountPage() {
   // Pro: client share links
   const [shares, setShares] = useState<ShareSummary[] | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [briefs, setBriefs] = useState<BriefSummary[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -88,6 +90,7 @@ export default function AccountPage() {
       setAccount(acct);
       setState("ready");
       setDrafts(await listAccountDrafts() ?? []);
+      fetch("/api/leads", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { briefs: [] })).then((d) => setBriefs(d.briefs ?? [])).catch(() => setBriefs([]));
       if (acct.plan.kind === "pro" || acct.plan.kind === "admin") {
         const r = await fetch("/api/shares", { cache: "no-store" }).catch(() => null);
         setShares(r?.ok ? (await r.json()).shares : []);
@@ -353,6 +356,46 @@ export default function AccountPage() {
                     {roomName(r.roomType)} · {fmtDate(r.createdAt)}
                   </span>
                 </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Builder briefs ───────────────────────────────────── */}
+        <section id="briefs" className="scroll-mt-32">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-bold text-charcoal"><Hammer size={18} className="text-terracotta" /> Builder briefs</h2>
+              <p className="text-sm text-charcoal/50">Designs you&apos;ve sent to be quoted. We&apos;ll be in touch by email or phone.</p>
+            </div>
+            <Link href="/connect" className="flex items-center gap-1.5 rounded-xl bg-charcoal px-4 py-2 text-xs font-bold text-white hover:bg-charcoal/90">
+              <MessageSquare size={14} /> Send a brief
+            </Link>
+          </div>
+          {briefs === null ? (
+            <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-sand-300"><Loader2 className="animate-spin text-charcoal/30" /></div>
+          ) : briefs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-sand-300 bg-white/40 px-6 py-8 text-center text-sm text-charcoal/50">
+              No briefs yet. When you&apos;re happy with a design, tap &ldquo;Send my brief to a builder&rdquo; and it&apos;ll show here.
+            </div>
+          ) : (
+            <div className="flex flex-col divide-y divide-sand-100 overflow-hidden rounded-2xl border border-sand-200 bg-white/80">
+              {briefs.map((b) => (
+                <div key={b.id} className="flex items-center gap-3 p-3">
+                  {b.renderUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={b.renderUrl} alt="" className="h-12 w-16 flex-shrink-0 rounded-lg object-cover" />
+                    : <div className="h-12 w-16 flex-shrink-0 rounded-lg bg-sand-100" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-charcoal">{b.room} brief · <span className="tabular-nums">{formatAUD(b.estimate)}</span></p>
+                    <p className="truncate text-xs text-charcoal/50">Sent {fmtDate(b.createdAt)}{b.timeline ? ` · ${b.timeline}` : ""}{b.address ? ` · ${b.address}` : ""}</p>
+                  </div>
+                  {b.reportUrl && (
+                    <a href={b.reportUrl} target="_blank" rel="noopener" className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-sand-200 px-2.5 py-2 text-xs font-bold text-charcoal/65 hover:border-terracotta/40 hover:text-terracotta">
+                      <FileText size={13} /><span className="hidden sm:inline">PDF</span>
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           )}

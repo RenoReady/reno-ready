@@ -86,7 +86,7 @@ export async function PUT(req: NextRequest) {
       // trim empty margins (logos often come with lots), then cap the size
       const trimmed = await sharp(raw, { density: 300 }).trim().png().toBuffer().catch(() => sharp(raw, { density: 300 }).png().toBuffer());
       const png = await sharp(trimmed).resize(800, 300, { fit: "inside", withoutEnlargement: true }).png().toBuffer();
-      const { error } = await store.upload(`${user.id}/logo.png`, png, { contentType: "image/png", upsert: true });
+      const { error } = await store.upload(`${user.id}/logo.png`, png, { contentType: "image/png", upsert: true, cacheControl: "0" });
       if (error) throw new Error(error.message);
       hasLogo = true;
     } catch (err) {

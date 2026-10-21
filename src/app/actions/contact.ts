@@ -3,9 +3,9 @@
 /**
  * Contact / Connect submission server action.
  *
- * Sends an email notification to the Reno Ready inbox via Resend
- * containing the user's contact details, design selections, and
- * estimated budget.
+ * Saves the brief (see leadStore — admin dashboard + My Account), then emails
+ * it to the Reno Ready inbox via Resend with the Pro Report attached. Saving
+ * comes first, so a lead is kept even if the email fails.
  *
  * Required env vars:
  *   RESEND_API_KEY              — from resend.com/api-keys
@@ -16,6 +16,8 @@
 import { Resend } from "resend";
 import { LEAD_NOTIFICATION_DESTINATION, RESEND_FROM } from "@/lib/config";
 import type { ProReportInput } from "@/lib/generateProReportPDF";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { saveLead, markLeadEmailed } from "@/lib/leadStore";
 
 // ── Inbound payload from the Connect form ──────────────────────────
 export interface ConnectSubmission {
@@ -266,12 +268,23 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
     return { ok: false, error: "Please enter a valid email." };
 
+  // Build the Pro Report here so the attachment never depends on the client's browser
+  const { attachment, reportProblem } = await buildReportAttachment(payload);
+  if (reportProblem) console.error("[connect] report:", reportProblem);
+
+  // Keep the brief before anything else can go wrong
+  const leadId = await keepLead(payload, attachment?.[0]?.content ?? null).catch((err) => {
+    console.error("[connect] couldn't save the lead:", err instanceof Error ? err.message : err);
+    return null;
+  });
+
   // Mock mode — log only, return success so dev/staging works without a key
   if (isMock()) {
     console.info("[connect] MOCK MODE — Resend key not configured. Submission logged only:", {
       name:  payload.name,
       email: payload.email,
       phone: payload.phone,
+      leadId,
     });
     return { ok: true, mock: true };
   }
@@ -279,10 +292,6 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
   const resend      = new Resend(process.env.RESEND_API_KEY!);
   const destination = LEAD_NOTIFICATION_DESTINATION;
   const fromAddress = RESEND_FROM;
-
-  // Build the Pro Report here so the attachment never depends on the client's browser
-  const { attachment, reportProblem } = await buildReportAttachment(payload);
-  if (reportProblem) console.error("[connect] report:", reportProblem);
 
   try {
     const { error } = await resend.emails.send({
@@ -296,13 +305,48 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
 
     if (error) {
       console.error("[connect] Resend error:", error);
+      // the brief is saved, so it's on the admin dashboard even though the email didn't go
+      if (leadId) return { ok: true };
       return { ok: false, error: error.message ?? "Email send failed." };
     }
 
+    if (leadId) await markLeadEmailed(leadId, true).catch(() => {});
     return { ok: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error("[connect] submitConnectForm failed:", msg);
+    if (leadId) return { ok: true };
     return { ok: false, error: msg };
   }
+}
+
+/** Saves the brief with its PDF and render; returns the lead id */
+async function keepLead(payload: ConnectSubmission, pdf: Buffer | null): Promise<string> {
+  let userId: string | null = null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+  } catch { /* signed out: the brief is still saved, just not listed on an account */ }
+
+  const d = payload.design;
+  const clip = (v: string | null | undefined, n: number) => v?.trim().slice(0, n) || null;
+  const render = payload.reportInput?.generatedImageUrl;
+  return saveLead({
+    userId,
+    name:       payload.name.trim().slice(0, 120),
+    email:      payload.email.trim().slice(0, 160),
+    phone:      clip(payload.phone, 40),
+    address:    clip(payload.address, 160),
+    timeline:   clip(payload.timeline, 60),
+    message:    clip(payload.message, 1_500),
+    room:       (d.room ?? "Bathroom").slice(0, 20),
+    estimate:   Number.isFinite(d.estimatedCost) ? d.estimatedCost : 0,
+    budget:     Number.isFinite(d.budget) ? d.budget : null,
+    rows:       (d.rows ?? []).slice(0, 20).map((r) => ({ label: String(r.label).slice(0, 40), value: String(r.value ?? "").slice(0, 120) })),
+    structural: (d.structural ?? []).slice(0, 20).map((x) => String(x).slice(0, 80)),
+    designNote: clip(d.customNote, 1_000),
+  }, {
+    pdf,
+    renderJpeg: typeof render === "string" && render.startsWith("data:image/jpeg;base64,") && render.length < 2_500_000 ? render : null,
+  });
 }

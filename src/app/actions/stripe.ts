@@ -84,6 +84,8 @@ export async function createCheckoutSession(
       customer_email:      email,
       metadata: { plan },            // lets the webhook know which plan was purchased
       line_items: [{ price: priceId, quantity: 1 }],
+      // "I agree to the Terms of Service" tickbox (the link is set in Stripe → Settings → Public details)
+      consent_collection: { terms_of_service: "required" },
       ...(mode === "subscription" && {
         subscription_data: { metadata: { plan, userId } },
       }),

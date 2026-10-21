@@ -14,12 +14,14 @@
 import { redirect } from "next/navigation";
 import {
   Users, CreditCard, DollarSign, Sparkles,
-  ImageIcon, Mail, AlertTriangle,
+  ImageIcon, Mail, AlertTriangle, Hammer, FileText, Phone, MapPin,
 } from "lucide-react";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { tierFor } from "@/lib/plans";
 import { fetchRevenue } from "@/lib/stripeRevenue";
+import { listLeads, type LeadWithLinks } from "@/lib/leadStore";
+import LeadStatusSelect from "./LeadStatusSelect";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
 import { cn, formatAUD } from "@/lib/utils";
 import UserDesigns, { type AdminDesign } from "./UserDesigns";
@@ -124,8 +126,15 @@ export default async function AdminPage() {
     redirect("/?admin_error=forbidden");
   }
 
-  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }, revenue] =
-    await Promise.all([fetchProfiles(), fetchDesigns(), fetchRevenue(ADMIN_EMAIL)]);
+  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }, revenue, leadsResult] =
+    await Promise.all([
+      fetchProfiles(), fetchDesigns(), fetchRevenue(ADMIN_EMAIL),
+      listLeads().then((leads) => ({ leads, error: null as string | null })).catch((e: unknown) => ({ leads: [] as LeadWithLinks[], error: e instanceof Error ? e.message : "Couldn't load leads" })),
+    ]);
+  const { leads, error: leadsError } = leadsResult;
+  const monthKey  = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }).slice(0, 7);
+  const leadsThisMonth = leads.filter((l) => monthKey(l.createdAt) === monthKey(new Date().toISOString())).length;
+  const openLeads = leads.filter((l) => l.status === "new").length;
 
   const designsByUser = new Map<string, StoredDesign[]>();
   for (const d of designs) designsByUser.set(d.userId, [...(designsByUser.get(d.userId) ?? []), d]);
@@ -164,7 +173,7 @@ export default async function AdminPage() {
         </header>
 
         {/* ── Stats grid ──────────────────────────────────────── */}
-        <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+        <section className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-10">
           <StatCard icon={Users}     accent="terracotta" label="Total Users"      value={totalUsers.toString()} />
           <StatCard icon={CreditCard} accent="emerald"   label="Paid Users"       value={paidUsers.toString()} hint={`${passUsers} pass · ${proUsers} Pro · ${freeUsers} free`} />
           <StatCard icon={DollarSign} accent="terracotta" label="Total Revenue"
@@ -172,9 +181,29 @@ export default async function AdminPage() {
                     hint={revenueOk
                       ? `${formatAUD(revenue.thisMonth / 100)} this month · ${revenue.payments} payment${revenue.payments === 1 ? "" : "s"}${revenue.refunded ? ` · ${formatAUD(revenue.refunded / 100)} refunded` : ""}${revenue.partial ? " · latest 2,000 only" : ""}`
                       : `Stripe: ${revenue.error}`} />
+          <StatCard icon={Hammer}     accent="emerald"    label="Builder Leads"    value={leads.length.toString()} hint={`${leadsThisMonth} this month · ${openLeads} new`} />
           <StatCard icon={Sparkles}   accent="charcoal"   label="AI Generations"   value={totalGenerations.toString()} />
           <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={storedDesigns.toString()}
                     hint={totalGenerations > storedDesigns ? "Saving started 8 Oct 2026" : undefined} />
+        </section>
+
+        {/* ── Builder leads ───────────────────────────────────── */}
+        <section className="mb-10">
+          <div className="flex items-end justify-between mb-4 gap-4 flex-wrap">
+            <h2 className="text-2xl font-bold text-charcoal">Builder leads</h2>
+            <p className="text-sm text-charcoal/45">Every brief sent from &ldquo;Send my brief to a builder&rdquo;, newest first</p>
+          </div>
+          {leadsError ? (
+            <SetupCard title="Leads couldn't load" detail={leadsError} steps={["Check SUPABASE_SERVICE_ROLE_KEY is set, then reload."]} />
+          ) : leads.length === 0 ? (
+            <div className="rounded-2xl bg-white border border-sand-200 p-10 text-center">
+              <p className="text-sm text-charcoal/55">No briefs yet. They&apos;ll appear here as soon as someone sends one.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {leads.map((l) => <LeadCard key={l.id} lead={l} />)}
+            </div>
+          )}
         </section>
 
         {/* ── User table ──────────────────────────────────────── */}
@@ -334,6 +363,47 @@ function StatCard({
       <p className="text-xs font-semibold text-charcoal/45 uppercase tracking-wider mb-1">{label}</p>
       <p className="text-2xl font-bold text-charcoal tabular-nums">{value}</p>
       {hint && <p className="text-[11px] text-charcoal/40 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+function LeadCard({ lead: l }: { lead: LeadWithLinks }) {
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-sand-200 bg-white p-4 shadow-warm-sm sm:flex-row">
+      {l.renderUrl
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={l.renderUrl} alt="" className="h-28 w-full flex-shrink-0 rounded-xl object-cover sm:w-40" />
+        : <div className="flex h-28 w-full flex-shrink-0 items-center justify-center rounded-xl bg-sand-100 text-xs text-charcoal/35 sm:w-40">No render</div>}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-base font-bold text-charcoal">{l.name} <span className="text-sm font-semibold text-charcoal/45">· {l.room}</span></p>
+            <p className="text-xs text-charcoal/45">{formatDate(l.createdAt)}{l.userId ? " · signed-in user" : " · guest"}{l.emailed ? "" : " · email not sent"}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-charcoal px-2.5 py-1 text-xs font-bold text-white tabular-nums">{formatAUD(l.estimate)}</span>
+            <LeadStatusSelect id={l.id} status={l.status} />
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-charcoal/70">
+          <a href={`mailto:${l.email}`} className="flex items-center gap-1 hover:text-terracotta"><Mail size={12} /> {l.email}</a>
+          {l.phone && <a href={`tel:${l.phone}`} className="flex items-center gap-1 hover:text-terracotta"><Phone size={12} /> {l.phone}</a>}
+          {l.address && <span className="flex items-center gap-1"><MapPin size={12} /> {l.address}</span>}
+          {l.timeline && <span className="rounded-full bg-terracotta/10 px-2 py-0.5 font-semibold text-terracotta">{l.timeline}</span>}
+        </div>
+        {l.message && <p className="mt-2 line-clamp-2 text-xs italic text-charcoal/60">&ldquo;{l.message}&rdquo;</p>}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {l.reportUrl && (
+            <a href={l.reportUrl} target="_blank" rel="noopener" className="flex items-center gap-1.5 rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-bold text-charcoal/70 hover:border-terracotta/40 hover:text-terracotta">
+              <FileText size={13} /> Pro Report PDF
+            </a>
+          )}
+          <a href={`mailto:${l.email}?subject=${encodeURIComponent(`Re: Your Reno Ready ${l.room.toLowerCase()} design`)}`}
+            className="flex items-center gap-1.5 rounded-lg bg-terracotta px-3 py-1.5 text-xs font-bold text-white hover:bg-terracotta/90">
+            <Mail size={13} /> Reply
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

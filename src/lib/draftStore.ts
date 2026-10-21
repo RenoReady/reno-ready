@@ -95,7 +95,7 @@ export async function saveDraft(userId: string, input: {
     }
     const buf = decodeImage(value);
     if (!buf) throw new Error(`Invalid ${field} image`);
-    const { error } = await store.upload(`${base}/${name}`, buf, { contentType: "image/jpeg", upsert: true });
+    const { error } = await store.upload(`${base}/${name}`, buf, { contentType: "image/jpeg", upsert: true, cacheControl: "0" });
     if (error) throw new Error(`Couldn't save the ${field}: ${error.message}`);
     if (field === "photo") hasPhoto = true; else hasRender = true;
   }
@@ -113,7 +113,7 @@ export async function saveDraft(userId: string, input: {
     description: input.description === undefined ? prev?.description ?? null : input.description?.slice(0, 2_000) ?? null,
     snapshot:    input.snapshot,
   };
-  const { error } = await store.upload(`${base}/draft.json`, Buffer.from(JSON.stringify(record)), { contentType: "application/json", upsert: true });
+  const { error } = await store.upload(`${base}/draft.json`, Buffer.from(JSON.stringify(record)), { contentType: "application/json", upsert: true, cacheControl: "0" });
   if (error) throw new Error(`Couldn't save the draft: ${error.message}`);
 
   if (!prev) await pruneDrafts(userId);

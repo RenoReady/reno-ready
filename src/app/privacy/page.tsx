@@ -97,9 +97,11 @@ export default function PrivacyPage() {
           <Section id="storage" title="How long we keep it">
             <p>
               We keep your account and stored designs while your account is active, so you and we can refer back to
-              them. If you ask us to delete your account, we delete your profile, stored designs and preview images.
-              Builder enquiries are kept in our email records for as long as needed to follow up your project.
-              Payment records are kept as required by Australian tax law.
+              them. You can delete your account yourself at any time under My Account. That permanently deletes your
+              profile, sign-in, AI designs and exports, drafts and room photos, client share links, report branding and
+              the builder briefs saved to your account, and cancels any active subscription. Copies of builder briefs
+              already emailed to us are deleted from our email records when you ask us to. Payment records are kept by
+              Stripe as required by Australian tax law.
             </p>
           </Section>
 
@@ -124,7 +126,7 @@ export default function PrivacyPage() {
             <List items={[
               "You can use parts of the site, such as the guides and cost information, without an account.",
               "You can ask to see the personal information we hold about you, or ask us to correct it.",
-              "You can ask us to delete your account and stored designs at any time.",
+              "You can delete your account and stored designs at any time under My Account, or ask us to do it for you.",
             ]} />
             <p>
               To make a request, email us at <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold text-terracotta hover:underline">{CONTACT_EMAIL}</a>.

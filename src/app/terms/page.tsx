@@ -200,8 +200,10 @@ export default function TermsPage() {
 
           <Section id="ending" title="15. Ending your use">
             <p>
-              You can stop using Reno Ready at any time. To delete your account and data, email us and we&apos;ll do it
-              (see our Privacy Policy). Deleting your account doesn&apos;t cancel a Pro subscription, so cancel that first.
+              You can stop using Reno Ready at any time. To delete your account and data, use &ldquo;Delete my
+              account&rdquo; under My Account (see our Privacy Policy for what&apos;s removed). Deleting your account
+              cancels an active Pro subscription straight away, so you won&apos;t be charged again; the rest of the
+              current period, or of a 7-Day Project Pass, isn&apos;t refunded.
             </p>
           </Section>
 

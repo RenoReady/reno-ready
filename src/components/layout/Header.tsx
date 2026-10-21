@@ -32,6 +32,7 @@ export default function Header() {
 
   const [user,     setUser]     = useState<UserInfo | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Load session once on mount, then listen for auth changes
@@ -188,9 +189,11 @@ export default function Header() {
                 title={user.email}
                 aria-label="Account menu"
               >
-                {user.avatarUrl ? (
+                {user.avatarUrl && !avatarFailed ? (
+                  /* Google only serves profile photos to requests without a referrer */
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full flex-shrink-0 object-cover" />
+                  <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" onError={() => setAvatarFailed(true)}
+                       className="w-7 h-7 rounded-full flex-shrink-0 object-cover" />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-terracotta/15 flex items-center justify-center flex-shrink-0">
                     <span className="text-[10px] font-bold text-terracotta">{user.initials}</span>

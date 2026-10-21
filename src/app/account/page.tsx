@@ -48,6 +48,7 @@ export default function AccountPage() {
   const [billingBusy,  setBillingBusy]  = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -114,9 +115,9 @@ export default function AccountPage() {
         {/* ── Profile + plan ───────────────────────────────────── */}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <div className="flex items-center gap-4 rounded-3xl border border-sand-200 bg-white/80 p-5 sm:p-6 shadow-warm-sm">
-            {account.avatarUrl
+            {account.avatarUrl && !avatarFailed
               // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={account.avatarUrl} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
+              ? <img src={account.avatarUrl} alt="" referrerPolicy="no-referrer" onError={() => setAvatarFailed(true)} className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
               : <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-terracotta/15 text-lg font-bold text-terracotta">{(account.name ?? account.email)[0]?.toUpperCase()}</div>}
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-widest text-charcoal/40">My Account</p>

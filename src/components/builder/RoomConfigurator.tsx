@@ -1156,6 +1156,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
 
+  // The query string we arrived with. The effect below tidies the address bar,
+  // so later effects read this instead of window.location.
+  const arrivalSearch = useRef<string | null>(null);
+  if (arrivalSearch.current === null && typeof window !== "undefined") arrivalSearch.current = window.location.search;
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -1188,6 +1193,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       // Bust the user-status cache and show a success banner
       bustUserStatusCache();
       setStatusRefreshKey((k) => k + 1);
+      // Stripe's confirmation can land a few seconds after the redirect: check again
+      for (const ms of [3_000, 8_000]) setTimeout(() => { bustUserStatusCache(); setStatusRefreshKey((k) => k + 1); }, ms);
       setPaymentBanner(true);
       // Checkout was a full page visit, so reload the design they were working on
       if (!useBuilderStore.getState().roomPhotoUrl) {
@@ -1335,6 +1342,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       return;
     }
     applyDraft(d);
+    setShowRoomRouter(false);   // the draft already says which room
     if (d.render) {
       pushToHistory(d.render);
       setViewportState("ready");
@@ -1355,7 +1363,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // (?resume=local), or offer the last draft if they're starting fresh
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("authed") || params.has("payment_success")) return;   // handled above
+    const arrived = new URLSearchParams(arrivalSearch.current ?? "");
+    if (arrived.has("authed") || arrived.has("payment_success")) return;   // handled above, without asking
     const clean = (key: string) => {
       const u = new URL(window.location.href);
       u.searchParams.delete(key);

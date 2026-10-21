@@ -49,14 +49,21 @@ async function getBaseUrl(): Promise<string> {
   return `${proto}://${host}`;
 }
 
+/** Pages checkout may send people back to (anything else returns to /builder) */
+const RETURN_PATHS = ["/bathroom", "/kitchen", "/bedroom", "/builder", "/preview", "/account", "/"];
+
 export async function createCheckoutSession(
   plan: PlanKey,
+  returnPath?: string,
 ): Promise<{ url: string } | { error: string; needsAuth?: true }> {
   try {
     if (!isPlanKey(plan)) return { error: "Unknown plan" };
     const stripe = getStripe();
     const base   = await getBaseUrl();
     const { mode, trialDays } = PLANS[plan];
+    const back = returnPath && RETURN_PATHS.includes(returnPath)
+      ? (returnPath === "/" ? "/builder" : returnPath)
+      : "/builder";
     // A sandbox (see .env.development.local) brings its own price IDs; live uses the catalogue's
     const priceId = (plan === "projectPass" ? process.env.STRIPE_PRICE_PROJECT_PASS : process.env.STRIPE_PRICE_PRO_MONTHLY)?.trim() || PLANS[plan].priceId;
 
@@ -87,8 +94,9 @@ export async function createCheckoutSession(
           ...(trialDays > 0 && { trial_period_days: trialDays }),
         },
       }),
-      success_url: `${base}/builder?payment_success=true&plan=${plan}`,
-      cancel_url:  `${base}/#pricing`,
+      // Back to the page they paid from, so their design is right there
+      success_url: `${base}${back}?payment_success=true&plan=${plan}`,
+      cancel_url:  back === "/" ? `${base}/#pricing` : `${base}${back}`,
       billing_address_collection: "auto",
     });
 

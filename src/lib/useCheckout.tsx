@@ -16,6 +16,8 @@ import { useCallback, useEffect, useState } from "react";
 import AuthModal from "@/components/auth/AuthModal";
 import { createCheckoutSession } from "@/app/actions/stripe";
 import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
+import { ROOM_PAGES } from "@/lib/roomPages";
+import { useBuilderStore } from "@/lib/store";
 
 const PENDING_KEY = "reno_ready_pending_plan";
 
@@ -43,7 +45,10 @@ export function useCheckout(resumeFor?: PlanKey | PlanKey[]) {
     setError(null);
     setPendingPlan(plan);
     try {
-      const result = await createCheckoutSession(plan);
+      // /preview reads the in-memory design, which checkout wipes, so come back to the room page
+      const here = window.location.pathname;
+      const back = here === "/preview" ? ROOM_PAGES[useBuilderStore.getState().roomType].path : here;
+      const result = await createCheckoutSession(plan, back);
       if ("url" in result) {
         writePending(null);
         window.location.href = result.url;

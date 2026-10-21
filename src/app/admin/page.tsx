@@ -17,7 +17,9 @@ import {
   ImageIcon, Mail, AlertTriangle,
 } from "lucide-react";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { ADMIN_EMAIL, PAID_USER_PRICE_CENTS } from "@/lib/config";
+import { ADMIN_EMAIL } from "@/lib/config";
+import { tierFor } from "@/lib/plans";
+import { fetchRevenue } from "@/lib/stripeRevenue";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
 import { cn, formatAUD } from "@/lib/utils";
 import UserDesigns, { type AdminDesign } from "./UserDesigns";
@@ -30,6 +32,7 @@ interface ProfileRow {
   email:              string | null;
   created_at:         string;
   subscription_plan:  "free" | "paid" | "project_pass" | "day_pass" | "monthly" | "annual" | null;
+  subscription_expires_at: string | null;
   generation_count:   number | null;
 }
 
@@ -56,7 +59,7 @@ async function fetchProfiles(): Promise<{ rows: ProfileRow[]; error: string | nu
     const supabase = createSupabaseServiceRoleClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, created_at, subscription_plan, generation_count")
+      .select("id, email, created_at, subscription_plan, subscription_expires_at, generation_count")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) return { rows: [], error: error.message };
@@ -121,8 +124,8 @@ export default async function AdminPage() {
     redirect("/?admin_error=forbidden");
   }
 
-  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }] =
-    await Promise.all([fetchProfiles(), fetchDesigns()]);
+  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }, revenue] =
+    await Promise.all([fetchProfiles(), fetchDesigns(), fetchRevenue(ADMIN_EMAIL)]);
 
   const designsByUser = new Map<string, StoredDesign[]>();
   for (const d of designs) designsByUser.set(d.userId, [...(designsByUser.get(d.userId) ?? []), d]);
@@ -131,9 +134,15 @@ export default async function AdminPage() {
 
   // ── Stats ───────────────────────────────────────────────────
   const totalUsers     = profiles.length;
-  const paidUsers      = profiles.filter((p) => p.subscription_plan && p.subscription_plan !== "free").length;
+  // Paid = an active pass or Pro plan right now (expired plans and the admin don't count)
+  const tiers          = profiles
+    .filter((p) => p.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase())
+    .map((p) => tierFor(p.subscription_plan, p.subscription_expires_at));
+  const passUsers      = tiers.filter((t) => t === "pass").length;
+  const proUsers       = tiers.filter((t) => t === "pro").length;
+  const paidUsers      = passUsers + proUsers;
   const freeUsers      = totalUsers - paidUsers;
-  const totalRevenueCents = paidUsers * PAID_USER_PRICE_CENTS;
+  const revenueOk      = !("error" in revenue);
   const totalGenerations  = profiles.reduce((sum, p) => sum + (p.generation_count ?? 0), 0);
 
   return (
@@ -157,8 +166,12 @@ export default async function AdminPage() {
         {/* ── Stats grid ──────────────────────────────────────── */}
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
           <StatCard icon={Users}     accent="terracotta" label="Total Users"      value={totalUsers.toString()} />
-          <StatCard icon={CreditCard} accent="emerald"   label="Paid Users"       value={paidUsers.toString()} hint={`${freeUsers} free`} />
-          <StatCard icon={DollarSign} accent="terracotta" label="Total Revenue"    value={formatAUD(totalRevenueCents / 100)} hint={`@ ${formatAUD(PAID_USER_PRICE_CENTS / 100)} / paid user`} />
+          <StatCard icon={CreditCard} accent="emerald"   label="Paid Users"       value={paidUsers.toString()} hint={`${passUsers} pass · ${proUsers} Pro · ${freeUsers} free`} />
+          <StatCard icon={DollarSign} accent="terracotta" label="Total Revenue"
+                    value={revenueOk ? formatAUD(revenue.net / 100) : "—"}
+                    hint={revenueOk
+                      ? `${formatAUD(revenue.thisMonth / 100)} this month · ${revenue.payments} payment${revenue.payments === 1 ? "" : "s"}${revenue.refunded ? ` · ${formatAUD(revenue.refunded / 100)} refunded` : ""}${revenue.partial ? " · latest 2,000 only" : ""}`
+                      : `Stripe: ${revenue.error}`} />
           <StatCard icon={Sparkles}   accent="charcoal"   label="AI Generations"   value={totalGenerations.toString()} />
           <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={storedDesigns.toString()}
                     hint={totalGenerations > storedDesigns ? "Saving started 8 Oct 2026" : undefined} />

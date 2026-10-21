@@ -26,6 +26,3 @@ export const LEAD_NOTIFICATION_DESTINATION: string =
 /** Verified Resend sender. Defaults to Resend's onboarding domain if unset. */
 export const RESEND_FROM: string =
   process.env.RESEND_FROM_EMAIL?.trim() || "Reno Ready <onboarding@resend.dev>";
-
-/** Day pass price in cents — used for Total Revenue calc on the admin dashboard */
-export const PAID_USER_PRICE_CENTS = 1_900;  // $19.00 AUD

@@ -12,8 +12,17 @@ import { DESIGN_STYLES, isDesignStyle } from "@/lib/designStyles";
 
 export interface ShareRow { label: string; value: string }
 
+/** The current design's rows (share links) */
 export function shareRows(): ShareRow[] {
-  const s = useBuilderStore.getState();
+  return designRows(useBuilderStore.getState() as unknown as DesignState);
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type DesignState = Record<string, any> & { roomType: "bathroom" | "kitchen" | "bedroom" };
+
+/** Rows for any saved design: the live store, or a draft's snapshot plus its roomType */
+export function designRows(s: DesignState): ShareRow[] {
+  s = { keepExisting: [], ...s, kitchenSelections: { keepExisting: [], ...s.kitchenSelections }, bedroomSelections: { keepExisting: [], ...s.bedroomSelections } };
   const kept = "Keep existing";
   const rows: [string, string | null | undefined, boolean?][] = [];
 
@@ -25,14 +34,14 @@ export function shareRows(): ShareRow[] {
       ["Floor",     kitchenFloorLabel(k), isKept(k.keepExisting, "floor")],
       ["Walls",     kitchenWallLabel(k),  isKept(k.keepExisting, "walls")],
     );
-    if (isDesignStyle(k.designStyle)) rows.push(["Style", DESIGN_STYLES[k.designStyle].name]);
+    { const ds: unknown = k.designStyle; if (isDesignStyle(ds)) rows.push(["Style", DESIGN_STYLES[ds].name]); }
   } else if (s.roomType === "bedroom") {
     const b = s.bedroomSelections;
     rows.push(
       ["Flooring", bedroomFloorLabel(b), isKept(b.keepExisting, "flooring")],
       ["Walls",    bedroomWallLabel(b),  isKept(b.keepExisting, "walls")],
     );
-    if (isDesignStyle(b.designStyle)) rows.push(["Style", DESIGN_STYLES[b.designStyle].name]);
+    { const ds: unknown = b.designStyle; if (isDesignStyle(ds)) rows.push(["Style", DESIGN_STYLES[ds].name]); }
   } else {
     rows.push(
       ["Floor",   surfaceLabel(FLOOR_FORMATS.find((f) => f.id === s.floorFormat), s.floorTile, s.customFloorColor), isKept(s.keepExisting, "floor")],
@@ -40,7 +49,7 @@ export function shareRows(): ShareRow[] {
       ["Vanity",  s.vanity ? VANITY_OPTIONS.find((v) => v.id === s.vanity)?.label ?? null : null],
       ["Tapware", s.tapware ? TAPWARE_OPTIONS.find((t) => t.id === s.tapware)?.label ?? null : null],
     );
-    if (isDesignStyle(s.designStyle)) rows.push(["Style", DESIGN_STYLES[s.designStyle].name]);
+    { const ds: unknown = s.designStyle; if (isDesignStyle(ds)) rows.push(["Style", DESIGN_STYLES[ds].name]); }
   }
 
   return rows

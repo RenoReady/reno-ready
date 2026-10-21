@@ -728,3 +728,210 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
 
   return pdf;
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  WHOLE-HOME PROJECT REPORT (Reno Ready Pro) — every room in one PDF
+// ══════════════════════════════════════════════════════════════════
+
+export interface ProjectRoomInput {
+  title:      string;
+  roomType:   RoomType;
+  renderUrl:  string | null;
+  photoUrl:   string | null;
+  rows:       { label: string; value: string }[];
+  estimate:   { total: number; low: number; high: number; items: { label: string; amount: number; detail?: string }[] };
+}
+
+export interface ProjectReportInput {
+  rooms:        ProjectRoomInput[];
+  brand?:       ReportBrand | null;
+  preparedFor?: string | null;
+}
+
+/** Download the whole-home report in the browser */
+export async function generateProjectReportPDF(input: ProjectReportInput): Promise<void> {
+  const pdf = await buildProjectReportPDF(input);
+  const name = hasBrand(input.brand)
+    ? `${input.brand.businessName.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "Design"}-Whole-Home-Report.pdf`
+    : "Reno-Ready-Whole-Home-Report.pdf";
+  pdf.save(name);
+}
+
+/** Server/Node side (tests): the whole-home report as bytes; images must already be JPEG data URLs */
+export async function projectReportPdfBytes(input: ProjectReportInput): Promise<Uint8Array> {
+  return new Uint8Array((await buildProjectReportPDF(input, true)).output("arraybuffer"));
+}
+
+async function buildProjectReportPDF(input: ProjectReportInput, imagesReady = false): Promise<jsPDF> {
+  const pdf    = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const PW     = pdf.internal.pageSize.getWidth();
+  const PH     = pdf.internal.pageSize.getHeight();
+  const MARGIN = 13;
+  const IW     = PW - MARGIN * 2;
+  const brand  = hasBrand(input.brand) ? input.brand : null;
+  const ACCENT = hexToRgb(brand?.accent) ?? RR_TERRACOTTA;
+  const header = (title: string) => addHeader(pdf, PW, title, pdf.getNumberOfPages(), brand, ACCENT);
+  const footer = () => addFooter(pdf, PW, PH, brand);
+  const dateStr = new Date().toLocaleDateString("en-AU", { year: "numeric", month: "long", day: "numeric", timeZone: "Australia/Brisbane" });
+
+  const rooms = input.rooms;
+  const load = async (url: string | null, maxW: number, q: number) =>
+    !url ? null : imagesReady ? (isJpegDataUrl(url) ? url : null) : loadImageAsDataUrl(url, maxW, q);
+  const images = await Promise.all(rooms.map(async (r) => ({
+    render: await load(r.renderUrl, 1400, 0.85),
+    photo:  await load(r.photoUrl, 1100, 0.8),
+  })));
+  const total = rooms.reduce((n, r) => n + r.estimate.total, 0);
+  const low   = rooms.reduce((n, r) => n + r.estimate.low, 0);
+  const high  = rooms.reduce((n, r) => n + r.estimate.high, 0);
+
+  const titleBlock = (text: string, sub: string[], y: number): number => {
+    drawRect(pdf, MARGIN, y, 4, 7, ACCENT, 2);
+    sf(pdf, "bold"); pdf.setTextColor(...CHARCOAL); pdf.setFontSize(13);
+    pdf.text(text.slice(0, 70), MARGIN + 7, y + 5.5);
+    sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
+    sub.forEach((line, i) => pdf.text(line.slice(0, 120), MARGIN + 7, y + 12 + i * 4.5));
+    return y + 14 + sub.length * 4.5;
+  };
+  const placeImage = (data: string | null, x: number, y: number, w: number, h: number) => {
+    if (!data) return false;
+    try { pdf.addImage(data, "JPEG", x, y, w, h); return true; } catch { return false; }
+  };
+
+  // ── Page 1: project summary ──────────────────────────────────────
+  header("Whole-Home Renovation Plan");
+  const by = brand
+    ? [[`Prepared ${dateStr} by ${brand.businessName}`, input.preparedFor?.trim() ? `for ${input.preparedFor.trim()}` : null].filter(Boolean).join(" "),
+       [brand.phone, brand.email, brand.website, brand.licence].filter(Boolean).join("   ·   ")].filter(Boolean)
+    : [`Prepared ${dateStr} · Reno Ready AI Design Platform`];
+  let y = titleBlock("Your Whole-Home Renovation Plan", by, 22);
+
+  drawRect(pdf, MARGIN, y, IW, 24, CHARCOAL, 3);
+  sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(180, 190, 200);
+  pdf.text("ESTIMATED PROJECT TOTAL", MARGIN + 6, y + 7);
+  pdf.setFontSize(20); pdf.setTextColor(...WHITE);
+  pdf.text(formatAUD(total), MARGIN + 6, y + 18);
+  sf(pdf, "normal"); pdf.setFontSize(7); pdf.setTextColor(180, 190, 200);
+  pdf.text(`${rooms.length} room${rooms.length === 1 ? "" : "s"}  ·  Range ${formatAUD(low)} – ${formatAUD(high)}  ·  ±12% typical variance`, PW - MARGIN - 4, y + 18, { align: "right" });
+  y += 30;
+
+  // rooms table
+  drawRect(pdf, MARGIN, y, IW, 6.5, CHARCOAL);
+  sf(pdf, "bold"); pdf.setFontSize(6); pdf.setTextColor(...WHITE);
+  pdf.text("ROOM", MARGIN + 3, y + 4.5);
+  pdf.text("DESIGN", MARGIN + 38, y + 4.5);
+  pdf.text("ESTIMATE", PW - MARGIN - 3, y + 4.5, { align: "right" });
+  y += 6.5;
+  rooms.forEach((r, i) => {
+    drawRect(pdf, MARGIN, y, IW, 8, i % 2 ? LIGHT_SAND : WHITE);
+    sf(pdf, "bold"); pdf.setFontSize(7.5); pdf.setTextColor(...CHARCOAL);
+    pdf.text(roomLabel(r.roomType), MARGIN + 3, y + 5.3);
+    sf(pdf, "normal");
+    pdf.text(r.title.slice(0, 60), MARGIN + 38, y + 5.3);
+    sf(pdf, "bold");
+    pdf.text(formatAUD(r.estimate.total), PW - MARGIN - 3, y + 5.3, { align: "right" });
+    y += 8;
+  });
+  drawRect(pdf, MARGIN, y, IW, 9, ACCENT);
+  sf(pdf, "bold"); pdf.setFontSize(8); pdf.setTextColor(...WHITE);
+  pdf.text("PROJECT TOTAL", MARGIN + 3, y + 6);
+  pdf.text(formatAUD(total), PW - MARGIN - 3, y + 6, { align: "right" });
+  y += 15;
+
+  // render thumbnails, two across, while they fit above the disclaimer
+  const tw = (IW - 5) / 2, th = tw * 0.62;
+  for (let i = 0; i < rooms.length && y + th + 8 < PH - 40; i += 2) {
+    [0, 1].forEach((k) => {
+      const r = rooms[i + k];
+      if (!r) return;
+      const x = MARGIN + k * (tw + 5);
+      if (!placeImage(images[i + k].render, x, y, tw, th)) drawRect(pdf, x, y, tw, th, SAND, 3);
+      drawRect(pdf, x, y + th - 7, tw, 7, CHARCOAL);
+      sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
+      pdf.text(`${roomLabel(r.roomType).toUpperCase()} · ${formatAUD(r.estimate.total)}`, x + tw / 2, y + th - 2.5, { align: "center" });
+    });
+    y += th + 5;
+  }
+
+  const dy = PH - 35;
+  drawRect(pdf, MARGIN, dy, IW, 20, LIGHT_SAND, 3);
+  sf(pdf, "bold"); pdf.setFontSize(6); pdf.setTextColor(...GREY_TEXT);
+  pdf.text("IMPORTANT DISCLAIMER", MARGIN + 3, dy + 5.5);
+  sf(pdf, "normal"); pdf.setFontSize(6.5);
+  (pdf.splitTextToSize(
+    "This plan is a planning aid only. Designs are AI-generated concepts and all cost estimates are indicative, based on mid-range QLD 2026 trade rates. Actual costs vary with site conditions, materials and scope. Always obtain written quotes from licensed builders before proceeding. " +
+    (brand ? "No liability is accepted for cost variations." : "Reno Ready accepts no liability for cost variations."), IW - 6) as string[])
+    .slice(0, 3).forEach((l, i) => pdf.text(l, MARGIN + 3, dy + 10 + i * 4.2));
+  footer();
+
+  // ── One page per room ────────────────────────────────────────────
+  rooms.forEach((r, idx) => {
+    pdf.addPage();
+    header(`Room ${idx + 1} of ${rooms.length} · ${roomLabel(r.roomType)}`);
+    let ry = titleBlock(r.title, [`${roomLabel(r.roomType)} · estimated ${formatAUD(r.estimate.total)} (range ${formatAUD(r.estimate.low)} – ${formatAUD(r.estimate.high)})`], 22);
+
+    const iw = (IW - 5) / 2, ih = 58;
+    const pair: [string | null, string, [number, number, number]][] = [
+      [images[idx].photo, "CURRENT STATE", CHARCOAL],
+      [images[idx].render, "CLIENT’S REQUESTED VISION", ACCENT],
+    ];
+    pair.forEach(([data, label, colour], k) => {
+      const x = MARGIN + k * (iw + 5);
+      if (placeImage(data, x, ry, iw, ih)) {
+        drawRect(pdf, x, ry + ih - 7, iw, 7, colour);
+        sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
+        pdf.text(label, x + iw / 2, ry + ih - 2.5, { align: "center" });
+      } else {
+        drawRect(pdf, x, ry, iw, ih, SAND, 3);
+        sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
+        pdf.text(k ? "No AI preview yet" : "No room photo", x + iw / 2, ry + ih / 2, { align: "center" });
+      }
+    });
+    ry += ih + 7;
+
+    if (r.rows.length) {
+      sf(pdf, "bold"); pdf.setFontSize(9); pdf.setTextColor(...CHARCOAL);
+      pdf.text("Finishes", MARGIN, ry + 4);
+      ry += 8;
+      r.rows.slice(0, 8).forEach((row, i) => {
+        drawRect(pdf, MARGIN, ry, IW, 7, i % 2 ? LIGHT_SAND : WHITE);
+        sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...GREY_TEXT);
+        pdf.text(row.label.toUpperCase(), MARGIN + 3, ry + 4.7);
+        sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...CHARCOAL);
+        pdf.text(row.value.slice(0, 90), MARGIN + 45, ry + 4.7);
+        ry += 7;
+      });
+      ry += 5;
+    }
+
+    // cost breakdown: stops above the footer, the rest summed into one line
+    sf(pdf, "bold"); pdf.setFontSize(9); pdf.setTextColor(...CHARCOAL);
+    pdf.text("Cost breakdown", MARGIN, ry + 4);
+    ry += 8;
+    const items = r.estimate.items.filter((it) => it.amount !== 0);
+    const fit = Math.max(0, Math.floor((PH - 30 - ry - 10) / 6.5));
+    const shown = items.length > fit ? items.slice(0, Math.max(0, fit - 1)) : items;
+    shown.forEach((it, i) => {
+      drawRect(pdf, MARGIN, ry, IW, 6.5, i % 2 ? LIGHT_SAND : WHITE);
+      sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...CHARCOAL);
+      pdf.text(it.label.slice(0, 80), MARGIN + 3, ry + 4.4);
+      sf(pdf, "bold");
+      pdf.text(formatAUD(it.amount), PW - MARGIN - 3, ry + 4.4, { align: "right" });
+      ry += 6.5;
+    });
+    if (shown.length < items.length) {
+      const rest = items.slice(shown.length).reduce((n, it) => n + it.amount, 0);
+      sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
+      pdf.text(`${items.length - shown.length} more items`, MARGIN + 3, ry + 4.4);
+      pdf.text(formatAUD(rest), PW - MARGIN - 3, ry + 4.4, { align: "right" });
+      ry += 6.5;
+    }
+    drawRect(pdf, MARGIN, ry + 1, IW, 9, CHARCOAL, 2);
+    sf(pdf, "bold"); pdf.setFontSize(8); pdf.setTextColor(...WHITE);
+    pdf.text("ROOM ESTIMATE", MARGIN + 3, ry + 7);
+    pdf.text(formatAUD(r.estimate.total), PW - MARGIN - 3, ry + 7, { align: "right" });
+    footer();
+  });
+
+  return pdf;
+}

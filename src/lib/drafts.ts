@@ -31,6 +31,17 @@ export interface LocalDraft {
 export interface DraftSummary {
   id: string; roomType: RoomType; title: string; updatedAt: string; createdAt: string;
   hasPhoto: boolean; hasRender: boolean; estimate: string | null; thumbUrl: string | null;
+  /** Counted in the whole-home project total */
+  inProject: boolean;
+  estimateTotal: number | null; estimateLow: number | null; estimateHigh: number | null;
+}
+
+/** Adds a draft to, or takes it out of, the whole-home project */
+export async function setDraftInProject(id: string, inProject: boolean): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/drafts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inProject }) });
+    return res.ok;
+  } catch { return false; }
 }
 
 // ── Current draft id ───────────────────────────────────────────────

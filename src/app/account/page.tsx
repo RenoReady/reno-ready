@@ -15,6 +15,7 @@ import {
   Link2, Copy, ExternalLink, Palette, Hammer, FileText,
 } from "lucide-react";
 import BrandForm from "@/components/account/BrandForm";
+import ProjectPlanner from "@/components/account/ProjectPlanner";
 import AuthModal from "@/components/auth/AuthModal";
 import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
@@ -275,6 +276,12 @@ export default function AccountPage() {
             <MessageSquare size={18} /> Send my brief to a builder
           </Link>
         </section>
+
+        {/* ── Whole-home project ──────────────────────────────── */}
+        {drafts && drafts.length > 0 && (
+          <ProjectPlanner drafts={drafts} isPro={plan.kind === "pro" || plan.kind === "admin"}
+            onChange={setDrafts} onUpgrade={() => setPaywall("project")} />
+        )}
 
         {/* ── Drafts ───────────────────────────────────────────── */}
         <section id="drafts" className="scroll-mt-32">

@@ -11,6 +11,7 @@
  */
 
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { estimateFromSnapshot } from "@/lib/projectEstimate";
 
 export const DRAFTS_BUCKET = "drafts";
 export const MAX_DRAFTS = 12;
@@ -28,12 +29,19 @@ export interface DraftRecord {
   /** Estimate shown in the builder once a preview exists, e.g. "$18,500–$21,000" */
   estimate:    string | null;
   description: string | null;
+  /** Counted in the whole-home project total. Unset = included once it has a render. */
+  inProject?:  boolean;
   snapshot:    Record<string, unknown>;
 }
 
 /** Summary for lists — no snapshot, with short-lived image links */
-export interface DraftSummary extends Omit<DraftRecord, "snapshot"> {
+export interface DraftSummary extends Omit<DraftRecord, "snapshot" | "inProject"> {
   thumbUrl: string | null;
+  inProject: boolean;
+  /** Priced from the draft's choices (null when it can't be) */
+  estimateTotal: number | null;
+  estimateLow:   number | null;
+  estimateHigh:  number | null;
 }
 
 export function isDraftId(id: unknown): id is string {
@@ -111,6 +119,7 @@ export async function saveDraft(userId: string, input: {
     hasRender,
     estimate:    input.estimate === undefined ? prev?.estimate ?? null : input.estimate,
     description: input.description === undefined ? prev?.description ?? null : input.description?.slice(0, 2_000) ?? null,
+    ...(prev?.inProject !== undefined && { inProject: prev.inProject }),
     snapshot:    input.snapshot,
   };
   const { error } = await store.upload(`${base}/draft.json`, Buffer.from(JSON.stringify(record)), { contentType: "application/json", upsert: true, cacheControl: "0" });
@@ -140,7 +149,23 @@ export async function listDrafts(userId: string): Promise<DraftSummary[]> {
   const signed = paths.length ? (await (await bucket()).createSignedUrls(paths, SIGNED_URL_SECONDS)).data ?? [] : [];
   const urlFor = new Map(signed.map((s) => [s.path, s.signedUrl]));
 
-  return records.map(({ snapshot: _snapshot, ...r }, i) => ({ ...r, thumbUrl: thumbs[i] ? urlFor.get(thumbs[i]!) ?? null : null }));
+  return records.map(({ snapshot, inProject, ...r }, i) => {
+    const est = estimateFromSnapshot(r.roomType, snapshot);
+    return {
+      ...r,
+      thumbUrl: thumbs[i] ? urlFor.get(thumbs[i]!) ?? null : null,
+      inProject: inProject ?? r.hasRender,
+      estimateTotal: est?.total || null, estimateLow: est?.low || null, estimateHigh: est?.high || null,
+    };
+  });
+}
+
+/** Adds a draft to, or takes it out of, the whole-home project */
+export async function setDraftInProject(userId: string, id: string, inProject: boolean): Promise<boolean> {
+  const record = await readRecord(userId, id);
+  if (!record) return false;
+  const { error } = await (await bucket()).upload(`${userId}/${id}/draft.json`, Buffer.from(JSON.stringify({ ...record, inProject })), { contentType: "application/json", upsert: true, cacheControl: "0" });
+  return !error;
 }
 
 /** One draft with links to its photo and render */

@@ -31,11 +31,14 @@ export interface DraftRecord {
   description: string | null;
   /** Counted in the whole-home project total. Unset = included once it has a render. */
   inProject?:  boolean;
+  /** When a "your design is waiting" email went out for this draft */
+  remindedAt?: string;
   snapshot:    Record<string, unknown>;
 }
 
 /** Summary for lists — no snapshot, with short-lived image links */
-export interface DraftSummary extends Omit<DraftRecord, "snapshot" | "inProject"> {
+export interface DraftSummary extends Omit<DraftRecord, "snapshot" | "inProject" | "remindedAt"> {
+  remindedAt: string | null;
   thumbUrl: string | null;
   inProject: boolean;
   /** Priced from the draft's choices (null when it can't be) */
@@ -120,6 +123,7 @@ export async function saveDraft(userId: string, input: {
     estimate:    input.estimate === undefined ? prev?.estimate ?? null : input.estimate,
     description: input.description === undefined ? prev?.description ?? null : input.description?.slice(0, 2_000) ?? null,
     ...(prev?.inProject !== undefined && { inProject: prev.inProject }),
+    ...(prev?.remindedAt && { remindedAt: prev.remindedAt }),
     snapshot:    input.snapshot,
   };
   const { error } = await store.upload(`${base}/draft.json`, Buffer.from(JSON.stringify(record)), { contentType: "application/json", upsert: true, cacheControl: "0" });
@@ -149,15 +153,36 @@ export async function listDrafts(userId: string): Promise<DraftSummary[]> {
   const signed = paths.length ? (await (await bucket()).createSignedUrls(paths, SIGNED_URL_SECONDS)).data ?? [] : [];
   const urlFor = new Map(signed.map((s) => [s.path, s.signedUrl]));
 
-  return records.map(({ snapshot, inProject, ...r }, i) => {
+  return records.map(({ snapshot, inProject, remindedAt, ...r }, i) => {
     const est = estimateFromSnapshot(r.roomType, snapshot);
     return {
       ...r,
       thumbUrl: thumbs[i] ? urlFor.get(thumbs[i]!) ?? null : null,
       inProject: inProject ?? r.hasRender,
+      remindedAt: remindedAt ?? null,
       estimateTotal: est?.total || null, estimateLow: est?.low || null, estimateHigh: est?.high || null,
     };
   });
+}
+
+/** Every user id that has drafts (for the reminder job) */
+export async function draftOwners(): Promise<string[]> {
+  const { data } = await (await bucket()).list("", { limit: 1000 });
+  return (data ?? []).map((f) => f.name).filter((n) => /^[0-9a-f-]{36}$/.test(n));
+}
+
+/** A long-lived link to a draft's render (or photo), for emails */
+export async function draftImageLink(userId: string, d: { id: string; hasRender: boolean; hasPhoto: boolean }, seconds = 30 * 86_400): Promise<string | null> {
+  const name = d.hasRender ? "render.jpg" : d.hasPhoto ? "photo.jpg" : null;
+  if (!name) return null;
+  return (await (await bucket()).createSignedUrl(`${userId}/${d.id}/${name}`, seconds)).data?.signedUrl ?? null;
+}
+
+/** Records that a reminder went out for this draft */
+export async function markDraftReminded(userId: string, id: string): Promise<void> {
+  const record = await readRecord(userId, id);
+  if (!record) return;
+  await (await bucket()).upload(`${userId}/${id}/draft.json`, Buffer.from(JSON.stringify({ ...record, remindedAt: new Date().toISOString() })), { contentType: "application/json", upsert: true, cacheControl: "0" });
 }
 
 /** Adds a draft to, or takes it out of, the whole-home project */

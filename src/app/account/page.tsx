@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import BrandForm from "@/components/account/BrandForm";
 import ProjectPlanner from "@/components/account/ProjectPlanner";
+import EmailPrefs from "@/components/account/EmailPrefs";
 import AuthModal from "@/components/auth/AuthModal";
 import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
@@ -493,6 +494,8 @@ export default function AccountPage() {
             </div>
           </section>
         )}
+
+        <EmailPrefs />
 
         <p className="text-center text-xs text-charcoal/40">
           Want your account or data deleted? Email <a href="mailto:hello@renoready.com.au" className="underline">hello@renoready.com.au</a>.

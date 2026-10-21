@@ -36,6 +36,13 @@ export function signOut(): void {
   localStorage.removeItem(AUTH_KEY);
 }
 
+/** Where to come back to after Google: this page, keeping a ?draft= link */
+function returnPath(): string {
+  const u = new URL(window.location.href);
+  const draft = u.searchParams.get("draft");
+  return draft ? `${u.pathname}?draft=${encodeURIComponent(draft)}` : u.pathname;
+}
+
 // ── Modal ─────────────────────────────────────────────────────────
 
 interface AuthModalProps {
@@ -80,7 +87,7 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
         provider: "google",
         options: {
           // Come back to the page they signed in from (e.g. /bathroom), not always /builder
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath())}`,
           queryParams: { access_type: "offline", prompt: "consent" },
         },
       });
@@ -169,7 +176,7 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
         <div className="flex items-center justify-center gap-2 text-xs text-charcoal/40">
           <ShieldCheck size={13} className="text-terracotta/60" />
           <span>
-            We never sell your data.{" "}
+            We never sell your data. We may email you a reminder if you leave a design unfinished.{" "}
             <a href="/privacy" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-charcoal/70">Privacy Policy</a>
             {" "}·{" "}
             <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-charcoal/70">Terms</a>

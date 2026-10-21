@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Upload, ImagePlus, Sparkles, SlidersHorizontal, Layers, Droplets,
   CheckCircle2, X, Maximize2, Minimize2, ArrowLeftRight,
@@ -1221,7 +1222,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    if (params.get("authed") === "1") {
+    if (params.get("authed") === "1" && params.has("draft")) {
+      // back from signing in to open a saved design (e.g. a reminder email): the draft effect loads it
+      markAuthed();
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete("authed");
+      window.history.replaceState({}, "", clean.toString());
+    } else if (params.get("authed") === "1") {
       markAuthed();
       const clean = new URL(window.location.href);
       clean.searchParams.delete("authed");
@@ -1330,6 +1337,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setRoomConfirmed(true);
   }, [room, setRoomType, setRoomConfirmed]);
   const [showAuthModal,      setShowAuthModal]      = useState(false);
+  // the sign-in was asked for to open a saved design (not to generate)
+  const [authForDraft,       setAuthForDraft]       = useState(false);
   // Which upgrade pop-up is open (null = none)
   const [paywall,            setPaywall]            = useState<PaywallReason | null>(null);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
@@ -1421,7 +1430,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const arrived = new URLSearchParams(arrivalSearch.current ?? "");
-    if (arrived.has("authed") || arrived.has("payment_success")) return;   // handled above, without asking
+    if (arrived.has("payment_success") || (arrived.has("authed") && !arrived.has("draft"))) return;   // handled above, without asking
     const clean = (key: string) => {
       const u = new URL(window.location.href);
       u.searchParams.delete(key);
@@ -1430,6 +1439,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     // a hop from another room's page, or a link from My Account
     const handoff = peekDraftHandoff();
     const wanted = handoff && "accountId" in handoff ? handoff.accountId : params.get("draft");
+    // a saved design needs the account: sign in first, then come straight back to it
+    if (wanted && !handoff && !isAuthed()) { setAuthForDraft(true); setShowAuthModal(true); return; }
     if (params.has("draft")) clean("draft");
     if (params.has("resume")) clean("resume");
     if (wanted) {
@@ -2911,8 +2922,14 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   "transition-all duration-200",
                 )}
               >
-                Add Another Room to My Project
+                Design another room
               </button>
+            )}
+            {viewportState === "ready" && !isGenerating && userStatus.userId && (
+              <p className="-mt-2 text-center text-xs text-charcoal/45">
+                Every room is saved and adds up in{" "}
+                <Link href="/account#project" className="font-semibold text-terracotta underline underline-offset-2">your whole-home project</Link>.
+              </p>
             )}
 
             </div>
@@ -2930,8 +2947,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       {showAuthModal && (
         <AuthModal
-          onSuccess={() => { setShowAuthModal(false); executeGenerate(); }}
-          onClose={() => setShowAuthModal(false)}
+          {...(authForDraft && { title: "Sign in to open your design", message: <>Your saved design is waiting in your account. Sign in with the same Google account to pick up where you left off.</> })}
+          onSuccess={() => { setShowAuthModal(false); if (!authForDraft) executeGenerate(); }}
+          onClose={() => { setShowAuthModal(false); setAuthForDraft(false); }}
         />
       )}
 

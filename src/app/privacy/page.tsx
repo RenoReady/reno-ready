@@ -64,6 +64,7 @@ export default function PrivacyPage() {
             <List items={[
               "To create your AI design previews and cost estimates.",
               "To manage your account, free preview limit and paid access.",
+              "To email you a reminder if you leave a design unfinished for a day or two (at most one a week). Every reminder has an unsubscribe link, and you can turn them off under My Account.",
               "To pass your design brief to builders when you ask us to connect you with one.",
               "To review the quality of AI previews, fix problems and improve the tool. Your stored designs may be viewed by the Reno Ready team for this purpose.",
               "To respond to you and to meet our legal obligations.",

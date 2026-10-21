@@ -36,6 +36,14 @@ export const MARKETING_VIDEO: RoomVideo = {
   poster:    "/videos/renoready-marketing-video-poster.jpg",
 };
 
+/** The site's social share image (src/app/opengraph-image.jpg), for pages that set their own share details */
+export const SHARE_IMAGE = {
+  url: "/opengraph-image.jpg",
+  width: 1200,
+  height: 630,
+  alt: "Reno Ready: a bathroom before and after an AI redesign, with the line “Design your dream renovation in seconds.”",
+};
+
 export const ROOM_PAGES: Record<RoomType, RoomPage> = {
   bathroom: {
     room:     "bathroom",

@@ -18,13 +18,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const SITE_TITLE       = "Reno Ready | Design Your Dream Renovation in Seconds";
+const SITE_DESCRIPTION = "Design your bathroom, kitchen, or bedroom in seconds. Get AI visual previews, instant itemized cost estimates, and builder briefs on Reno Ready.";
+
 export const metadata: Metadata = {
+  // absolute URLs for share images and canonical links
+  metadataBase: new URL("https://www.renoready.com.au"),
   title: {
-    default:  "Reno Ready — AI Bathroom Design & Cost Estimator Australia",
+    default:  SITE_TITLE,
     template: "%s | Reno Ready",
   },
-  description:
-    "Design your Australian bathroom renovation with AI, get an instant cost estimate, then connect with local builders. Free bathroom design tool — no architect needed.",
+  description: SITE_DESCRIPTION,
+  applicationName: "Reno Ready",
   keywords: [
     "bathroom renovation Australia",
     "bathroom design tool",
@@ -37,12 +42,23 @@ export const metadata: Metadata = {
     "bathroom design AI Australia",
     "renovation planning tool",
     "bathroom renovation ideas Australia",
+    "kitchen renovation cost estimator",
+    "AI kitchen design",
+    "bedroom renovation ideas",
+    "renovation cost estimate Australia",
   ],
+  // the share image comes from app/opengraph-image.jpg and twitter-image.jpg
   openGraph: {
-    title:       "Reno Ready — AI Bathroom Design & Cost Estimator Australia",
-    description: "Design your Australian bathroom renovation with AI, get an instant cost estimate, then connect with local builders.",
+    title:       SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    siteName:    "Reno Ready",
     type:        "website",
     locale:      "en_AU",
+  },
+  twitter: {
+    card:        "summary_large_image",
+    title:       SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   icons: {
     icon: [

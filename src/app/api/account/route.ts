@@ -6,8 +6,8 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { ADMIN_EMAIL } from "@/lib/config";
-import { FREE_GENERATION_LIMIT, hasActivePlan } from "@/lib/plans";
+import { FREE_GENERATION_LIMIT } from "@/lib/plans";
+import { getAllowance } from "@/lib/usage";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +20,15 @@ export interface AccountResponse {
   avatarUrl: string | null;
   memberSince: string | null;
   plan: {
-    /** "free" | "pass" | "monthly" | "admin" */
-    kind:      "free" | "pass" | "monthly" | "admin";
+    kind:      "free" | "pass" | "pro" | "admin";
+    /** Pro only */
+    interval:  "monthly" | "annual" | null;
     active:    boolean;
     expiresAt: string | null;
-    /** Pro Monthly only: a Stripe customer exists, so the billing portal can open */
+    /** Pro only: a Stripe customer exists, so the billing portal can open */
     canManageBilling: boolean;
   };
+  usage: { rendersUsed: number; rendersLimit: number | null; editsUsed: number; editsLimit: number | null };
   generationCount: number;
   freeLimit:       number;
   renders: { id: string; roomType: string; createdAt: string; url: string | null; hadPhoto: boolean }[];
@@ -38,20 +40,16 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Sign in to see your account." }, { status: 401 });
 
   const svc = createSupabaseServiceRoleClient();
-  const [{ data: profile }, { data: gens }] = await Promise.all([
-    svc.from("profiles")
-      .select("generation_count, subscription_plan, subscription_expires_at, stripe_customer_id, created_at")
-      .eq("id", user.id).single(),
+  const [allowance, { data: profile }, { data: gens }] = await Promise.all([
+    getAllowance(user),
+    svc.from("profiles").select("created_at").eq("id", user.id).single(),
     svc.from("generations")
       .select("id, room_type, image_path, had_photo, created_at")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(RENDERS_SHOWN),
   ]);
 
-  const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  const planValue = profile?.subscription_plan as string | null | undefined;
-  const active = hasActivePlan(planValue, profile?.subscription_expires_at);
-  const kind: AccountResponse["plan"]["kind"] =
-    isAdmin ? "admin" : !active ? "free" : planValue === "monthly" ? "monthly" : "pass";
+  const kind = allowance.tier;
+  const isPro = kind === "pro";
 
   const paths = (gens ?? []).map((g) => g.image_path as string);
   const signed = paths.length ? (await svc.storage.from(GENERATIONS_BUCKET).createSignedUrls(paths, 3600)).data ?? [] : [];
@@ -65,11 +63,16 @@ export async function GET() {
     memberSince: (profile?.created_at as string | undefined) ?? user.created_at ?? null,
     plan: {
       kind,
-      active:    active || isAdmin,
-      expiresAt: active ? (profile?.subscription_expires_at as string | null) ?? null : null,
-      canManageBilling: !!profile?.stripe_customer_id && planValue === "monthly",
+      interval:  isPro ? (allowance.plan === "annual" ? "annual" : "monthly") : null,
+      active:    kind !== "free",
+      expiresAt: kind === "pass" || isPro ? allowance.expiresAt : null,
+      canManageBilling: isPro && !!allowance.stripeCustomerId,
     },
-    generationCount: (profile?.generation_count as number | undefined) ?? 0,
+    usage: {
+      rendersUsed: allowance.rendersUsed, rendersLimit: allowance.rendersLimit,
+      editsUsed: allowance.editsUsed, editsLimit: allowance.editsLimit,
+    },
+    generationCount: allowance.generationCount,
     freeLimit:       FREE_GENERATION_LIMIT,
     renders: (gens ?? []).map((g) => ({
       id: g.id as string, roomType: g.room_type as string, createdAt: g.created_at as string,

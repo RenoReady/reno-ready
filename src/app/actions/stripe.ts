@@ -50,7 +50,7 @@ async function getBaseUrl(): Promise<string> {
 }
 
 /** Pages checkout may send people back to (anything else returns to /builder) */
-const RETURN_PATHS = ["/bathroom", "/kitchen", "/bedroom", "/builder", "/preview", "/account", "/"];
+const RETURN_PATHS = ["/bathroom", "/kitchen", "/bedroom", "/builder", "/preview", "/account", "/pricing", "/"];
 
 export async function createCheckoutSession(
   plan: PlanKey,
@@ -60,12 +60,10 @@ export async function createCheckoutSession(
     if (!isPlanKey(plan)) return { error: "Unknown plan" };
     const stripe = getStripe();
     const base   = await getBaseUrl();
-    const { mode, trialDays } = PLANS[plan];
-    const back = returnPath && RETURN_PATHS.includes(returnPath)
-      ? (returnPath === "/" ? "/builder" : returnPath)
-      : "/builder";
+    const { mode, priceEnv } = PLANS[plan];
+    const back = returnPath && RETURN_PATHS.includes(returnPath) ? returnPath : "/builder";
     // A sandbox (see .env.development.local) brings its own price IDs; live uses the catalogue's
-    const priceId = (plan === "projectPass" ? process.env.STRIPE_PRICE_PROJECT_PASS : process.env.STRIPE_PRICE_PRO_MONTHLY)?.trim() || PLANS[plan].priceId;
+    const priceId = process.env[priceEnv]?.trim() || PLANS[plan].priceId;
 
     // ── Resolve the current user so the webhook can attribute the purchase ──
     let userId: string | undefined;
@@ -86,16 +84,12 @@ export async function createCheckoutSession(
       customer_email:      email,
       metadata: { plan },            // lets the webhook know which plan was purchased
       line_items: [{ price: priceId, quantity: 1 }],
-      // Pro Monthly: 7-day free trial, card collected up front, first charge after the trial
       ...(mode === "subscription" && {
-        payment_method_collection: "always" as const,
-        subscription_data: {
-          metadata: { plan, userId },
-          ...(trialDays > 0 && { trial_period_days: trialDays }),
-        },
+        subscription_data: { metadata: { plan, userId } },
       }),
-      // Back to the page they paid from, so their design is right there
-      success_url: `${base}${back}?payment_success=true&plan=${plan}`,
+      // Back to the page they paid from, so their design is right there.
+      // From the landing or pricing page, paying leads straight into the builder.
+      success_url: `${base}${back === "/" || back === "/pricing" ? "/builder" : back}?payment_success=true&plan=${plan}`,
       cancel_url:  back === "/" ? `${base}/#pricing` : `${base}${back}`,
       billing_address_collection: "auto",
     });

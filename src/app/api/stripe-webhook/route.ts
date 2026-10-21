@@ -17,10 +17,10 @@
  *       customer.subscription.deleted   (cancelled or unpaid)
  *
  * Plans:
- *  projectPass  one-time $19      → "project_pass", access for 7 days
- *  proMonthly   $29/mo, 7-day trial → "monthly", access until the end of the
- *               current period (the trial end during the trial), extended on
- *               every renewal by customer.subscription.updated
+ *  projectPass  one-time $19  → "day_pass", access for 7 days
+ *  proMonthly   $49/mo        → "monthly" ┐ access until the end of the current
+ *  proAnnual    $399/yr       → "annual"  ┘ period, extended on every renewal
+ *                                           by customer.subscription.updated
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -43,7 +43,7 @@ const RENEWAL_GRACE_MS = DAY_MS;
 function planValue(plan: string): string {
   if (plan === "projectPass" || plan === "dayPass") return "day_pass";
   if (plan === "proMonthly"  || plan === "monthly") return "monthly";
-  if (plan === "annual") return "annual";
+  if (plan === "proAnnual"   || plan === "annual")  return "annual";
   return "paid";
 }
 
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .from("profiles")
       .update({ subscription_expires_at: expiresAt.toISOString() })
       .eq("stripe_customer_id", customer)
-      .eq("subscription_plan", "monthly");
+      .in("subscription_plan", ["monthly", "annual"]);
 
     if (error) {
       console.error("[stripe-webhook] Subscription sync failed:", error.message);

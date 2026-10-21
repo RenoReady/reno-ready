@@ -31,13 +31,32 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-AU", { day
 const daysLeft = (iso: string) => Math.max(0, Math.ceil((Date.parse(iso) - Date.now()) / 86_400_000));
 
 const PRO_PERKS = [
-  { title: "Full 2K renders",              body: "Sharper, print-ready designs instead of the 1K free preview." },
-  { title: "No watermark",                 body: "Clean images you can share with family, builders and designers." },
-  { title: "Unlimited “Not quite right?” edits", body: "Highlight any spot and change just that part." },
+  { title: "Crisp 2K renders",             body: "Sharper designs instead of the standard free preview." },
+  { title: "No watermark",                 body: "Clean images to share with family, builders and designers." },
+  { title: "More \u201cNot quite right?\u201d edits", body: "Highlight any spot and change just that part." },
   { title: "Contractor PDF Pro Reports",   body: "Materials, itemised costs and your render, ready to quote from." },
-  { title: "Multi-room reports",           body: "Bathroom, kitchen and bedroom in one builder brief (Pro Monthly)." },
-  { title: "Contractor lead tools",        body: "Send your brief to builders and keep your projects moving (Pro Monthly)." },
+  { title: "Unlimited renders and edits",  body: "Design every room, as many times as you like (fair use)." },
+  { title: "4K exports",                   body: "Print-quality images for listings, brochures and presentations." },
+  { title: "Multi-room reports",           body: "Bathroom, kitchen and bedroom in one builder brief." },
+  { title: "Commercial use licence",       body: "Use your renders in property listings and marketing." },
 ];
+/** The Project Pass includes the first PASS_PERKS of the list above */
+const PASS_PERKS = 4;
+
+function UsageBar({ label, used, limit, dark }: { label: string; used: number; limit: number; dark?: boolean }) {
+  const pct = Math.min(100, (used / Math.max(1, limit)) * 100);
+  return (
+    <div>
+      <div className={cn("mb-1.5 flex justify-between text-xs font-semibold", dark ? "text-white/60" : "text-charcoal/55")}>
+        <span>{label}</span>
+        <span>{Math.max(0, limit - used)} of {limit} left</span>
+      </div>
+      <div className={cn("h-2 overflow-hidden rounded-full", dark ? "bg-white/10" : "bg-sand-200")}>
+        <div className={cn("h-full rounded-full", pct >= 100 ? "bg-red-400" : "bg-terracotta")} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
 
 export default function AccountPage() {
   const [account, setAccount] = useState<AccountResponse | null>(null);
@@ -106,7 +125,11 @@ export default function AccountPage() {
   const isFree = plan.kind === "free";
   const watermark = isFree;
   const roomsDesigned = new Set([...account.renders.map((r) => r.roomType), ...(drafts ?? []).map((d) => d.roomType)]).size;
-  const freeLeft = Math.max(0, account.freeLimit - account.generationCount);
+  const { usage } = account;
+  const outOfRenders = usage.rendersLimit !== null && usage.rendersUsed >= usage.rendersLimit;
+  const planName =
+    plan.kind === "free" ? "Free" : plan.kind === "pass" ? "7-Day Project Pass"
+    : plan.kind === "pro" ? `Reno Ready Pro${plan.interval === "annual" ? " \u00b7 Annual" : ""}` : "Admin \u00b7 full access";
 
   return (
     <div className="min-h-screen bg-sand pb-20">
@@ -134,7 +157,7 @@ export default function AccountPage() {
                 <p className={cn("text-xs font-bold uppercase tracking-widest", isFree ? "text-charcoal/40" : "text-white/45")}>Your plan</p>
                 <p className="mt-1 flex items-center gap-2 text-xl font-bold">
                   {!isFree && <Crown size={18} className="text-terracotta" />}
-                  {plan.kind === "free" ? "Free" : plan.kind === "pass" ? "7-Day Project Pass" : plan.kind === "monthly" ? "Pro Monthly / Unlimited" : "Admin · full access"}
+                  {planName}
                 </p>
               </div>
               {plan.expiresAt && plan.kind !== "admin" && (
@@ -147,16 +170,11 @@ export default function AccountPage() {
 
             {isFree ? (
               <>
-                <div>
-                  <div className="mb-1.5 flex justify-between text-xs font-semibold text-charcoal/55">
-                    <span>Free previews</span>
-                    <span>{Math.min(account.generationCount, account.freeLimit)} of {account.freeLimit} used</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-sand-200">
-                    <div className="h-full rounded-full bg-terracotta" style={{ width: `${Math.min(100, (account.generationCount / account.freeLimit) * 100)}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs text-charcoal/50">
-                    {freeLeft > 0 ? "Your free preview is ready to use." : "You've used your free preview. Upgrade to keep designing in full 2K."}
+                <div className="flex flex-col gap-3">
+                  <UsageBar label="Free preview" used={usage.rendersUsed} limit={usage.rendersLimit ?? 1} />
+                  <UsageBar label="Free edit" used={usage.editsUsed} limit={usage.editsLimit ?? 1} />
+                  <p className="text-xs text-charcoal/50">
+                    {!outOfRenders ? "Your free preview is ready to use." : "You've used your free preview. Upgrade to keep designing in full 2K."}
                   </p>
                 </div>
                 <button onClick={() => setPaywall("upgrade")}
@@ -167,10 +185,16 @@ export default function AccountPage() {
             ) : (
               <>
                 <p className="text-sm text-white/60">
-                  {plan.kind === "pass" && plan.expiresAt && <>Unlimited 2K renders, edits and Pro Reports until {fmtDate(plan.expiresAt)}. Nothing renews.</>}
-                  {plan.kind === "monthly" && <>Unlimited access to everything. Cancel anytime in 1-click.</>}
+                  {plan.kind === "pass" && plan.expiresAt && <>2K renders, edits and PDF Pro Reports until {fmtDate(plan.expiresAt)}. Nothing renews.</>}
+                  {plan.kind === "pro" && <>Unlimited renders and edits, 4K exports and a commercial use licence. Cancel anytime in 1-click.</>}
                   {plan.kind === "admin" && <>Every feature is unlocked on this account.</>}
                 </p>
+                {plan.kind === "pass" && usage.rendersLimit !== null && usage.editsLimit !== null && (
+                  <div className="flex flex-col gap-3">
+                    <UsageBar dark label="Renders" used={usage.rendersUsed} limit={usage.rendersLimit} />
+                    <UsageBar dark label="Edits" used={usage.editsUsed} limit={usage.editsLimit} />
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {plan.canManageBilling && (
                     <button onClick={manageBilling} disabled={billingBusy}
@@ -180,7 +204,7 @@ export default function AccountPage() {
                   )}
                   {plan.kind === "pass" && (
                     <button onClick={() => setPaywall("upgrade")} className="flex items-center gap-2 rounded-xl bg-terracotta px-4 py-2.5 text-sm font-bold text-white hover:bg-terracotta/90">
-                      <Sparkles size={15} /> Go Pro Monthly
+                      <Sparkles size={15} /> Go Pro for unlimited
                     </button>
                   )}
                 </div>
@@ -308,23 +332,23 @@ export default function AccountPage() {
         </section>
 
         {/* ── What the paid plans add ──────────────────────────── */}
-        {plan.kind !== "monthly" && plan.kind !== "admin" && (
+        {plan.kind !== "pro" && plan.kind !== "admin" && (
           <section className="rounded-3xl border border-terracotta/25 bg-terracotta/5 p-5 sm:p-7">
             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-charcoal">{isFree ? "What you’re missing with Pro" : "Even more with Pro Monthly"}</h2>
+                <h2 className="text-lg font-bold text-charcoal">{isFree ? "What you’re missing" : "Even more with Reno Ready Pro"}</h2>
                 <p className="text-sm text-charcoal/55">
-                  {isFree ? "Your free preview shows the idea. Pro gets it ready for a builder." : "Your pass covers this project. Pro Monthly keeps every room going."}
+                  {isFree ? "Your free preview shows the idea. A paid plan gets it ready for a builder." : "Your pass covers this project. Pro keeps every room going, with 4K and a commercial licence."}
                 </p>
               </div>
               <button onClick={() => setPaywall("upgrade")}
                 className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-bold text-white shadow-warm-sm hover:bg-terracotta/90 sm:mt-0">
-                <Sparkles size={15} /> {isFree ? "See plans" : "Start 7-day free trial"}
+                <Sparkles size={15} /> {isFree ? "See plans" : "See Pro"}
               </button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {PRO_PERKS.map((p, i) => {
-                const has = !isFree && i < 4;   // the pass includes the first four
+                const has = !isFree && i < PASS_PERKS;
                 return (
                   <div key={p.title} className="flex gap-3 rounded-2xl bg-white/80 p-4">
                     <span className={cn("flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full",

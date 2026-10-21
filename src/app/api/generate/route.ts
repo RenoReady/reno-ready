@@ -26,7 +26,8 @@ import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { saveGeneration } from "@/lib/generations";
-import { FREE_GENERATION_LIMIT, hasActivePlan } from "@/lib/plans";
+import { isPaidTier } from "@/lib/plans";
+import { getAllowance, canUse, recordUsage, type UsageKind } from "@/lib/usage";
 
 // Vercel hobby plan caps serverless functions at 60 s.
 // We set 55 s here so we have time to return a clean error rather than a raw 504.
@@ -91,7 +92,8 @@ interface GenerateResponse {
   mock?:             boolean;         // true when running in mock mode
   error?:            string;
   upgrade_required?: boolean;         // true when the user must upgrade
-  reason?:           "auth_required" | "limit_reached" | "pro_feature";
+  reason?:           "auth_required" | "limit_reached" | "edit_limit";
+  tier?:             string;
   /** Output resolution: 2K for paid plans, 1K for the free preview */
   resolution?:       "1K" | "2K";
 }
@@ -359,39 +361,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     }
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    let hasPro = isAdmin;
+    const kind: UsageKind = body.mode === "refine" ? "edit" : "render";
+    const allowance = await getAllowance(user);
+    const hasPro = isPaidTier(allowance.tier);
 
-    if (!isAdmin) {
-      // Look up profile for subscription status + count
-      const svc = createSupabaseServiceRoleClient();
-      const { data: profile } = await svc
-        .from("profiles")
-        .select("generation_count, subscription_plan, subscription_expires_at")
-        .eq("id", user.id)
-        .single();
-
-      hasPro = hasActivePlan(profile?.subscription_plan, profile?.subscription_expires_at);
-
-      if (!hasPro) {
-        // "Not quite right?" edits are a paid feature
-        if (body.mode === "refine") {
-          return NextResponse.json({
-            success:          false,
-            upgrade_required: true,
-            reason:           "pro_feature",
-            error:            "Edits are part of the 7-Day Project Pass and Pro Monthly. Upgrade to refine your design.",
-          });
-        }
-        const count = profile?.generation_count ?? 0;
-        if (count >= FREE_GENERATION_LIMIT) {
-          return NextResponse.json({
-            success:          false,
-            upgrade_required: true,
-            reason:           "limit_reached",
-            error:            "You've used your free preview. Upgrade to keep designing.",
-          });
-        }
-      }
+    if (!canUse(allowance, kind)) {
+      const paid = hasPro;
+      return NextResponse.json({
+        success:          false,
+        upgrade_required: true,
+        reason:           kind === "edit" ? "edit_limit" : "limit_reached",
+        tier:             allowance.tier,
+        error: kind === "edit"
+          ? (paid ? "You've used all the edits in your pass." : "You've used your free edit. Upgrade for more edits.")
+          : (paid ? "You've used all the renders in your pass." : "You've used your free preview. Upgrade to keep designing."),
+      });
     }
     // ── End gate ──────────────────────────────────────────────────
 
@@ -414,9 +398,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       const imageUrl = result.imageUrl;
       after(async () => {
         if (!isAdmin) {
-          const { error } = await createSupabaseServiceRoleClient()
-            .rpc("increment_generation_count", { uid: user.id });
-          if (error) console.warn("[generate] Failed to increment count:", error.message);
+          await recordUsage(user.id, allowance, kind);
+          // lifetime preview count (edits aren't previews)
+          if (kind === "render") {
+            const { error } = await createSupabaseServiceRoleClient()
+              .rpc("increment_generation_count", { uid: user.id });
+            if (error) console.warn("[generate] Failed to increment count:", error.message);
+          }
         }
         if (imageUrl?.startsWith("data:")) {
           await saveGeneration({

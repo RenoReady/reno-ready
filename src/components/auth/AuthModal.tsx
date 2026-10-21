@@ -131,7 +131,7 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
         <div className="text-center">
           <h2 className="text-2xl font-bold text-charcoal mb-2">{title ?? "Sign in to generate"}</h2>
           <p className="text-charcoal/60 text-sm leading-relaxed">
-            {message ?? <>Your <strong>first AI preview is free</strong> when you sign in. No credit card required.</>}
+            {message ?? <>Your <strong>first AI preview and edit are free</strong> when you sign in. No credit card required.</>}
           </p>
         </div>
 
@@ -175,7 +175,7 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
         </div>
 
         <p className="text-center text-xs text-charcoal/40">
-          Then from <strong className="text-charcoal/60">$19 AUD</strong> for a 7-Day Project Pass with unlimited 2K renders.
+          Then from <strong className="text-charcoal/60">$19 AUD</strong> for a 7-Day Project Pass: 20 renders and 10 edits in 2K.
         </p>
       </div>
     </div>

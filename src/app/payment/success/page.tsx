@@ -34,7 +34,8 @@ async function SuccessContent({
   }
 
   if (plan === "projectPass" || plan === "dayPass") planLabel = "7-Day Project Pass";
-  if (plan === "proMonthly" || plan === "monthly") planLabel = "Pro Monthly / Unlimited";
+  if (plan === "proMonthly" || plan === "monthly") planLabel = "Reno Ready Pro (monthly)";
+  if (plan === "proAnnual"  || plan === "annual")  planLabel = "Reno Ready Pro (annual)";
 
   // ── (Optional) Mark user as paid in Supabase ──────────────────
   // Uncomment once Supabase is configured:

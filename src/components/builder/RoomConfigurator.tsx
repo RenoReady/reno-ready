@@ -50,7 +50,7 @@ import KitchenSidebar from "@/components/ui/KitchenSidebar";
 import BedroomSidebar from "@/components/ui/BedroomSidebar";
 import HiddenCostAdvisor from "@/components/ui/HiddenCostAdvisor";
 import SourcingModal from "@/components/ui/SourcingModal";
-import { useUserStatus, bustUserStatusCache, hasProAccess } from "@/lib/useUserStatus";
+import { useUserStatus, bustUserStatusCache, hasProAccess, hasProTier, remaining } from "@/lib/useUserStatus";
 import { cn, formatAUD } from "@/lib/utils";
 import {
   type ProjectBrief,
@@ -600,11 +600,14 @@ function ArchitectViewport({
   onGenerate, onRegionClick, onZoneClick, isGenerating,
   viewportState, generateDescription, generateError, activeZone, refinementMode,
   historyLength, historyIdx, onNavigateHistory, brushRef, brushSize = "M", onMaskChange,
-  watermark = false, onUpgrade,
+  watermark = false, onUpgrade, canExport4k = false, on4kLocked,
 }: {
   /** Free tier: diagonal watermark on the render, watermarked downloads */
   watermark?:        boolean;
   onUpgrade?:        () => void;
+  /** Pro: 4K export button works; otherwise it opens the upgrade pop-up */
+  canExport4k?:      boolean;
+  on4kLocked?:       () => void;
   /** "Not quite right?" highlighter */
   brushRef?:         React.Ref<BrushMaskHandle>;
   brushSize?:        BrushSize;
@@ -625,6 +628,33 @@ function ArchitectViewport({
   const { roomPhotoUrl, generatedImageUrl, floorTile, wallTile, vanity, tapware, floorFormat, wallFormat } = useBuilderStore();
 
   const viewportRef   = useRef<HTMLDivElement>(null);
+  const [exporting4k, setExporting4k] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const export4k = async () => {
+    if (!generatedImageUrl || exporting4k) return;
+    if (!canExport4k) { on4kLocked?.(); return; }
+    setExporting4k(true);
+    setExportError(null);
+    try {
+      const res = await fetch("/api/export-4k", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: await toJpeg(generatedImageUrl, 0.92) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error ?? "Export failed");
+      // the link is served as a download, so this saves the file
+      const a = document.createElement("a");
+      a.href = data.url;
+      a.rel = "noopener";
+      a.click();
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting4k(false);
+    }
+  };
   const [isFullscreen,    setIsFullscreen]    = useState(false);
   const [beforeAfterMode, setBeforeAfterMode] = useState(false);
   const [sliderPos,       setSliderPos]       = useState(50);
@@ -759,6 +789,24 @@ function ArchitectViewport({
             )}
           >
             <Download size={12} /> Download
+          </button>
+        )}
+
+        {hasGenerated && generatedImageUrl && (
+          <button
+            onClick={export4k}
+            disabled={exporting4k}
+            title={canExport4k ? "Export a print-quality 4K version" : "4K exports are part of Reno Ready Pro"}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200",
+              canExport4k
+                ? "bg-amber-300/90 text-charcoal hover:bg-amber-300"
+                : "border border-amber-300/40 text-amber-200/80 hover:text-amber-200 hover:border-amber-300/70",
+              exporting4k && "opacity-70 cursor-wait",
+            )}
+          >
+            {exporting4k ? <Loader2 size={12} className="animate-spin" /> : canExport4k ? <Download size={12} /> : <Lock size={11} />}
+            {exporting4k ? "Exporting 4K\u2026" : "4K"}
           </button>
         )}
 
@@ -958,6 +1006,10 @@ function ArchitectViewport({
         </span>
       </div>
 
+      {exportError && (
+        <div className="px-4 py-2 bg-[#151920] text-[11px] text-red-300">{exportError}</div>
+      )}
+
       {generateDescription && !isGenerating && (
         <div className="px-4 pb-3 bg-[#151920]">
           <p className="text-[11px] text-white/40 leading-relaxed">{generateDescription}</p>
@@ -1155,6 +1207,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [paymentBanner,        setPaymentBanner]         = useState(false);
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
+  const [localEditBump,        setLocalEditBump]        = useState(0);
 
   // The query string we arrived with. The effect below tidies the address bar,
   // so later effects read this instead of window.location.
@@ -1509,12 +1562,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
     // Client-side early paywall — avoids a round-trip when we already know
     // the user is over the free limit. The API enforces this server-side too.
-    if (!userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium) {
-      const effectiveCount = userStatus.generationCount + localGenerationBump;
-      if (effectiveCount >= userStatus.freeLimit) {
-        setPaywall("limit");
-        return;
-      }
+    if (!userStatus.loading && remaining(userStatus, "render", localGenerationBump) === 0) {
+      setPaywall(userStatus.tier === "pass" ? "pass_limit" : "limit");
+      return;
     }
 
     setIsGenerating(true);
@@ -1578,7 +1628,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
           saveBuilderStateForAuth(true);
           setShowAuthModal(true);
         } else {
-          setPaywall("limit");
+          setPaywall(data.tier === "pass" ? "pass_limit" : "limit");
         }
         setIsGenerating(false);
         setViewportState("idle");
@@ -1593,10 +1643,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setGenerateError(null);
       setViewportState("ready");
       if (data.imageUrl) pushToHistory(data.imageUrl);
-      // Instantly decrement the displayed free counter without waiting for a re-fetch
-      if (!userStatus.isAdmin && !userStatus.isPremium) {
-        setLocalGenerationBump((b) => b + 1);
-      }
+      // Count it straight away without waiting for a re-fetch
+      setLocalGenerationBump((b) => b + 1);
       // Also bust the cache so it syncs the real count in the background
       bustUserStatusCache();
     } catch (err: unknown) {
@@ -1692,7 +1740,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       const data = await res.json();
       if (data.upgrade_required) {
-        setPaywall(data.reason === "pro_feature" ? "refine" : "limit");
+        setPaywall(data.tier === "pass" ? "pass_limit" : data.reason === "edit_limit" ? "refine" : "limit");
         // put the render back so they don't lose it
         setGeneratedImageUrl(store.generatedImageUrl);
         setViewportState("ready");
@@ -1706,6 +1754,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setViewportState("ready");
       if (data.imageUrl) pushToHistory(data.imageUrl);
       setMaskStrokes(0);
+      setLocalEditBump((b) => b + 1);
       bustUserStatusCache();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -1756,28 +1805,33 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Autosave the design: on this device always, to the account once signed in
   useDraftAutosave(!resumeOffer, !!userStatus.userId, () => ({ estimate: hasPreview ? liveEstimate : null }));
 
-  const showFreeCounter = !userStatus.loading && !userStatus.isAdmin && !userStatus.isPremium;
-  // Free tier (once we know): watermark on, edits and Pro Reports locked
-  const proLocked       = !userStatus.loading && !hasProAccess(userStatus);
-  const freeUsed        = userStatus.generationCount + localGenerationBump;
-  const freeRemaining   = Math.max(0, userStatus.freeLimit - freeUsed);
-  const freeExhausted   = freeUsed >= userStatus.freeLimit;
-  const freeLeftLabel   = showFreeCounter
-    ? (freeExhausted ? "Free previews used" : `${freeRemaining} free ${freeRemaining === 1 ? "preview" : "previews"} left`)
-    : null;
+  // Free tier (once we know): watermark on, Pro Reports locked
+  const proLocked    = !userStatus.loading && !hasProAccess(userStatus);
+  const rendersLeft  = remaining(userStatus, "render", localGenerationBump);
+  const editsLeft    = remaining(userStatus, "edit", localEditBump);
+  // Pro has no counter on screen (fair use); free and the pass show what's left
+  const showCounter  = !userStatus.loading && (userStatus.tier === "free" || userStatus.tier === "pass");
+  const outOfRenders = rendersLeft === 0;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const freeLeftLabel = !showCounter ? null
+    : userStatus.tier === "free"
+      ? (outOfRenders ? "Free preview used" : "1 free preview \u00b7 1 free edit")
+      : `${plural(rendersLeft ?? 0, "render")} \u00b7 ${plural(editsLeft ?? 0, "edit")} left`;
+  const lockedEdits = !userStatus.loading && editsLeft === 0;
+  const openEditsPaywall = () => setPaywall(userStatus.tier === "pass" ? "pass_limit" : "refine");
 
-  const freeCounter = showFreeCounter && (
+  const freeCounter = showCounter && (
     <button
-      onClick={() => setPaywall("limit")}
+      onClick={() => setPaywall(userStatus.tier === "pass" ? "pass_limit" : "limit")}
       className={cn(
         "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300",
-        freeExhausted
+        outOfRenders
           ? "bg-terracotta/10 text-terracotta border border-terracotta/20 hover:bg-terracotta/15"
-          : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30 cursor-default",
+          : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30",
       )}
     >
-      <span>{freeExhausted ? "Free previews used — tap to upgrade" : freeLeftLabel}</span>
-      {freeExhausted && <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">Upgrade</span>}
+      <span>{outOfRenders ? (userStatus.tier === "pass" ? "Pass renders used \u2014 go Pro for unlimited" : "Free preview used \u2014 tap to upgrade") : freeLeftLabel}</span>
+      <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">{userStatus.tier === "pass" ? "Go Pro" : "Upgrade"}</span>
     </button>
   );
 
@@ -2454,6 +2508,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 onMaskChange={setMaskStrokes}
                 watermark={proLocked}
                 onUpgrade={() => setPaywall("watermark")}
+                canExport4k={hasProTier(userStatus)}
+                on4kLocked={() => setPaywall("4k")}
                 historyLength={genHistory.length}
                 historyIdx={historyIdx}
                 onNavigateHistory={navigateHistory}
@@ -2467,7 +2523,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     <div className="flex gap-3">
                       {/* Orange — enter refinement mode */}
                       <button
-                        onClick={() => (proLocked ? setPaywall("refine") : setRefinementMode(true))}
+                        onClick={() => (lockedEdits ? openEditsPaywall() : setRefinementMode(true))}
                         className={cn(
                           "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
                           "bg-terracotta text-white text-sm font-bold",
@@ -2475,9 +2531,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                           "transition-all duration-200",
                         )}
                       >
-                        {proLocked ? <Lock size={15} /> : <Sparkles size={16} />}
+                        {lockedEdits ? <Lock size={15} /> : <Sparkles size={16} />}
                         Not quite right?
-                        {proLocked && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Pro</span>}
+                        {showCounter && editsLeft !== null && (
+                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                            {editsLeft === 0 ? "Upgrade" : userStatus.tier === "free" ? "1 free edit" : `${editsLeft} left`}
+                          </span>
+                        )}
                       </button>
 
                       {/* Blue — proceed to full preview */}

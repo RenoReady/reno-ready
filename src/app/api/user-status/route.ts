@@ -1,21 +1,18 @@
 /**
  * GET /api/user-status
  *
- * Returns the current user's auth + subscription state so the client
- * can gate generation without exposing the service-role key.
+ * The current user's plan and what they have left, so the builder can show
+ * counters and gate features without exposing the service-role key.
  *
- * Response:
- *  { isAdmin, isPremium, generationCount, userId, freeLimit }
- *
- * isAdmin    — email matches ADMIN_EMAIL env var; unlimited access
- * isPremium  — active 7-Day Project Pass or Pro Monthly (legacy day_pass / annual too)
- * freeLimit  — how many free generations are allowed (1)
+ *  tier          free | pass | pro | admin
+ *  isPremium     a paid plan is active (pass or Pro) — no watermark, PDF reports
+ *  renders/edits used + limit for the current period (limit null = no limit)
  */
 
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { ADMIN_EMAIL } from "@/lib/config";
-import { FREE_GENERATION_LIMIT, hasActivePlan } from "@/lib/plans";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TIER_LIMITS, FREE_GENERATION_LIMIT, isPaidTier, type Tier } from "@/lib/plans";
+import { getAllowance } from "@/lib/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -23,46 +20,40 @@ interface UserStatusResponse {
   userId:          string | null;
   isAdmin:         boolean;
   isPremium:       boolean;
+  tier:            Tier;
   generationCount: number;
   freeLimit:       number;
+  rendersUsed:     number;
+  rendersLimit:    number | null;
+  editsUsed:       number;
+  editsLimit:      number | null;
 }
 
 export async function GET(): Promise<NextResponse<UserStatusResponse>> {
   const empty: UserStatusResponse = {
-    userId:          null,
-    isAdmin:         false,
-    isPremium:       false,
-    generationCount: 0,
-    freeLimit:       FREE_GENERATION_LIMIT,
+    userId: null, isAdmin: false, isPremium: false, tier: "free",
+    generationCount: 0, freeLimit: FREE_GENERATION_LIMIT,
+    rendersUsed: 0, rendersLimit: TIER_LIMITS.free.renders,
+    editsUsed: 0, editsLimit: TIER_LIMITS.free.edits,
   };
 
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-
     if (!user) return NextResponse.json(empty);
 
-    const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-    // Use service role to read profile (bypasses RLS, avoids any permission edge-cases)
-    const svc = createSupabaseServiceRoleClient();
-    const { data: profile } = await svc
-      .from("profiles")
-      .select("generation_count, subscription_plan, subscription_expires_at")
-      .eq("id", user.id)
-      .single();
-
-    const generationCount = profile?.generation_count ?? 0;
-
-    // Premium = active paid plan that hasn't expired
-    const isPremium = hasActivePlan(profile?.subscription_plan, profile?.subscription_expires_at);
-
+    const a = await getAllowance(user);
     return NextResponse.json({
       userId:          user.id,
-      isAdmin,
-      isPremium,
-      generationCount,
+      isAdmin:         a.tier === "admin",
+      isPremium:       isPaidTier(a.tier) && a.tier !== "admin",
+      tier:            a.tier,
+      generationCount: a.generationCount,
       freeLimit:       FREE_GENERATION_LIMIT,
+      rendersUsed:     a.rendersUsed,
+      rendersLimit:    a.rendersLimit,
+      editsUsed:       a.editsUsed,
+      editsLimit:      a.editsLimit,
     });
   } catch (err) {
     console.error("[user-status]", err);

@@ -8,9 +8,7 @@ import {
 import Button from "@/components/ui/Button";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
 import ScrollReveal from "@/components/ui/ScrollReveal";
-import BuyButton from "@/components/ui/BuyButton";
-import { PLAN_COPY } from "@/lib/plans";
-import PricingMotion from "@/components/ui/PricingMotion";
+import PricingPlans from "@/components/ui/PricingPlans";
 import Marquee from "@/components/ui/Marquee";
 import { type PlanKey } from "@/lib/plans";
 import HeroVideo from "@/components/ui/HeroVideo";
@@ -84,57 +82,6 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-// ── Pricing card ───────────────────────────────────────────────────
-function PricingCard({
-  badge, badgeColor, title, price, period, sub, features, cta, featured, plan, note,
-}: {
-  note?:       string;
-  badge?:      string;
-  badgeColor?: string;
-  title:       string;
-  price:       string;
-  period:      string;
-  sub:         string;
-  features:    string[];
-  cta:         string;
-  featured?:   boolean;
-  plan:        PlanKey;
-}) {
-  return (
-    <div className={`relative flex flex-col gap-6 p-7 rounded-3xl border-2 transition-shadow ${
-      featured
-        ? "border-terracotta bg-terracotta/4 shadow-warm-lg"
-        : "border-sand-200 bg-white/70 shadow-warm-sm hover:shadow-warm"
-    }`}>
-      {badge && (
-        <div className={`absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap ${badgeColor ?? "bg-terracotta"}`}>
-          {badge}
-        </div>
-      )}
-      <div>
-        <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest mb-3">{title}</p>
-        <div className="flex items-end gap-1.5">
-          <span className="text-4xl font-bold text-charcoal">{price}</span>
-          <span className="text-charcoal/50 text-sm mb-1.5">{period}</span>
-        </div>
-        <p className="text-sm text-charcoal/55 mt-1">{sub}</p>
-      </div>
-      <ul className="flex flex-col gap-2.5">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2.5 text-sm text-charcoal/75">
-            <Check size={15} className="text-terracotta mt-0.5 flex-shrink-0" strokeWidth={2.5} />
-            {f}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-auto flex flex-col gap-2">
-        <BuyButton plan={plan} label={cta} featured={featured} />
-        {note && <p className="text-xs leading-snug text-charcoal/45 text-center">{note}</p>}
-      </div>
-    </div>
-  );
-}
-
 // ── JSON-LD structured data ────────────────────────────────────────
 const jsonLd = {
   "@context": "https://schema.org",
@@ -155,11 +102,12 @@ const jsonLd = {
     "@type": "AggregateOffer",
     "priceCurrency": "AUD",
     "lowPrice": "0",
-    "highPrice": "29",
+    "highPrice": "399",
     "offers": [
-      { "@type": "Offer", "name": "Free",                    "price": "0",  "priceCurrency": "AUD", "description": "1 free AI preview, no credit card required" },
-      { "@type": "Offer", "name": "7-Day Project Pass",      "price": "19", "priceCurrency": "AUD", "description": "One-time payment: 7 days of unlimited 2K renders, edits and PDF Pro Reports" },
-      { "@type": "Offer", "name": "Pro Monthly / Unlimited", "price": "29", "priceCurrency": "AUD", "description": "Unlimited access, multi-room PDF reports and contractor lead tools. 7-day free trial" },
+      { "@type": "Offer", "name": "Free",               "price": "0",   "priceCurrency": "AUD", "description": "1 AI preview and 1 edit, no credit card required" },
+      { "@type": "Offer", "name": "7-Day Project Pass", "price": "19",  "priceCurrency": "AUD", "description": "One-time: 20 renders and 10 edits in 2K plus PDF Pro Reports, for 7 days" },
+      { "@type": "Offer", "name": "Reno Ready Pro",     "price": "49",  "priceCurrency": "AUD", "description": "Monthly: unlimited 2K renders and edits, 4K exports, multi-room reports, commercial use licence" },
+      { "@type": "Offer", "name": "Reno Ready Pro (annual)", "price": "399", "priceCurrency": "AUD", "description": "Yearly: everything in Pro" },
     ],
   },
   "featureList": [
@@ -237,7 +185,7 @@ export default function LandingPage() {
 
                 {/* Trust badges */}
                 <div className="flex flex-wrap items-center gap-5 pt-1">
-                  {["1 free preview", "No credit card", "Bathrooms · Kitchens · Bedrooms"].map((b) => (
+                  {["1 free preview + edit", "No credit card", "Bathrooms · Kitchens · Bedrooms"].map((b) => (
                     <div key={b} className="flex items-center gap-2 text-sm font-medium text-charcoal/60">
                       <CheckCircle2 size={15} className="text-terracotta" />
                       {b}
@@ -604,47 +552,16 @@ export default function LandingPage() {
           PRICING
       ══════════════════════════════════════════════════════════ */}
       <section id="pricing" className="py-24 px-6 bg-white/40 border-y border-sand-200">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
             <p className="text-sm font-bold text-terracotta uppercase tracking-widest mb-3">Simple, Transparent Pricing</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-charcoal mb-4">Unlock Full 2K Designs &amp; Contractor PDF Reports</h2>
             <p className="text-base sm:text-lg text-charcoal/55 max-w-2xl mx-auto">
-              Your first preview is free. Upgrade to remove the watermark, edit any detail with &ldquo;Not quite right?&rdquo; and hand your builder a PDF Pro Report.
+              Your first preview and edit are free. Upgrade for crisp 2K renders, more &ldquo;Not quite right?&rdquo; edits and a PDF report your builder can quote from.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6 items-stretch mt-8 max-w-4xl mx-auto">
-            {(["projectPass", "proMonthly"] as const).map((key, i) => {
-              const c = PLAN_COPY[key];
-              return (
-                <PricingMotion key={key} index={i}>
-                  <PricingCard
-                    plan={key}
-                    badge={c.badge}
-                    badgeColor={key === "proMonthly" ? undefined : "bg-charcoal"}
-                    title={c.title.toUpperCase()}
-                    price={c.price}
-                    period={c.period}
-                    sub={c.sub}
-                    features={c.features}
-                    cta={c.cta}
-                    note={c.note}
-                    featured={key === "proMonthly"}
-                  />
-                </PricingMotion>
-              );
-            })}
-          </div>
-
-          {/* Guarantee strip */}
-          <div className="flex flex-wrap items-center justify-center gap-8 mt-10 text-sm text-charcoal/50">
-            {["No contracts, cancel anytime in 1-click", "1 free preview, no card needed", "30-Day Money-Back Guarantee"].map((t) => (
-              <div key={t} className="flex items-center gap-2">
-                <BadgeCheck size={16} className="text-terracotta/60" />
-                {t}
-              </div>
-            ))}
-          </div>
+          <PricingPlans />
         </div>
       </section>
 
@@ -673,7 +590,9 @@ export default function LandingPage() {
               { q: "Does the AI understand my specific room layout?",
                 a: "Yes. When you upload a photo of your current room, our AI analyses the image to identify plumbing points, walls, windows, and structural elements — ensuring the redesign fits your actual space. Without a photo, we generate a high-quality concept room using your selected materials from scratch." },
               { q: "What do I get for free, and what do the paid plans add?",
-                a: "Every account gets 1 free AI preview of any room — no credit card required. Free previews carry a small watermark. The 7-Day Project Pass ($19, one-time) gives you 7 days of unlimited 2K renders, \u201cNot quite right?\u201d edits and downloadable PDF Pro Reports. Pro Monthly ($29/mo) includes everything, plus multi-room reports and contractor lead tools, and starts with a 7-day free trial. Cancel anytime in 1-click." },
+                a: "Every account gets 1 free AI preview and 1 \u201cNot quite right?\u201d edit of any room, with no credit card required. Free images carry a small watermark. The 7-Day Project Pass ($19, one-time) gives you 20 renders and 10 edits in 2K, no watermark and downloadable PDF Pro Reports for 7 days. Reno Ready Pro ($49/mo, or $399/yr) is for agents, designers, investors and multi-room renovators: unlimited renders and edits (fair use), 4K exports, multi-room reports, a commercial use licence and priority support. Cancel anytime in 1-click." },
+              { q: "Can I use the images commercially?",
+                a: "With Reno Ready Pro, yes: you can use your renders in property listings, marketing, brochures and client presentations. Free and Project Pass images are for personal use, such as planning your renovation and sharing it with your builder, family and friends." },
             ].map(({ q, a }, i) => (
               <ScrollReveal key={q} delay={i * 0.07}>
                 <FaqItem q={q} a={a} />
@@ -690,7 +609,7 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-terracotta/20 border border-terracotta/30 w-fit mx-auto mb-8">
             <Zap size={14} className="text-terracotta" />
-            <span className="text-sm font-semibold text-terracotta">1 free preview on sign-up · Any room</span>
+            <span className="text-sm font-semibold text-terracotta">1 free preview + 1 free edit · Any room</span>
           </div>
           <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6 text-balance">
             Ready to reimagine your home?

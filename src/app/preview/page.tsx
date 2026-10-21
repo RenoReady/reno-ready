@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import PaywallModal from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
-import { useUserStatus, hasProAccess } from "@/lib/useUserStatus";
+import { useUserStatus, hasProAccess, hasProTier } from "@/lib/useUserStatus";
+import type { ReportBrand } from "@/lib/generateProReportPDF";
 import { downloadImage } from "@/lib/watermark";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -141,6 +142,14 @@ export default function PreviewPage() {
 
   // Free tier: watermark on the render, Pro Report locked
   const userStatus = useUserStatus();
+  // Pro: the user's own branding on the report, and who it's for
+  const isPro = hasProTier(userStatus);
+  const [brand, setBrand] = useState<ReportBrand | null | undefined>(undefined);
+  const [preparedFor, setPreparedFor] = useState("");
+  useEffect(() => {
+    if (!isPro) return;
+    fetch("/api/brand", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => setBrand(d?.brand ?? null)).catch(() => setBrand(null));
+  }, [isPro]);
   const proLocked  = !userStatus.loading && !hasProAccess(userStatus);
 
   const handleDownloadPDF = async () => {
@@ -186,6 +195,7 @@ export default function PreviewPage() {
         roomType,
         kitchenSelections,
         bedroomSelections,
+        ...(isPro && brand && { brand, preparedFor: preparedFor.trim() || null }),
       });
     } catch (err) {
       console.error("PDF generation failed:", err);
@@ -506,6 +516,25 @@ export default function PreviewPage() {
                 <ArrowRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
+
+            {/* Pro: branded report */}
+            {isPro && brand !== undefined && (
+              brand ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-sand-200 bg-white/70 p-3.5">
+                  <p className="flex items-center justify-between gap-2 text-xs font-semibold text-charcoal/60">
+                    <span>Report branded as <span className="font-bold text-charcoal">{brand.businessName}</span></span>
+                    <Link href="/account#branding" className="text-terracotta underline underline-offset-2">Edit</Link>
+                  </p>
+                  <input value={preparedFor} onChange={(e) => setPreparedFor(e.target.value)} maxLength={60}
+                    placeholder="Prepared for (client name, optional)"
+                    className="rounded-xl border border-sand-300 bg-white px-3 py-2 text-base text-charcoal outline-none placeholder:text-charcoal/35 focus:border-terracotta focus:ring-2 focus:ring-terracotta/20 sm:text-sm" />
+                </div>
+              ) : (
+                <Link href="/account#branding" className="rounded-2xl border border-dashed border-terracotta/40 bg-terracotta/5 px-4 py-3 text-center text-xs font-semibold text-terracotta hover:bg-terracotta/10">
+                  Add your logo and business details to this report
+                </Link>
+              )
+            )}
 
             {/* Pro Report PDF download */}
             <button

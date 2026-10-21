@@ -12,8 +12,9 @@ import Link from "next/link";
 import {
   Sparkles, History, Image as ImageIcon, Lock, Check, CreditCard, Loader2, Trash2,
   ArrowRight, Download, X, Bath, ChefHat, BedDouble, MessageSquare, Crown, CalendarClock,
-  Link2, Copy, ExternalLink,
+  Link2, Copy, ExternalLink, Palette,
 } from "lucide-react";
+import BrandForm from "@/components/account/BrandForm";
 import AuthModal from "@/components/auth/AuthModal";
 import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
@@ -44,6 +45,7 @@ const PRO_PERKS = [
   { title: "Commercial use licence",       body: "Use your renders in property listings and marketing." },
   { title: "4 variations per click",       body: "Four takes on the same room at once, to compare options." },
   { title: "Client share links",           body: "Send a private before/after page. No account needed to view it." },
+  { title: "Branded PDF reports",          body: "Your logo, contact details and colours on every report." },
 ];
 /** The Project Pass includes the first PASS_PERKS of the list above */
 const PASS_PERKS = 4;
@@ -355,6 +357,17 @@ export default function AccountPage() {
             </div>
           )}
         </section>
+
+        {/* ── Report branding (Pro) ────────────────────────────── */}
+        {(plan.kind === "pro" || plan.kind === "admin") && (
+          <section id="branding" className="scroll-mt-32">
+            <div className="mb-3">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-charcoal"><Palette size={18} className="text-terracotta" /> Report branding</h2>
+              <p className="text-sm text-charcoal/50">Your logo, details and colour on every PDF Pro Report you download, in place of Reno Ready&apos;s.</p>
+            </div>
+            <BrandForm />
+          </section>
+        )}
 
         {/* ── Client share links (Pro) ─────────────────────────── */}
         {shares !== null && (

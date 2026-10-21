@@ -96,9 +96,8 @@ export default function TermsPage() {
           <Section id="cancel" title="4. Cancelling and refunds">
             <List items={[
               <><strong>Cancel anytime.</strong> Cancel Pro in one click from the account menu (&ldquo;Manage or cancel subscription&rdquo;) or My Account. There&apos;s no contract or cancellation fee. Your Pro access continues until the end of the month or year you&apos;ve already paid for, and you won&apos;t be charged again.</>,
-              <><strong>30-day money-back guarantee.</strong> If you&apos;re not happy with your first purchase of a paid plan, email us within 30 days of paying and we&apos;ll refund that payment in full. This applies once per customer, to your first payment for each plan.</>,
-              <><strong>Your consumer rights.</strong> You&apos;re also entitled to a remedy under the Australian Consumer Law if our service has a major failure, whether or not you&apos;re within 30 days.</>,
-              "Apart from the above, payments for time already used (such as an expired pass or a past Pro period) aren't refundable.",
+              <><strong>No refunds for change of mind.</strong> Your free preview and free edit let you try Reno Ready before you pay, so we don&apos;t give refunds if you simply change your mind, don&apos;t use your plan, or use only part of it. Cancelling Pro stops future payments; it doesn&apos;t refund the current month or year.</>,
+              <><strong>Your consumer rights.</strong> This doesn&apos;t limit your rights under the Australian Consumer Law. If our service has a major failure (for example, it doesn&apos;t work or isn&apos;t as described), you&apos;re entitled to a refund or another remedy. Email us and we&apos;ll sort it out.</>,
             ]} />
           </Section>
 

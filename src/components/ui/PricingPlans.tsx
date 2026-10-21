@@ -180,7 +180,7 @@ export default function PricingPlans({ compact = false, showTable = !compact }: 
         <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-sm font-semibold text-charcoal/60">
           <span className="flex items-center gap-2"><BadgeCheck size={16} className="text-terracotta" /> No contracts, cancel anytime in 1-click</span>
           <span className="flex items-center gap-2"><Lock size={15} className="text-terracotta" /> Secure checkout with Stripe</span>
-          {!compact && <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-terracotta" /> 30-Day Money-Back Guarantee</span>}
+          {!compact && <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-terracotta" /> Try it free before you pay</span>}
         </div>
         {compact && (
           <p className="text-center text-[11px] text-charcoal/45">

@@ -12,7 +12,7 @@ import Link from "next/link";
 import {
   Sparkles, History, Image as ImageIcon, Lock, Check, CreditCard, Loader2, Trash2,
   ArrowRight, Download, X, Bath, ChefHat, BedDouble, MessageSquare, Crown, CalendarClock,
-  Link2, Copy, ExternalLink, Palette, Hammer, FileText,
+  Link2, Copy, ExternalLink, Palette, Hammer, FileText, Eye, ThumbsUp, MessageCircleQuestion,
 } from "lucide-react";
 import BrandForm from "@/components/account/BrandForm";
 import ProjectPlanner from "@/components/account/ProjectPlanner";
@@ -29,7 +29,8 @@ import { ROOM_PAGES } from "@/lib/roomPages";
 import type { RoomType } from "@/lib/roomTypes";
 import type { AccountResponse } from "@/app/api/account/route";
 
-interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null }
+interface ShareReplySummary { kind: "approve" | "question"; name: string; contact: string; message: string | null; at: string }
+interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null; firstViewedAt?: string | null; replies: ShareReplySummary[] }
 interface BriefSummary { id: string; createdAt: string; room: string; estimate: number; timeline: string | null; address: string | null; reportUrl: string | null; renderUrl: string | null }
 import { cn, formatAUD } from "@/lib/utils";
 
@@ -426,7 +427,7 @@ export default function AccountPage() {
           <section>
             <div className="mb-3">
               <h2 className="flex items-center gap-2 text-lg font-bold text-charcoal"><Link2 size={18} className="text-terracotta" /> Client links</h2>
-              <p className="text-sm text-charcoal/50">Private before/after pages you&apos;ve shared. Turn one off and the link stops working.</p>
+              <p className="text-sm text-charcoal/50">Private before/after pages you&apos;ve shared, with your branding. Clients can approve a design or ask a question, and their replies show here. Turn one off and the link stops working.</p>
             </div>
             {shares.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-sand-300 bg-white/40 px-6 py-8 text-center text-sm text-charcoal/50">
@@ -435,14 +436,28 @@ export default function AccountPage() {
             ) : (
               <div className="flex flex-col divide-y divide-sand-100 overflow-hidden rounded-2xl border border-sand-200 bg-white/80">
                 {shares.map((sh) => (
-                  <div key={sh.id} className="flex items-center gap-3 p-3">
+                  <div key={sh.id} className="p-3">
+                  <div className="flex items-center gap-3">
                     {sh.thumbUrl
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={sh.thumbUrl} alt="" className="h-12 w-16 flex-shrink-0 rounded-lg object-cover" />
                       : <div className="h-12 w-16 flex-shrink-0 rounded-lg bg-sand-100" />}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-charcoal">{sh.title}</p>
-                      <p className="text-xs text-charcoal/50">{roomName(sh.roomType)} · shared {fmtDate(sh.createdAt)}</p>
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-charcoal/50">
+                        <span>{roomName(sh.roomType)} · shared {fmtDate(sh.createdAt)}</span>
+                        <span className={cn("flex items-center gap-1 font-semibold", sh.firstViewedAt ? "text-charcoal/60" : "text-charcoal/35")}>
+                          <Eye size={12} /> {sh.firstViewedAt ? `Opened ${fmtDate(sh.firstViewedAt)}` : "Not opened yet"}
+                        </span>
+                        {sh.replies.some((r) => r.kind === "approve") && (
+                          <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-bold text-emerald-700"><ThumbsUp size={11} /> Approved</span>
+                        )}
+                        {sh.replies.filter((r) => r.kind === "question").length > 0 && (
+                          <span className="flex items-center gap-1 rounded-md bg-terracotta/10 px-1.5 py-0.5 font-bold text-terracotta">
+                            <MessageCircleQuestion size={11} /> {sh.replies.filter((r) => r.kind === "question").length} question{sh.replies.filter((r) => r.kind === "question").length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <div className="flex flex-shrink-0 gap-1.5">
                       <button onClick={() => copyShare(sh.id)} className="flex items-center gap-1 rounded-lg bg-charcoal px-2.5 py-2 text-xs font-bold text-white hover:bg-charcoal/90">
@@ -454,6 +469,23 @@ export default function AccountPage() {
                         {deleting === sh.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                       </button>
                     </div>
+                  </div>
+                  {sh.replies.length > 0 && (
+                    <ul className="mt-2.5 flex flex-col gap-2 sm:ml-[76px]">
+                      {[...sh.replies].reverse().map((r, i) => (
+                        <li key={i} className="rounded-xl bg-sand-50 px-3 py-2 text-sm">
+                          <p className="flex flex-wrap items-center gap-x-2 text-xs text-charcoal/50">
+                            <span className="font-bold text-charcoal">{r.name}</span>
+                            <span className={r.kind === "approve" ? "font-semibold text-emerald-700" : "font-semibold text-terracotta"}>{r.kind === "approve" ? "approved it" : "asked a question"}</span>
+                            <span>{fmtDate(r.at)}</span>
+                          </p>
+                          {r.message && <p className="mt-1 whitespace-pre-line text-charcoal/75">{r.message}</p>}
+                          <a href={r.contact.includes("@") ? `mailto:${r.contact}` : `tel:${r.contact.replace(/[^\d+]/g, "")}`}
+                            className="mt-1 inline-block text-xs font-bold text-terracotta hover:underline">{r.contact}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   </div>
                 ))}
               </div>

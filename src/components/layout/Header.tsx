@@ -101,6 +101,9 @@ export default function Header() {
     });
   }
 
+  // client share links (/s/…) belong to the business that sent them, so no Reno Ready nav
+  if (pathname.startsWith("/s/")) return null;
+
   return (
     <header className="sticky top-0 z-50 w-full bg-sand-50/90 backdrop-blur-md border-b border-sand-200">
       <div className={cn(

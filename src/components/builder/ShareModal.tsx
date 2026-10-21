@@ -22,6 +22,12 @@ export default function ShareModal({ estimate, onClose }: { estimate: string | n
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // null while checking; false = no report branding yet, so the page would go out unbranded
+  const [branded, setBranded] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/brand", { cache: "no-store" }).then((r) => r.json()).then((d) => setBranded(!!d.brand)).catch(() => setBranded(null));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -71,7 +77,7 @@ export default function ShareModal({ estimate, onClose }: { estimate: string | n
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta"><Link2 size={18} /></div>
           <div className="flex-1">
             <h2 id="share-title" className="text-lg font-bold text-charcoal">Share with your client</h2>
-            <p className="text-sm text-charcoal/55">A private link with the before/after and the key finishes. No account needed to view it.</p>
+            <p className="text-sm text-charcoal/55">A private page with your branding, the before/after and the key finishes. Your client can approve it or ask a question, and you&apos;ll see their reply in My Account. No account needed to view it.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="rounded-xl p-2 text-charcoal/40 hover:bg-sand-50 hover:text-charcoal"><X size={18} /></button>
         </div>
@@ -94,6 +100,11 @@ export default function ShareModal({ estimate, onClose }: { estimate: string | n
                 <input type="checkbox" checked={withEstimate} onChange={(e) => setWithEstimate(e.target.checked)} className="h-4 w-4 accent-terracotta" />
                 Show the estimate ({estimate})
               </label>
+            )}
+            {branded === false && (
+              <p className="rounded-xl bg-sand-50 px-3.5 py-2.5 text-xs text-charcoal/60">
+                Add your logo and contact details under <a href="/account#branding" target="_blank" rel="noopener" className="font-bold text-terracotta hover:underline">Report branding</a> in My Account and they&apos;ll show on the page, including links you&apos;ve already sent.
+              </p>
             )}
             {error && <p className="text-sm text-red-500">{error}</p>}
             <button onClick={create} disabled={busy}

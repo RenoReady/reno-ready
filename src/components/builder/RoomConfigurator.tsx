@@ -9,7 +9,7 @@ import {
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
-  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp, Lock, LayoutGrid, Link2,
+  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp, Lock, LayoutGrid, Link2, Pencil,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -67,6 +67,10 @@ import {
   calcKitchenCost,
   calcBedroomCost,
 } from "@/lib/roomTypes";
+
+/** One tile in the Pro variations strip: take `root` (A–D), and `edit` 0 for the original or 1, 2… for edits of it */
+type Variation = { status: "pending" | "done" | "failed"; url?: string; root: number; edit: number };
+const variationLabel = (v: Pick<Variation, "root" | "edit">) => String.fromCharCode(65 + v.root) + (v.edit || "");
 
 // ══════════════════════════════════════════════════════════════════
 //  DESIGN CONCIERGE  — cycling tips during generation
@@ -1210,8 +1214,12 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
   const [localEditBump,        setLocalEditBump]        = useState(0);
-  // Pro: the last "4 variations" batch (shown as a strip under the preview)
-  const [variations, setVariations] = useState<{ status: "pending" | "done" | "failed"; url?: string }[]>([]);
+  // Pro: the last "4 variations" batch (shown as a strip under the preview).
+  // Edits join the strip right after the take they came from: B, then B1, B2…
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const variationsRef = useRef(variations);
+  variationsRef.current = variations;
+  const variationStripRef = useRef<HTMLDivElement>(null);
   const [shareOpen,  setShareOpen]  = useState(false);
 
   // The query string we arrived with. The effect below tidies the address bar,
@@ -1587,7 +1595,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
     setRefinementMode(false);   // reset to comparison view for each new generation
-    setVariations(count > 1 ? Array.from({ length: count }, () => ({ status: "pending" as const })) : []);
+    setVariations(count > 1 ? Array.from({ length: count }, (_, i) => ({ status: "pending" as const, root: i, edit: 0 })) : []);
     goTo("estimate");
 
     try {
@@ -1648,7 +1656,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             if (d.upgrade_required) { blocked = d; throw new Error("upgrade"); }
             if (!d.success || !d.imageUrl) throw new Error(d.error ?? "failed");
             ok++;
-            setVariations((v) => v.map((x, j) => (j === i ? { status: "done", url: d.imageUrl } : x)));
+            setVariations((v) => v.map((x) => (x.root === i && x.edit === 0 ? { ...x, status: "done", url: d.imageUrl } : x)));
             pushToHistory(d.imageUrl);
             if (!shown) {
               shown = true;
@@ -1659,7 +1667,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
               setIsGenerating(false);
             }
           } catch {
-            setVariations((v) => v.map((x, j) => (j === i ? { status: "failed" } : x)));
+            setVariations((v) => v.map((x) => (x.root === i && x.edit === 0 ? { ...x, status: "failed" } : x)));
           }
         }));
         setLocalGenerationBump((b) => b + ok);
@@ -1736,6 +1744,16 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     if (idx >= 0) { historyIdxRef.current = idx; setHistoryIdx(idx); }
   }, [setGeneratedImageUrl]);
 
+  // Keep the selected (or newly loading) tile in view as edits lengthen the strip
+  useEffect(() => {
+    const strip = variationStripRef.current;
+    const tile = strip?.querySelector<HTMLElement>("[data-active]");
+    if (!strip || !tile) return;
+    const left = tile.offsetLeft - strip.offsetLeft, right = left + tile.offsetWidth;
+    if (left < strip.scrollLeft) strip.scrollTo({ left: left - 4, behavior: "smooth" });
+    else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: right - strip.clientWidth + 4, behavior: "smooth" });
+  }, [variations, generatedImageUrl]);
+
   // Auto-trigger generation when returning from Google OAuth redirect.
   // Waits until userStatus has finished loading so the paywall check
   // inside executeGenerate uses real data (not the loading placeholder).
@@ -1767,6 +1785,16 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     // the painted area, captured before the render is cleared for the new one
     const highlighted = maskStrokes > 0 ? await brushRef.current?.highlighted().catch(() => null) ?? null : null;
     const roomWord = store.roomType;
+
+    // Editing one of the variations: its result joins the strip after that take's last edit (B → B1 → B2)
+    const parent = variationsRef.current.find((v) => v.url === store.generatedImageUrl);
+    const slot = parent && { root: parent.root, edit: Math.max(...variationsRef.current.filter((v) => v.root === parent.root).map((v) => v.edit)) + 1 };
+    const isSlot = (v: Variation) => !!slot && v.root === slot.root && v.edit === slot.edit;
+    if (slot) setVariations((vs) => {
+      const at = vs.reduce((last, v, i) => (v.root === slot.root ? i : last), -1) + 1;
+      return [...vs.slice(0, at), { status: "pending", ...slot }, ...vs.slice(at)];
+    });
+    const dropSlot = () => { if (slot) setVariations((vs) => vs.filter((v) => !isSlot(v))); };
 
     setIsRefining(true);
     setIsGenerating(true);
@@ -1817,10 +1845,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         // put the render back so they don't lose it
         setGeneratedImageUrl(store.generatedImageUrl);
         setViewportState("ready");
+        dropSlot();
         return;
       }
       if (!data.success) throw new Error(data.error ?? "Refinement failed");
 
+      if (slot && data.imageUrl) setVariations((vs) => vs.map((v) => (isSlot(v) ? { ...v, status: "done", url: data.imageUrl } : v)));
+      else dropSlot();
       setGeneratedImageUrl(data.imageUrl ?? null);
       setGenerateDescription(data.description ?? null);
       setGenerateError(null);
@@ -1832,6 +1863,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       console.error("[refine]", msg);
+      dropSlot();
       setGenerateError(msg);
       setViewportState("error");
     } finally {
@@ -2604,23 +2636,37 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             {variations.length > 0 && (
               <div className="rounded-2xl border border-sand-200 bg-white/70 p-3">
                 <p className="mb-2 flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-widest text-charcoal/50">
-                  <LayoutGrid size={13} className="text-terracotta" /> {variations.length} variations · tap to compare
+                  <LayoutGrid size={13} className="text-terracotta" />
+                  {(() => {
+                    const takes = variations.filter((v) => !v.edit).length, edits = variations.length - takes;
+                    return `${takes} variations${edits ? ` + ${edits} edit${edits > 1 ? "s" : ""}` : ""} · tap to compare`;
+                  })()}
                 </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {variations.map((v, i) => (
-                    v.status === "done" && v.url ? (
-                      <button key={i} type="button" onClick={() => pickVariation(v.url!)} aria-label={`Show variation ${i + 1}`} aria-pressed={generatedImageUrl === v.url}
-                        className={cn("relative aspect-[4/3] overflow-hidden rounded-xl ring-offset-2 transition", generatedImageUrl === v.url ? "ring-2 ring-terracotta" : "opacity-80 hover:opacity-100")}>
+                {/* scrolls sideways once edits push it past four tiles */}
+                <div ref={variationStripRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 pt-1">
+                  {variations.map((v) => {
+                    const label = variationLabel(v);
+                    // past four tiles, the next one peeks in so it's clear the strip scrolls
+                    const tile = cn("relative aspect-[4/3] flex-shrink-0 snap-start overflow-hidden rounded-xl",
+                      variations.length > 4 ? "w-[calc((100%-2rem)/4.4)]" : "w-[calc((100%-1.5rem)/4)]");
+                    return v.status === "done" && v.url ? (
+                      <button key={label} type="button" data-active={generatedImageUrl === v.url || undefined} onClick={() => pickVariation(v.url!)}
+                        aria-label={v.edit ? `Show edit ${v.edit} of variation ${label[0]}` : `Show variation ${label}`} aria-pressed={generatedImageUrl === v.url}
+                        className={cn(tile, "ring-offset-2 transition", generatedImageUrl === v.url ? "ring-2 ring-terracotta" : "opacity-80 hover:opacity-100")}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={v.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                        <span className="absolute left-1.5 top-1.5 rounded-md bg-black/55 px-1.5 text-[10px] font-bold text-white">{String.fromCharCode(65 + i)}</span>
+                        <span className={cn("absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md px-1.5 text-[10px] font-bold text-white", v.edit ? "bg-terracotta/90" : "bg-black/55")}>
+                          {v.edit > 0 && <Pencil size={9} strokeWidth={3} />}{label}
+                        </span>
                       </button>
                     ) : (
-                      <div key={i} className="flex aspect-[4/3] items-center justify-center rounded-xl bg-sand-100 text-[10px] font-semibold text-charcoal/40">
-                        {v.status === "pending" ? <Loader2 size={16} className="animate-spin text-terracotta" /> : "Didn\u2019t work"}
+                      <div key={label} data-active={(v.status === "pending" && v.edit > 0) || undefined}
+                        className={cn(tile, "flex flex-col items-center justify-center gap-1 bg-sand-100 text-[10px] font-semibold text-charcoal/40")}>
+                        {v.status === "pending" ? <Loader2 size={16} className="animate-spin text-terracotta" /> : "Didn’t work"}
+                        {v.edit > 0 && <span>Editing {label}</span>}
                       </div>
-                    )
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2698,7 +2744,17 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   /* ── Refinement mode: textarea + controls ── */
                   <div className="rounded-2xl border border-sand-200 bg-white/70 backdrop-blur-sm p-4 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-charcoal/60 uppercase tracking-widest">Refine your design</p>
+                      <p className="flex items-center gap-2 text-xs font-bold text-charcoal/60 uppercase tracking-widest">
+                        Refine your design
+                        {(() => {
+                          const v = variations.find((x) => x.url === generatedImageUrl);
+                          return v && (
+                            <span className="rounded-md bg-terracotta/10 px-1.5 py-0.5 text-[10px] normal-case tracking-normal text-terracotta">
+                              Editing {v.edit ? `edit ${variationLabel(v)}` : `variation ${variationLabel(v)}`}
+                            </span>
+                          );
+                        })()}
+                      </p>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => { setRefinementMode(false); setSelectedRegion(null); setMaskStrokes(0); }}

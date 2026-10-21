@@ -9,9 +9,13 @@
  *   <id>/share.json          ShareRecord
  *   <id>/after.jpg           the render
  *   <id>/before.jpg          the original photo, if any
+ *   <id>/replies.json        ShareReply[]: the client approving it or asking a question
  *   owners/<user_id>/<id>    empty marker, so an owner can list and delete theirs
  *
  * Ids are 12 random URL-safe characters, so links can't be guessed.
+ *
+ * The page shows the owner's report branding (looked up live, so links stay
+ * current when they change it) and lets the client reply to them.
  */
 
 import { randomBytes } from "node:crypto";
@@ -19,7 +23,28 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 
 export const SHARES_BUCKET = "shares";
 export const MAX_SHARES_PER_USER = 100;
+export const MAX_REPLIES_PER_SHARE = 20;
 const MAX_IMAGE_BYTES = 4_000_000;
+
+export interface ShareReply {
+  kind:    "approve" | "question";
+  name:    string;
+  /** Email or phone, whichever the client gave */
+  contact: string;
+  message: string | null;
+  at:      string;
+}
+
+/** The owner's business details as shown on the page (from their report branding) */
+export interface ShareBrand {
+  businessName: string;
+  phone:   string | null;
+  email:   string | null;
+  website: string | null;
+  licence: string | null;
+  accent:  string | null;
+  logoUrl: string | null;
+}
 
 export interface ShareRecord {
   id:         string;
@@ -32,6 +57,8 @@ export interface ShareRecord {
   estimate:   string | null;
   rows:       { label: string; value: string }[];
   hasBefore:  boolean;
+  /** When someone other than the owner first opened it */
+  firstViewedAt?: string | null;
 }
 
 export function isShareId(id: unknown): id is string {
@@ -99,13 +126,14 @@ export async function createShare(ownerId: string, input: {
   };
 
   const store = await bucket();
-  const put = async (path: string, body: Buffer, contentType: string) => {
-    const { error } = await store.upload(path, body, { contentType, upsert: false });
+  const put = async (path: string, body: Buffer, contentType: string, cacheControl?: string) => {
+    const { error } = await store.upload(path, body, { contentType, upsert: false, ...(cacheControl && { cacheControl }) });
     if (error) throw new Error(`Couldn't save the share: ${error.message}`);
   };
   await put(`${id}/after.jpg`, after, "image/jpeg");
   if (before) await put(`${id}/before.jpg`, before, "image/jpeg");
-  await put(`${id}/share.json`, Buffer.from(JSON.stringify(record)), "application/json");
+  // uncached: it's rewritten when the client first opens it
+  await put(`${id}/share.json`, Buffer.from(JSON.stringify(record)), "application/json", "0");
   await put(`owners/${ownerId}/${id}`, Buffer.from(""), "text/plain");
   return record;
 }
@@ -123,16 +151,61 @@ export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: s
   return { ...record, afterUrl, beforeUrl: record.hasBefore ? await sign("before.jpg") : null };
 }
 
-export async function listShares(ownerId: string): Promise<(ShareRecord & { thumbUrl: string | null })[]> {
+async function readJson<T>(path: string): Promise<T | null> {
+  const { data } = await (await bucket()).download(path);
+  try { return data ? (JSON.parse(await data.text()) as T) : null; } catch { return null; }
+}
+
+// overwritten files need cacheControl "0", or reads come back stale for an hour
+async function writeJson(path: string, value: unknown) {
+  const { error } = await (await bucket()).upload(path, Buffer.from(JSON.stringify(value)), { contentType: "application/json", upsert: true, cacheControl: "0" });
+  if (error) throw new Error(`Couldn't save: ${error.message}`);
+}
+
+export async function listShares(ownerId: string): Promise<(ShareRecord & { thumbUrl: string | null; replies: ShareReply[] })[]> {
   const ids = await ownedIds(ownerId);
   const store = await bucket();
-  const records = (await Promise.all(ids.map(async (id) => {
-    const { data } = await store.download(`${id}/share.json`);
-    try { return data ? (JSON.parse(await data.text()) as ShareRecord) : null; } catch { return null; }
-  }))).filter((r): r is ShareRecord => !!r && r.ownerId === ownerId);
+  const records = (await Promise.all(ids.map((id) => readJson<ShareRecord>(`${id}/share.json`))))
+    .filter((r): r is ShareRecord => !!r && r.ownerId === ownerId);
   records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const signed = records.length ? (await store.createSignedUrls(records.map((r) => `${r.id}/after.jpg`), 3600)).data ?? [] : [];
-  return records.map((r, i) => ({ ...r, thumbUrl: signed[i]?.signedUrl ?? null }));
+  const [signed, replies] = await Promise.all([
+    records.length ? store.createSignedUrls(records.map((r) => `${r.id}/after.jpg`), 3600).then((r) => r.data ?? []) : [],
+    Promise.all(records.map((r) => readJson<ShareReply[]>(`${r.id}/replies.json`))),
+  ]);
+  return records.map((r, i) => ({ ...r, thumbUrl: signed[i]?.signedUrl ?? null, replies: replies[i] ?? [] }));
+}
+
+/** Records the first time someone other than the owner opens the link */
+export async function markShareViewed(id: string): Promise<void> {
+  const record = await readJson<ShareRecord>(`${id}/share.json`);
+  if (!record || record.firstViewedAt) return;
+  await writeJson(`${id}/share.json`, { ...record, firstViewedAt: new Date().toISOString() });
+}
+
+/** Saves a client's reply; returns the share so the caller can notify its owner */
+export async function addShareReply(id: string, reply: Omit<ShareReply, "at">): Promise<ShareRecord> {
+  if (!isShareId(id)) throw new Error("Not found");
+  const record = await readJson<ShareRecord>(`${id}/share.json`);
+  if (!record) throw new Error("Not found");
+  const replies = (await readJson<ShareReply[]>(`${id}/replies.json`)) ?? [];
+  if (replies.length >= MAX_REPLIES_PER_SHARE) throw new Error("Too many replies");
+  await writeJson(`${id}/replies.json`, [...replies, { ...reply, at: new Date().toISOString() }]);
+  return record;
+}
+
+/** The owner's report branding for the page, or null if they haven't set it up; plus their account email */
+export async function shareOwner(ownerId: string): Promise<{ brand: ShareBrand | null; email: string | null }> {
+  const svc = createSupabaseServiceRoleClient();
+  const { data } = await svc.auth.admin.getUserById(ownerId);
+  const user = data?.user;
+  if (!user) return { brand: null, email: null };
+  const b = user.app_metadata?.brand as (Omit<ShareBrand, "logoUrl"> & { hasLogo?: boolean }) | undefined;
+  if (!b?.businessName) return { brand: null, email: user.email ?? null };
+  const logoUrl = b.hasLogo ? (await svc.storage.from("brands").createSignedUrl(`${ownerId}/logo.png`, 60 * 60 * 6)).data?.signedUrl ?? null : null;
+  return {
+    brand: { businessName: b.businessName, phone: b.phone ?? null, email: b.email ?? null, website: b.website ?? null, licence: b.licence ?? null, accent: b.accent ?? null, logoUrl },
+    email: user.email ?? null,
+  };
 }
 
 /** Deletes a share if it belongs to ownerId */
@@ -143,6 +216,6 @@ export async function deleteShare(ownerId: string, id: string): Promise<boolean>
   if (!data) return false;
   const record = JSON.parse(await data.text()) as ShareRecord;
   if (record.ownerId !== ownerId) return false;
-  await store.remove([`${id}/share.json`, `${id}/after.jpg`, `${id}/before.jpg`, `owners/${ownerId}/${id}`]);
+  await store.remove([`${id}/share.json`, `${id}/after.jpg`, `${id}/before.jpg`, `${id}/replies.json`, `owners/${ownerId}/${id}`]);
   return true;
 }

@@ -12,6 +12,7 @@ import Link from "next/link";
 import {
   Sparkles, History, Image as ImageIcon, Lock, Check, CreditCard, Loader2, Trash2,
   ArrowRight, Download, X, Bath, ChefHat, BedDouble, MessageSquare, Crown, CalendarClock,
+  Link2, Copy, ExternalLink,
 } from "lucide-react";
 import AuthModal from "@/components/auth/AuthModal";
 import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
@@ -23,6 +24,8 @@ import { downloadImage } from "@/lib/watermark";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import type { RoomType } from "@/lib/roomTypes";
 import type { AccountResponse } from "@/app/api/account/route";
+
+interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null }
 import { cn } from "@/lib/utils";
 
 const ROOM_ICON: Record<RoomType, typeof Bath> = { bathroom: Bath, kitchen: ChefHat, bedroom: BedDouble };
@@ -39,6 +42,8 @@ const PRO_PERKS = [
   { title: "4K exports",                   body: "Print-quality images for listings, brochures and presentations." },
   { title: "Multi-room reports",           body: "Bathroom, kitchen and bedroom in one builder brief." },
   { title: "Commercial use licence",       body: "Use your renders in property listings and marketing." },
+  { title: "4 variations per click",       body: "Four takes on the same room at once, to compare options." },
+  { title: "Client share links",           body: "Send a private before/after page. No account needed to view it." },
 ];
 /** The Project Pass includes the first PASS_PERKS of the list above */
 const PASS_PERKS = 4;
@@ -68,20 +73,40 @@ export default function AccountPage() {
   const [billingError, setBillingError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  // Pro: client share links
+  const [shares, setShares] = useState<ShareSummary[] | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/account", { cache: "no-store" });
       if (res.status === 401) { setState("signed-out"); return; }
       if (!res.ok) throw new Error(String(res.status));
-      setAccount(await res.json());
+      const acct = (await res.json()) as AccountResponse;
+      setAccount(acct);
       setState("ready");
       setDrafts(await listAccountDrafts() ?? []);
+      if (acct.plan.kind === "pro" || acct.plan.kind === "admin") {
+        const r = await fetch("/api/shares", { cache: "no-store" }).catch(() => null);
+        setShares(r?.ok ? (await r.json()).shares : []);
+      }
     } catch {
       setState("error");
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const shareUrl = (id: string) => `${window.location.origin}/s/${id}`;
+  const copyShare = async (id: string) => {
+    try { await navigator.clipboard.writeText(shareUrl(id)); setCopiedId(id); setTimeout(() => setCopiedId(null), 2_000); } catch { /* clipboard blocked */ }
+  };
+  const removeShare = async (id: string) => {
+    if (!window.confirm("Turn off this link? Anyone who has it won't be able to open it any more.")) return;
+    setDeleting(id);
+    const ok = (await fetch(`/api/shares/${id}`, { method: "DELETE" }).catch(() => null))?.ok;
+    if (ok) setShares((list) => list?.filter((x) => x.id !== id) ?? null);
+    setDeleting(null);
+  };
 
   const manageBilling = async () => {
     setBillingBusy(true); setBillingError(null);
@@ -330,6 +355,46 @@ export default function AccountPage() {
             </div>
           )}
         </section>
+
+        {/* ── Client share links (Pro) ─────────────────────────── */}
+        {shares !== null && (
+          <section>
+            <div className="mb-3">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-charcoal"><Link2 size={18} className="text-terracotta" /> Client links</h2>
+              <p className="text-sm text-charcoal/50">Private before/after pages you&apos;ve shared. Turn one off and the link stops working.</p>
+            </div>
+            {shares.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sand-300 bg-white/40 px-6 py-8 text-center text-sm text-charcoal/50">
+                No links yet. Tap &ldquo;Share with client&rdquo; under any preview to make one.
+              </div>
+            ) : (
+              <div className="flex flex-col divide-y divide-sand-100 overflow-hidden rounded-2xl border border-sand-200 bg-white/80">
+                {shares.map((sh) => (
+                  <div key={sh.id} className="flex items-center gap-3 p-3">
+                    {sh.thumbUrl
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={sh.thumbUrl} alt="" className="h-12 w-16 flex-shrink-0 rounded-lg object-cover" />
+                      : <div className="h-12 w-16 flex-shrink-0 rounded-lg bg-sand-100" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-charcoal">{sh.title}</p>
+                      <p className="text-xs text-charcoal/50">{roomName(sh.roomType)} · shared {fmtDate(sh.createdAt)}</p>
+                    </div>
+                    <div className="flex flex-shrink-0 gap-1.5">
+                      <button onClick={() => copyShare(sh.id)} className="flex items-center gap-1 rounded-lg bg-charcoal px-2.5 py-2 text-xs font-bold text-white hover:bg-charcoal/90">
+                        {copiedId === sh.id ? <Check size={13} /> : <Copy size={13} />}<span className="hidden sm:inline">{copiedId === sh.id ? "Copied" : "Copy link"}</span>
+                      </button>
+                      <a href={`/s/${sh.id}`} target="_blank" rel="noopener" aria-label="Open" className="flex items-center rounded-lg border border-sand-200 px-2.5 text-charcoal/55 hover:text-charcoal"><ExternalLink size={14} /></a>
+                      <button onClick={() => removeShare(sh.id)} disabled={deleting === sh.id} aria-label="Turn off link"
+                        className="flex items-center rounded-lg border border-sand-200 px-2.5 text-charcoal/45 hover:border-red-200 hover:text-red-500 disabled:opacity-50">
+                        {deleting === sh.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── What the paid plans add ──────────────────────────── */}
         {plan.kind !== "pro" && plan.kind !== "admin" && (

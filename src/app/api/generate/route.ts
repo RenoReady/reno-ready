@@ -26,7 +26,7 @@ import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { saveGeneration } from "@/lib/generations";
-import { isPaidTier } from "@/lib/plans";
+import { isPaidTier, isProTier } from "@/lib/plans";
 import { getAllowance, canUse, recordUsage, type UsageKind } from "@/lib/usage";
 
 // Vercel hobby plan caps serverless functions at 60 s.
@@ -44,6 +44,8 @@ interface GenerateRequest {
   mode?: "refine" | null;
   /** Refine only: the same render with the area to change tinted pink (the highlighter) */
   maskImageBase64?: string | null;
+  /** Pro "4 variations": which of the four (1 = the standard take) */
+  variation?: number | null;
   /** Optional project brief from the 3-question modal */
   projectBrief?: { yearBuilt: number; budgetTier: string; scope: string } | null;
   /** Which room is being generated */
@@ -92,7 +94,7 @@ interface GenerateResponse {
   mock?:             boolean;         // true when running in mock mode
   error?:            string;
   upgrade_required?: boolean;         // true when the user must upgrade
-  reason?:           "auth_required" | "limit_reached" | "edit_limit";
+  reason?:           "auth_required" | "limit_reached" | "edit_limit" | "pro_feature";
   tier?:             string;
   /** Output resolution: 2K for paid plans, 1K for the free preview */
   resolution?:       "1K" | "2K";
@@ -127,7 +129,23 @@ function promptFor(req: GenerateRequest): string {
     return req.prompt.trim().slice(0, 2_000) + (maskFor(req) ? REFINE_MASK_INSTRUCTION : "") +
       "\nOutput: the same photo, same framing and camera, photorealistic, no text or labels.";
   }
-  return buildGeminiPrompt(req);
+  return buildGeminiPrompt(req) + variationHint(req.variation);
+}
+
+/**
+ * Each of the four variations keeps every chosen finish and the room itself,
+ * and takes a different styling angle so the client has real options.
+ */
+const VARIATION_HINTS: Record<number, string> = {
+  2: "Styling and accessories: a warmer, softer take (natural textiles, timber accents, warm afternoon light).",
+  3: "Styling and accessories: a crisp, minimal take (clean surfaces, few accessories, bright cool daylight).",
+  4: "Styling and accessories: a bolder, layered take (greenery, artwork, statement towels or decor, moody evening lighting).",
+};
+function variationHint(v: number | null | undefined): string {
+  const hint = v ? VARIATION_HINTS[v] : undefined;
+  return hint
+    ? `\n\nVARIATION ${v} OF 4: keep every selected material, colour and fixture, the vanity design, the doors, windows and trims, and the room layout exactly as specified. ${hint} Change only loose decor, accessories, textiles, plants and lighting mood, so it is clearly different from the other variations without changing anything a builder would quote on.`
+    : "";
 }
 
 /** Build the system instruction + user prompt from structured selections */
@@ -364,6 +382,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     const kind: UsageKind = body.mode === "refine" ? "edit" : "render";
     const allowance = await getAllowance(user);
     const hasPro = isPaidTier(allowance.tier);
+
+    // 4 variations at once is a Pro feature
+    if (body.variation && !isProTier(allowance.tier)) {
+      return NextResponse.json({
+        success: false, upgrade_required: true, reason: "pro_feature", tier: allowance.tier,
+        error: "4 variations per click is part of Reno Ready Pro.",
+      });
+    }
 
     if (!canUse(allowance, kind)) {
       const paid = hasPro;

@@ -8,7 +8,7 @@ import {
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
   ClipboardList, TriangleAlert, Lightbulb, ShoppingBag,
-  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp, Lock,
+  ChevronLeft, ChevronRight, Check, MapPin, ArrowLeft, ThumbsUp, Lock, LayoutGrid, Link2,
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
@@ -28,6 +28,7 @@ import PaywallModal, { type PaywallReason } from "@/components/ui/PaywallModal";
 import PreviewWatermark from "@/components/ui/PreviewWatermark";
 import { downloadImage, toJpeg } from "@/lib/watermark";
 import ResumeDraftModal, { type ResumeOffer } from "@/components/builder/ResumeDraftModal";
+import ShareModal from "@/components/builder/ShareModal";
 import {
   useDraftAutosave, loadLocalDraft, isResumable, applyDraft, startNewDraft,
   fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, type LocalDraft,
@@ -1208,6 +1209,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
   const [localEditBump,        setLocalEditBump]        = useState(0);
+  // Pro: the last "4 variations" batch (shown as a strip under the preview)
+  const [variations, setVariations] = useState<{ status: "pending" | "done" | "failed"; url?: string }[]>([]);
+  const [shareOpen,  setShareOpen]  = useState(false);
 
   // The query string we arrived with. The effect below tidies the address bar,
   // so later effects read this instead of window.location.
@@ -1545,7 +1549,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setSelectedRegion(zone.charAt(0).toUpperCase() + zone.slice(1));
   }, []);
 
-  const executeGenerate = useCallback(async () => {
+  const executeGenerate = useCallback(async (count: number = 1) => {
     if (!isAuthed()) {
       saveBuilderStateForAuth(true); // snapshot before OAuth redirect
       setShowAuthModal(true);
@@ -1572,6 +1576,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setGeneratedImageUrl(null);
     setGenerateDescription(null);
     setRefinementMode(false);   // reset to comparison view for each new generation
+    setVariations(count > 1 ? Array.from({ length: count }, () => ({ status: "pending" as const })) : []);
     goTo("estimate");
 
     try {
@@ -1587,10 +1592,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         (store.tileStyle ? `, layout=${store.tileStyle}` : "") +
         (store.customNote ? `, custom: ${store.customNote}` : "");
 
-      const res = await fetch("/api/generate", {
+      const postGenerate = async (variation?: number) => (await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...(variation && { variation }),
           imageBase64:       store.roomPhotoUrl,
           layoutTemplate:    store.roomPhotoUrl ? null : store.layoutTemplate,
           projectBrief:      store.projectBrief,
@@ -1618,9 +1624,50 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             keepExisting:      store.keepExisting,
           },
         }),
-      });
+      })).json();
 
-      const data = await res.json();
+      // Pro: four takes at once. The first to finish shows straight away;
+      // the rest fill the strip under the preview as they arrive.
+      if (count > 1) {
+        let shown = false, ok = 0;
+        let blocked: { reason?: string; tier?: string } | null = null;
+        await Promise.all(Array.from({ length: count }, async (_, i) => {
+          try {
+            const d = await postGenerate(i + 1);
+            if (d.upgrade_required) { blocked = d; throw new Error("upgrade"); }
+            if (!d.success || !d.imageUrl) throw new Error(d.error ?? "failed");
+            ok++;
+            setVariations((v) => v.map((x, j) => (j === i ? { status: "done", url: d.imageUrl } : x)));
+            pushToHistory(d.imageUrl);
+            if (!shown) {
+              shown = true;
+              setGeneratedImageUrl(d.imageUrl);
+              setGenerateDescription(d.description ?? null);
+              setGenerateError(null);
+              setViewportState("ready");
+              setIsGenerating(false);
+            }
+          } catch {
+            setVariations((v) => v.map((x, j) => (j === i ? { status: "failed" } : x)));
+          }
+        }));
+        setLocalGenerationBump((b) => b + ok);
+        bustUserStatusCache();
+        if (!ok) {
+          setVariations([]);
+          const b = blocked as { reason?: string; tier?: string } | null;
+          if (b) {
+            setPaywall(b.reason === "pro_feature" ? "variations" : b.tier === "pass" ? "pass_limit" : "limit");
+            setViewportState("idle");
+            setStage("design");
+          } else {
+            throw new Error("None of the variations worked this time. Please try again.");
+          }
+        }
+        return;
+      }
+
+      const data = await postGenerate();
 
       // Handle paywall responses from the API
       if (data.upgrade_required) {
@@ -1662,6 +1709,21 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     if (!useBuilderStore.getState().roomPhotoUrl) { goTo("upload"); return; }
     await executeGenerate();
   }, [executeGenerate, goTo]);
+
+  /** Pro: generate four takes at once */
+  const handleVariations = useCallback(async () => {
+    if (!userStatus.loading && !hasProTier(userStatus)) { setPaywall("variations"); return; }
+    if (!useBuilderStore.getState().roomPhotoUrl) { goTo("upload"); return; }
+    await executeGenerate(4);
+  }, [executeGenerate, goTo, userStatus]);
+
+  /** Shows one of the variations in the preview */
+  const pickVariation = useCallback((url: string) => {
+    setGeneratedImageUrl(url);
+    setViewportState("ready");
+    const idx = genHistoryRef.current.indexOf(url);
+    if (idx >= 0) { historyIdxRef.current = idx; setHistoryIdx(idx); }
+  }, [setGeneratedImageUrl]);
 
   // Auto-trigger generation when returning from Google OAuth redirect.
   // Waits until userStatus has finished loading so the paywall check
@@ -1803,7 +1865,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   })();
 
   // Autosave the design: on this device always, to the account once signed in
-  useDraftAutosave(!resumeOffer, !!userStatus.userId, () => ({ estimate: hasPreview ? liveEstimate : null }));
+  // An estimate worth showing elsewhere: there's a preview and something is priced
+  const shownEstimate = hasPreview && liveEstimate !== formatAUD(0) ? liveEstimate : null;
+  useDraftAutosave(!resumeOffer, !!userStatus.userId, () => ({ estimate: shownEstimate }));
 
   // Free tier (once we know): watermark on, Pro Reports locked
   const proLocked    = !userStatus.loading && !hasProAccess(userStatus);
@@ -1832,6 +1896,16 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     >
       <span>{outOfRenders ? (userStatus.tier === "pass" ? "Pass renders used \u2014 go Pro for unlimited" : "Free preview used \u2014 tap to upgrade") : freeLeftLabel}</span>
       <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">{userStatus.tier === "pass" ? "Go Pro" : "Upgrade"}</span>
+    </button>
+  );
+
+  const isPro = hasProTier(userStatus);
+  const variationsButton = (
+    <button type="button" onClick={handleVariations} disabled={isGenerating}
+      className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-sand-200 bg-white/70 py-3 text-sm font-bold text-charcoal/75 transition-colors hover:border-terracotta/40 hover:text-terracotta disabled:opacity-50">
+      {isPro || userStatus.loading ? <LayoutGrid size={15} /> : <Lock size={14} />}
+      Generate 4 variations
+      {!isPro && !userStatus.loading && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">Pro</span>}
     </button>
   );
 
@@ -1934,6 +2008,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 ) : <EstimateLocked />}
                 {freeCounter}
                 {generateButton}
+                {variationsButton}
               </div>
             </aside>
 
@@ -2515,6 +2590,30 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                 onNavigateHistory={navigateHistory}
               />
 
+            {variations.length > 0 && (
+              <div className="rounded-2xl border border-sand-200 bg-white/70 p-3">
+                <p className="mb-2 flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-widest text-charcoal/50">
+                  <LayoutGrid size={13} className="text-terracotta" /> {variations.length} variations · tap to compare
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {variations.map((v, i) => (
+                    v.status === "done" && v.url ? (
+                      <button key={i} type="button" onClick={() => pickVariation(v.url!)} aria-label={`Show variation ${i + 1}`} aria-pressed={generatedImageUrl === v.url}
+                        className={cn("relative aspect-[4/3] overflow-hidden rounded-xl ring-offset-2 transition", generatedImageUrl === v.url ? "ring-2 ring-terracotta" : "opacity-80 hover:opacity-100")}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 rounded-md bg-black/55 px-1.5 text-[10px] font-bold text-white">{String.fromCharCode(65 + i)}</span>
+                      </button>
+                    ) : (
+                      <div key={i} className="flex aspect-[4/3] items-center justify-center rounded-xl bg-sand-100 text-[10px] font-semibold text-charcoal/40">
+                        {v.status === "pending" ? <Loader2 size={16} className="animate-spin text-terracotta" /> : "Didn\u2019t work"}
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+            )}
+
             {viewportState === "ready" && !isGenerating && (
               <>
                 {!refinementMode ? (
@@ -2553,6 +2652,20 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                       >
                         View Full Preview
                         <ArrowRight size={16} />
+                      </button>
+                    </div>
+
+                    {/* Pro: more options for clients */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={handleVariations}
+                        className="flex items-center justify-center gap-2 rounded-2xl border-2 border-sand-200 bg-white/60 py-3 text-sm font-semibold text-charcoal/70 transition-all duration-200 hover:border-terracotta/40 hover:bg-terracotta/5 hover:text-terracotta">
+                        {isPro || userStatus.loading ? <LayoutGrid size={15} /> : <Lock size={14} />} 4 variations
+                        {!isPro && !userStatus.loading && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">Pro</span>}
+                      </button>
+                      <button type="button" onClick={() => (isPro ? setShareOpen(true) : setPaywall("share"))}
+                        className="flex items-center justify-center gap-2 rounded-2xl border-2 border-sand-200 bg-white/60 py-3 text-sm font-semibold text-charcoal/70 transition-all duration-200 hover:border-terracotta/40 hover:bg-terracotta/5 hover:text-terracotta">
+                        {isPro || userStatus.loading ? <Link2 size={15} /> : <Lock size={14} />} Share with client
+                        {!isPro && !userStatus.loading && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">Pro</span>}
                       </button>
                     </div>
 
@@ -2821,6 +2934,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
           onClose={() => setShowAuthModal(false)}
         />
       )}
+
+      {shareOpen && <ShareModal estimate={shownEstimate} onClose={() => setShareOpen(false)} />}
 
       {resumeOffer && (
         <ResumeDraftModal

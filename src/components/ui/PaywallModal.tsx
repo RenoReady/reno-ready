@@ -12,7 +12,7 @@ import { useEffect } from "react";
 import { X, Sparkles } from "lucide-react";
 import PricingPlans from "@/components/ui/PricingPlans";
 
-export type PaywallReason = "limit" | "pass_limit" | "refine" | "report" | "watermark" | "upgrade" | "4k";
+export type PaywallReason = "limit" | "pass_limit" | "refine" | "report" | "watermark" | "upgrade" | "4k" | "variations" | "share";
 
 const REASON_COPY: Record<PaywallReason, { title: string; body: string }> = {
   limit:      { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "You’ve used your free preview. Keep designing in full 2K, with no watermark." },
@@ -22,6 +22,8 @@ const REASON_COPY: Record<PaywallReason, { title: string; body: string }> = {
   watermark:  { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "Upgrade to remove the watermark and unlock 2K exports." },
   upgrade:    { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "Pick the plan that fits your project." },
   "4k":       { title: "4K exports are part of Reno Ready Pro",            body: "Print-quality 4K images for listings, brochures and client presentations." },
+  variations: { title: "4 variations per click is part of Reno Ready Pro", body: "See four takes on the same room at once, so you and your clients can compare options." },
+  share:      { title: "Client share links are part of Reno Ready Pro",   body: "Send a private before/after page to a client. No account needed to view it." },
 };
 
 interface PaywallModalProps {

@@ -139,6 +139,8 @@ export const PLAN_CARDS: Record<PlanCard["id"], PlanCard> = {
     pitch: "Unlimited designs, 4K exports and a commercial licence.",
     features: [
       "Unlimited 2K renders and edits",
+      "4 design variations per click",
+      "Client share links (before/after)",
       "4K exports for print and listings",
       "Multi-room PDF Pro Reports",
       "Commercial use licence",
@@ -161,8 +163,8 @@ export const PLAN_COMPARISON: { label: string; free: boolean | string; pass: boo
   { label: "Commercial use licence",             free: false,          pass: false,          pro: true },
   { label: "Access",                             free: "Forever",      pass: "7 days",       pro: "While subscribed" },
   { label: "Support",                            free: "Email",        pass: "Email",        pro: "Priority" },
-  { label: "4 design variations per click",      free: false,          pass: false,          pro: true, soon: true },
-  { label: "Client share links",                 free: false,          pass: false,          pro: true, soon: true },
+  { label: "4 design variations per click",      free: false,          pass: false,          pro: true },
+  { label: "Client share links",                 free: false,          pass: false,          pro: true },
   { label: "Your branding on PDF reports",       free: false,          pass: false,          pro: true, soon: true },
 ];
 

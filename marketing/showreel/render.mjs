@@ -11,7 +11,7 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FPS  = +(process.env.FPS ?? 60);
 const SUB  = +(process.env.SUB ?? 4);        // sub-frames blended per output frame
-const DUR  = 15;
+const DUR  = +(process.env.DUR ?? 15);
 const PAGE = process.env.PAGE ?? "index.html";                 // kitchen.html for the kitchen reel
 const NAME = path.basename(PAGE, ".html") === "index" ? "" : path.basename(PAGE, ".html") + "-";
 const [W, H] = (process.env.SIZE ?? (PAGE.includes("vertical") ? "1080x1920" : "1920x1080")).split("x").map(Number);

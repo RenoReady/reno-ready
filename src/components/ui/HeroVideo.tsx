@@ -9,6 +9,7 @@
  *    or has data-saver / a 2G connection — then it waits for a tap.
  *  - Pauses while scrolled off-screen and resumes when it comes back.
  *  - Phones get the lighter 720p source via <source media>.
+ *  - `portrait` cuts (9:16) render as a tall card rather than a 16:9 frame.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +25,7 @@ interface HeroVideoProps extends RoomVideo {
 
 type NetworkInformation = { saveData?: boolean; effectiveType?: string };
 
-export default function HeroVideo({ src, mobileSrc, poster, label, className }: HeroVideoProps) {
+export default function HeroVideo({ src, mobileSrc, poster, portrait, label, className }: HeroVideoProps) {
   const videoRef     = useRef<HTMLVideoElement>(null);
   const userPaused   = useRef(false);
   const [playing, setPlaying] = useState(false);
@@ -74,7 +75,12 @@ export default function HeroVideo({ src, mobileSrc, poster, label, className }: 
   };
 
   return (
-    <div className={cn("group relative aspect-video w-full overflow-hidden rounded-3xl bg-sand-200 shadow-warm-xl ring-1 ring-charcoal/5", className)}>
+    <div className={cn(
+      "group relative overflow-hidden rounded-3xl bg-sand-200 shadow-warm-xl ring-1 ring-charcoal/5",
+      // vertical cuts: a tall card, narrow enough on phones that the headline still shows on the first screen
+      portrait ? "aspect-[9/16] mx-auto w-[min(300px,72vw)] sm:w-[340px] lg:w-[min(390px,calc((100svh-9rem)*9/16))]" : "aspect-video w-full",
+      className,
+    )}>
       <video
         ref={videoRef}
         className="absolute inset-0 h-full w-full object-cover"

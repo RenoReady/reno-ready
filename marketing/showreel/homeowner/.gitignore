@@ -1,0 +1,8 @@
+# regenerable audio scratch (rebuilt by vo-process.mjs / mix.mjs / voice-pick.mjs / retake.mjs)
+seg/
+mixwork/
+voices/
+fg-fenrir/
+retake-*/
+ref-vo.mp3
+*.mp3

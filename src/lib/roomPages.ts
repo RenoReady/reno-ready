@@ -14,7 +14,17 @@ export interface RoomVideo {
   mobileSrc?: string;
   /** Still frame shown before playback, and instead of it on reduced-motion / data-saver */
   poster:     string;
+  /** 9:16 vertical cut, shown as a tall card instead of a 16:9 frame */
+  portrait?:  boolean;
 }
+
+/** Home page hero: the 30-second homeowner ad (9:16) */
+export const HOME_VIDEO: RoomVideo = {
+  src:       "/videos/renoready-homeowner-video.mp4",
+  mobileSrc: "/videos/renoready-homeowner-video-720.mp4",
+  poster:    "/videos/renoready-homeowner-video-poster.jpg",
+  portrait:  true,
+};
 
 export interface RoomPage {
   room:        RoomType;

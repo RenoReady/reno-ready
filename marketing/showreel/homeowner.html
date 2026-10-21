@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Reno Ready: Show Your Space (homeowner, 30 s)</title>
+<style>
+@font-face{font-family:"Geist";src:url("node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+@font-face{font-family:"Anton";src:url("node_modules/@fontsource/anton/files/anton-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Kalam";src:url("node_modules/@fontsource/kalam/files/kalam-latin-400-normal.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"Kalam";src:url("node_modules/@fontsource/kalam/files/kalam-latin-700-normal.woff2") format("woff2");font-weight:700}
+:root{--sand:#EEE7DC;--ink:#1d1d1b;--charcoal:#2C3E50;--terra:#D27D5E;--navy:#2C3E50;--face:#F3EEE6}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:var(--sand)}
+#stage{position:absolute;inset:0;overflow:hidden;font-family:"Geist",system-ui,sans-serif;color:var(--charcoal);
+  background:radial-gradient(120% 80% at 50% 38%,#F4EFE7 0%,#EEE7DC 55%,#E6DED1 100%);-webkit-font-smoothing:antialiased}
+.scene{position:absolute;inset:0;display:none}
+svg.art{position:absolute;inset:0;width:1080px;height:1920px;overflow:visible}
+.ink:not([fill]){fill:none}
+.ink{stroke:var(--ink);stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+.thin{stroke-width:4}
+
+/* headlines */
+.hl{position:absolute;left:0;right:0;top:170px;text-align:center;font-family:"Anton",sans-serif;font-size:100px;line-height:1.02;
+  letter-spacing:.005em;color:#1a1a1a;visibility:hidden;text-transform:uppercase}
+.hl .t{color:var(--terra)}
+.hl .w{display:inline-block;opacity:0}
+.hl.small{font-size:84px;top:150px}
+
+/* cutouts */
+.cut{position:absolute;width:118px;height:88px;border:4px solid #fff;border-radius:4px;box-shadow:0 3px 8px rgba(0,0,0,.18);
+  background-size:cover;background-position:center;visibility:hidden}
+.cut.tall{width:84px;height:112px}
+
+/* laptop planner */
+#lap{position:absolute;left:70px;top:640px;width:940px;height:640px;border-radius:34px;background:#1f2328;padding:24px}
+#lapBase{position:absolute;left:20px;top:1280px;width:1040px;height:40px;background:#2a2f35;border-radius:0 0 30px 30px;
+  clip-path:polygon(4% 0,96% 0,100% 100%,0 100%)}
+#lapScreen{position:relative;width:100%;height:100%;background:#d9dcdf;border-radius:10px;overflow:hidden}
+#tb{position:absolute;left:0;right:0;top:0;height:48px;background:#b9bec4;display:flex;gap:7px;padding:9px 10px}
+#tb i{display:block;width:30px;height:30px;border-radius:5px;background:#8e959d}
+#tb i:nth-child(3n){background:#7b838c}
+#side{position:absolute;left:0;top:48px;bottom:0;width:170px;background:#c8ccd1;padding:16px 14px}
+#side b{display:block;height:12px;margin:0 0 16px;border-radius:6px;background:#9aa1a9}
+#view{position:absolute;left:170px;right:0;top:48px;bottom:0;perspective:900px;display:grid;place-items:center;
+  background:repeating-linear-gradient(0deg,transparent 0 39px,#c6cacf 39px 40px),repeating-linear-gradient(90deg,transparent 0 39px,#c6cacf 39px 40px)}
+#cube{position:relative;width:230px;height:230px;transform-style:preserve-3d}
+#cube div{position:absolute;inset:0;background:rgba(140,146,154,.82);border:3px solid #5d646c}
+#tip{position:absolute;left:470px;top:110px;background:#fffbe0;border:2px solid #9b8f4a;color:#4a4320;font-size:22px;padding:8px 14px;border-radius:6px;font-weight:600}
+#err{position:absolute;left:250px;top:200px;width:420px;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.3);overflow:hidden;font-size:24px}
+#err h4{background:#c94b4b;color:#fff;padding:10px 16px;font-size:22px}
+#err p{padding:16px;color:#333}
+#err span{display:inline-block;margin:0 16px 16px;padding:8px 26px;background:#e3e5e8;border-radius:6px;font-weight:600}
+#cursor{position:absolute;left:0;top:0;width:34px;height:48px}
+
+/* phone */
+.phone{position:absolute;left:130px;top:330px;width:820px;height:1580px;border-radius:92px;background:#141414;padding:22px;
+  box-shadow:0 24px 50px rgba(0,0,0,.22)}
+.screen{position:absolute;inset:22px;border-radius:72px;background:#F3EEE6;overflow:hidden}
+.sbar{height:72px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 56px 6px 64px;font-weight:600;font-size:30px;color:#111}
+.sbar i{display:inline-block;width:12px;height:12px;border-radius:50%;background:#111;margin-left:5px}
+.sbar i:last-child{width:10px;height:22px;border-radius:3px}
+.appbar{height:96px;display:flex;align-items:center;padding:0 40px;border-bottom:2px solid #e4ddd2}
+.appbar img{height:52px}
+.pane{position:absolute;left:0;right:0;top:168px;bottom:0;padding:34px 40px}
+.step{font-size:29px;font-weight:700;letter-spacing:.09em;color:var(--terra);text-transform:uppercase}
+.pills{display:flex;gap:12px;margin:18px 0 24px;align-items:center}
+.pill{height:52px;min-width:52px;border-radius:26px;background:#e6e0d6;color:#9a948b;font-weight:600;font-size:24px;display:grid;place-items:center;padding:0 6px}
+.pill.on{background:var(--navy);color:#fff;padding:0 22px 0 8px;display:flex;gap:12px}
+.pill.on em{font-style:normal;width:36px;height:36px;border-radius:50%;background:#fff;color:var(--navy);display:grid;place-items:center;font-size:22px}
+.pill.done{background:#2fa152;color:#fff}
+h3.big{font-size:45px;font-weight:700;color:var(--charcoal);letter-spacing:-.01em}
+p.sub{font-size:30px;color:#77736d;margin:8px 0 26px}
+.drop{position:relative;height:600px;border:3px dashed #cfc6b8;border-radius:30px;background:#faf7f2;display:grid;place-items:center;text-align:center;overflow:hidden}
+.drop .cam{width:120px;height:120px;border-radius:24px;background:var(--navy);display:grid;place-items:center;margin:0 auto 26px}
+.drop b{display:block;font-size:36px;color:var(--charcoal);margin-bottom:22px}
+.btn{display:inline-block;background:var(--terra);color:#fff;font-weight:700;font-size:32px;padding:22px 46px;border-radius:18px}
+.photo{position:absolute;inset:0;background-size:cover;background-position:center}
+.chip{position:absolute;left:18px;top:18px;background:rgba(44,62,80,.92);color:#fff;font-weight:700;font-size:24px;letter-spacing:.06em;padding:8px 16px;border-radius:10px}
+.chip.r{left:auto;right:18px;background:var(--terra)}
+.sample{margin-top:30px;height:120px;border-radius:22px;background:#fff;border:2px solid #e7e0d5;display:flex;align-items:center;gap:22px;padding:0 24px;font-size:30px;font-weight:600}
+.sample i{width:76px;height:76px;border-radius:14px;background:url(assets/bathroom-before-2.jpg) center/cover}
+.sample small{display:block;font-size:22px;color:#8d877e;font-weight:500}
+.lbl{font-size:32px;font-weight:700;margin:24px 0 14px}
+.sw{display:flex;gap:14px}
+.sw div{position:relative;flex:1;height:150px;border-radius:16px;border:3px solid transparent;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:8px;font-size:22px;font-weight:600;color:#555;overflow:hidden}
+.sw div.sel{border-color:var(--terra)}
+.sw .tick{position:absolute;right:6px;top:6px;width:34px;height:34px;border-radius:50%;background:var(--terra);display:grid;place-items:center;opacity:0}
+.chips{display:flex;gap:14px}
+.chips div{flex:1;height:80px;border-radius:16px;background:#fff;border:3px solid #e7e0d5;display:flex;align-items:center;justify-content:center;gap:12px;font-size:26px;font-weight:600}
+.chips div.sel{border-color:var(--terra);background:#fbeee8}
+.chips i{width:24px;height:24px;border-radius:50%}
+.gen{margin-top:30px;height:100px;border-radius:20px;background:var(--terra);color:#fff;font-weight:700;font-size:34px;display:grid;place-items:center}
+.slider{position:relative;height:640px;border-radius:26px;overflow:hidden}
+.slider .after{position:absolute;inset:0;background:url(assets/bathroom-after-2.jpg) center/cover}
+.slider .before{position:absolute;inset:0;background:url(assets/bathroom-before-2.jpg) center/cover}
+.slider .line{position:absolute;top:0;bottom:0;width:5px;background:#fff;margin-left:-2px}
+.slider .knob{position:absolute;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:800;color:#333;font-size:24px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.est{margin-top:26px;background:var(--navy);color:#fff;border-radius:26px;padding:30px 36px}
+.est h5{font-size:24px;letter-spacing:.1em;color:#b8c2cc;font-weight:700}
+.est .tot{font-size:92px;font-weight:800;letter-spacing:-.02em;margin:4px 0 14px}
+.est .row{display:flex;justify-content:space-between;font-size:30px;line-height:52px;color:#dfe5ea}
+.est .row b{color:#fff}
+.tap{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;background:rgba(44,62,80,.32);border:4px solid rgba(255,255,255,.85);opacity:0}
+.ring{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;border:5px solid var(--terra);opacity:0}
+#flash{position:absolute;inset:0;background:#fff;opacity:0}
+
+/* bubbles */
+.speech{position:absolute;background:#fff;border:5px solid var(--ink);border-radius:34px;font-family:"Kalam",cursive;font-size:52px;line-height:1.12;
+  text-align:center;padding:22px 34px;color:#1d1d1b;transform:skewX(-6deg);visibility:hidden}
+.speech:after{content:"";position:absolute;width:34px;height:34px;background:#fff;border:5px solid var(--ink);border-width:0 5px 5px 0;bottom:-21px;transform:rotate(45deg)}
+.speech.tl:after{left:70px}
+.speech.tr:after{right:70px}
+.note{position:absolute;font-family:"Kalam",cursive;font-size:50px;color:#1d1d1b;visibility:hidden;transform:rotate(-4deg)}
+
+/* inset phone (day scene) */
+#mini{position:absolute;left:590px;top:560px;width:430px;height:820px;border-radius:60px;background:#141414;padding:16px;box-shadow:0 18px 40px rgba(0,0,0,.25);visibility:hidden}
+#mini .screen{inset:16px;border-radius:46px}
+#mini .m{position:absolute;left:0;right:0;top:40px;bottom:0;padding:26px}
+#mini .ph{height:300px;border-radius:20px;background:url(assets/bathroom-after-2.jpg) center/cover}
+#mini .sum{margin-top:18px;background:var(--navy);border-radius:18px;color:#fff;padding:18px 22px}
+#mini .sum small{font-size:16px;letter-spacing:.1em;color:#b8c2cc;font-weight:700}
+#mini .sum b{display:block;font-size:56px;font-weight:800}
+#mini .cta{margin-top:22px;height:86px;border-radius:18px;background:var(--terra);color:#fff;font-weight:700;font-size:28px;display:grid;place-items:center}
+#mini .sent{position:absolute;left:26px;right:26px;bottom:116px;height:86px;border-radius:18px;background:#2fa152;color:#fff;font-weight:700;font-size:28px;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0}
+#pdf{position:absolute;width:200px;height:260px;background:#fff;border:4px solid var(--ink);border-radius:6px;padding:12px;visibility:hidden;box-shadow:0 6px 14px rgba(0,0,0,.18)}
+#pdf .h{height:20px;background:var(--terra);border-radius:3px;margin-bottom:10px}
+#pdf .i{height:84px;border-radius:4px;background:url(assets/bathroom-after-2.jpg) center/cover;margin-bottom:10px}
+#pdf .l{height:9px;background:#c9c3ba;border-radius:4px;margin-bottom:8px}
+#pdf .l.s{width:60%}
+#pdf .t{position:absolute;left:12px;right:12px;bottom:12px;height:24px;background:var(--navy);border-radius:4px}
+
+/* end card */
+#logo{position:absolute;left:50%;top:150px;height:170px;transform:translateX(-50%)}
+#endHl{position:absolute;left:0;right:0;top:370px;text-align:center;font-family:"Anton",sans-serif;font-size:94px;line-height:1.02;color:#1a1a1a}
+#endHl .t{color:var(--terra)}
+#endHl .w{display:inline-block;opacity:0;margin:0 14px}
+#card{position:absolute;left:110px;top:640px;width:860px;height:700px;border-radius:34px;border:8px solid #fff;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.18)}
+#cta{position:absolute;left:220px;top:1420px;width:740px;height:124px;border-radius:62px;background:var(--terra);color:#fff;font-weight:700;font-size:52px;
+  display:grid;place-items:center;box-shadow:0 10px 24px rgba(210,125,94,.35)}
+#fine{position:absolute;left:220px;width:740px;top:1580px;text-align:center;font-size:36px;color:#6f6a63}
+#fine b{color:#2a2a2a}
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg width="0" height="0" style="position:absolute">
+      <defs>
+        <filter id="wob" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter>
+        <radialGradient id="glow"><stop offset="0" stop-color="#FFD27A" stop-opacity=".55"/><stop offset="1" stop-color="#FFD27A" stop-opacity="0"/></radialGradient>
+        <clipPath id="dreamClip"><ellipse cx="330" cy="640" rx="190" ry="118"/></clipPath>
+        <clipPath id="realClip"><ellipse cx="330" cy="640" rx="190" ry="118"/></clipPath>
+      </defs>
+  </svg>
+
+  <!-- ═════ desk (night, then day) ═════ -->
+  <div class="scene" id="sDesk">
+    <svg class="art" viewBox="0 0 1080 1920">
+
+      <circle id="glowA" cx="640" cy="1010" r="420" fill="url(#glow)"/>
+      <g filter="url(#wob)">
+        <!-- window + clock -->
+        <g id="winNight"><rect x="800" y="560" width="170" height="170" fill="#1F2E4A" class="ink"/><path class="ink" d="M885 560V730M800 645H970"/>
+          <path id="moon" d="M940 590a22 22 0 1 0 14 34a17 17 0 1 1-14-34z" fill="#F3EEE6"/></g>
+        <g id="winDay" opacity="0"><rect x="800" y="560" width="170" height="170" fill="#A9D6EE" class="ink"/><circle cx="930" cy="605" r="20" fill="#F7C948"/><path class="ink" d="M885 560V730M800 645H970"/></g>
+        <circle cx="895" cy="830" r="42" fill="#fff" class="ink"/>
+        <path id="hrHand" class="ink" d="M895 830V806"/><path id="mnHand" class="ink" d="M895 830H921"/>
+        <!-- pendant lamp -->
+        <path class="ink" d="M640 0V800"/><path d="M600 800H680L702 846H578Z" fill="#1d1d1b" class="ink"/>
+        <!-- desk -->
+        <path class="ink" d="M400 1110H900" style="stroke-width:12"/><path class="ink" d="M430 1110V1360M870 1110V1360"/>
+        <!-- laptop (open) -->
+        <g id="lapOpen"><rect x="580" y="955" width="200" height="140" rx="8" fill="#2a2f35" class="ink"/><rect x="592" y="967" width="176" height="116" fill="#cfd3d7"/>
+          <g id="miniCube"><path d="M650 1000l30-14 30 14v34l-30 14-30-14z" fill="#9aa0a7" stroke="#5d646c" stroke-width="3"/><path d="M650 1000l30 14 30-14M680 1014v34" stroke="#5d646c" stroke-width="3" fill="none"/></g>
+          <path class="ink" d="M560 1104H800" style="stroke-width:9"/></g>
+        <g id="lapClosed" opacity="0"><path class="ink" d="M570 1100H790" style="stroke-width:14"/></g>
+        <!-- mug -->
+        <path d="M812 1058h44v48h-44z" fill="#8B5E46" class="ink thin"/><path class="ink thin" d="M856 1068q18 0 18 14t-18 14"/>
+        <!-- chair -->
+        <path class="ink" d="M225 960V1360M225 1185H350M340 1185V1360M240 1185V1360"/>
+        <!-- ground -->
+        <path class="ink" d="M-20 1360H1100"/>
+      </g>
+      <!-- thought bubble (dream, then the real thing) -->
+      <g id="bubble" filter="url(#wob)">
+        <circle cx="300" cy="840" r="9" fill="#fff" class="ink thin"/><circle cx="318" cy="800" r="15" fill="#fff" class="ink thin"/>
+        <path id="cloud" fill="#fff" class="ink"/>
+        <image id="dreamImg" href="assets/after.jpg" x="140" y="420" width="380" height="440" preserveAspectRatio="xMidYMid slice" clip-path="url(#dreamClip)" style="filter:blur(3px) saturate(.6) brightness(1.08)"/>
+        <image id="realImg" href="assets/bathroom-after-2.jpg" x="140" y="420" width="380" height="440" preserveAspectRatio="xMidYMid slice" clip-path="url(#realClip)" opacity="0"/>
+      </g>
+      <!-- homeowner -->
+      <g id="hoDesk" filter="url(#wob)"></g>
+      <!-- question marks -->
+      <g id="qm" font-family="Anton" font-size="70" fill="#D27D5E">
+        <text id="q1" x="170" y="700" opacity="0">?</text><text id="q2" x="380" y="660" opacity="0">?</text><text id="q3" x="430" y="760" opacity="0">?</text>
+      </g>
+      <g id="stars" class="ink thin" opacity="0"><path d="M600 1000l10-26 10 26-26-10h32z"/><path d="M470 960l7-18 7 18-18-7h22z"/></g>
+    </svg>
+    <div id="cuts"></div>
+    <div class="note" id="later" style="left:640px;top:890px">3 hours later…</div>
+    <div id="mini"><div class="screen"><div class="m">
+      <div class="ph"></div>
+      <div class="sum"><small>BATHROOM COST ESTIMATE</small><b>$30,800</b></div>
+      <div class="cta" id="miniCta">Connect with a Builder</div>
+    </div><div class="sent" id="miniSent"><svg width="30" height="30" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Brief sent</div></div>
+    <div class="tap" id="miniTap"></div><div class="ring" id="miniRing"></div></div>
+  </div>
+
+  <!-- ═════ 3D planner ═════ -->
+  <div class="scene" id="sPlan">
+    <svg class="art" viewBox="0 0 1080 1920"><path class="ink" d="M-20 1360H1100" filter="url(#wob)"/></svg>
+    <div id="lap"><div id="lapScreen">
+      <div id="tb"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div id="side"><b></b><b style="width:80%"></b><b></b><b style="width:60%"></b><b></b><b style="width:70%"></b><b></b><b style="width:50%"></b><b></b></div>
+      <div id="view"><div id="cube"><div style="transform:translateZ(115px)"></div><div style="transform:rotateY(180deg) translateZ(115px)"></div>
+        <div style="transform:rotateY(90deg) translateZ(115px)"></div><div style="transform:rotateY(-90deg) translateZ(115px)"></div>
+        <div style="transform:rotateX(90deg) translateZ(115px)"></div><div style="transform:rotateX(-90deg) translateZ(115px)"></div></div></div>
+      <div id="tip">Select a wall to extrude</div>
+      <div id="err"><h4>Error</h4><p>Wall intersects floor plane. Undo last 14 actions?</p><span>OK</span></div>
+      <svg id="cursor" viewBox="0 0 24 34"><path d="M2 2v26l7-6 5 10 4-2-5-10h9z" fill="#fff" stroke="#111" stroke-width="2" stroke-linejoin="round"/></svg>
+    </div></div>
+    <div id="lapBase"></div>
+  </div>
+
+  <!-- ═════ pivot: show your space ═════ -->
+  <div class="scene" id="sPivot">
+    <svg class="art" viewBox="0 0 1080 1920"><g filter="url(#wob)"><path class="ink" d="M-20 1360H1100"/><g id="hoPivot"></g>
+      <g id="spark" class="ink thin" opacity="0"><path d="M740 640l26-20M760 700h32M736 580l12-28"/></g></g></svg>
+  </div>
+
+  <!-- ═════ phone: three steps ═════ -->
+  <div class="scene" id="sPhone">
+    <div class="phone" id="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span><i></i><i></i><i></i><i></i></span></div>
+      <div class="appbar"><img src="assets/logo-cropped.png" alt=""></div>
+      <!-- step 1 -->
+      <div class="pane" id="p1">
+        <div class="step">Step 1 of 3: Upload photo</div>
+        <div class="pills"><div class="pill on"><em>1</em>Upload Photo</div><div class="pill">2</div><div class="pill">3</div></div>
+        <h3 class="big">Upload a photo of your space</h3>
+        <p class="sub">We'll design on top of your real bathroom.</p>
+        <div class="drop" id="drop">
+          <div><div class="cam"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+          <b>Tap to add a photo</b><span class="btn" id="choose">Choose photo</span></div>
+          <div class="photo" id="p1photo" style="background-image:url(assets/bathroom-before-2.jpg);opacity:0"><span class="chip">YOUR BATHROOM</span></div>
+        </div>
+        <div class="sample"><i></i><div>Try with a sample bathroom<small>Dated family bathroom</small></div></div>
+      </div>
+      <!-- step 2 -->
+      <div class="pane" id="p2" style="visibility:hidden">
+        <div class="step">Step 2 of 3: Choose style</div>
+        <div class="pills"><div class="pill done">&#10003;</div><div class="pill on"><em>2</em>Choose Style</div><div class="pill">3</div></div>
+        <div style="position:relative;height:380px;border-radius:24px;overflow:hidden"><div class="photo" style="background-image:url(assets/bathroom-before-2.jpg)"></div><span class="chip">YOUR BATHROOM</span></div>
+        <div class="lbl">Wall tiles</div>
+        <div class="sw">
+          <div style="background:repeating-linear-gradient(0deg,#f3efe7 0 34px,#ded6c9 34px 36px),#f3efe7">Zellige</div>
+          <div id="swSage" style="background:repeating-linear-gradient(0deg,#86b5a0 0 30px,#cfe3d8 30px 33px);color:#fff">Sage<span class="tick"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" fill="none" stroke="#fff" stroke-width="3.5"/></svg></span></div>
+          <div style="background:radial-gradient(#b9b1a6 2px,transparent 3px) 0 0/22px 22px,#ece7df">Terrazzo</div>
+          <div style="background:#3b4046;color:#fff">Slate</div>
+        </div>
+        <div class="lbl">Tapware</div>
+        <div class="chips"><div><i style="background:#d9dde1"></i>Chrome</div><div id="chGold"><i style="background:#c9a24a"></i>Brushed gold</div><div><i style="background:#1d1d1b"></i>Black</div></div>
+        <div class="lbl">Vanity</div>
+        <div class="chips"><div id="chOak"><i style="background:#c8a478"></i>White oak</div><div><i style="background:#f4f2ee;border:2px solid #ccc"></i>Matte white</div><div><i style="background:#9a9690"></i>Concrete</div></div>
+        <div class="gen" id="gen">Generate Preview</div>
+      </div>
+      <!-- step 3 -->
+      <div class="pane" id="p3" style="visibility:hidden">
+        <div class="step">Step 3 of 3: Get estimate</div>
+        <div class="pills"><div class="pill done">&#10003;</div><div class="pill done">&#10003;</div><div class="pill on"><em>3</em>Get Estimate</div></div>
+        <div class="slider" id="sl"><div class="after"></div><div class="before" id="slB"></div><span class="chip" id="slChipB">BEFORE</span><span class="chip r">AFTER</span>
+          <div class="line" id="slLine"></div><div class="knob" id="slKnob">&lsaquo;&rsaquo;</div></div>
+        <div class="est"><h5>BATHROOM COST ESTIMATE</h5><div class="tot" id="tot">$0</div>
+          <div class="row r0"><span>Floor &amp; wall tiles</span><b>$8,400</b></div>
+          <div class="row r1"><span>Vanity &amp; tapware</span><b>$4,900</b></div>
+          <div class="row r2"><span>Waterproofing</span><b>$2,600</b></div>
+          <div class="row r3"><span>Plumbing</span><b>$5,200</b></div>
+          <div class="row r4"><span>Labour</span><b>$9,700</b></div></div>
+      </div>
+      <div id="flash"></div>
+      <div class="tap" id="tap"></div><div class="ring" id="ring"></div>
+    </div></div>
+  </div>
+
+  <!-- ═════ hand-over ═════ -->
+  <div class="scene" id="sHand">
+    <svg class="art" viewBox="0 0 1080 1920"><g filter="url(#wob)">
+      <rect x="110" y="560" width="170" height="170" fill="#A9D6EE" class="ink"/><circle cx="240" cy="605" r="20" fill="#F7C948"/><path class="ink" d="M195 560V730M110 645H280"/>
+      <path class="ink" d="M-20 1360H1100"/>
+      <g id="hoHand"></g><g id="bldHand"></g></g></svg>
+    <div id="pdf"><div class="h"></div><div class="i"></div><div class="l"></div><div class="l s"></div><div class="l"></div><div class="t"></div></div>
+    <div class="speech tr" id="startBub" style="left:400px;top:560px;width:560px">When d'you want me to start?</div>
+  </div>
+
+  <!-- ═════ end card ═════ -->
+  <div class="scene" id="sEnd">
+    <img id="logo" src="assets/logo-cropped.png" alt="">
+    <div id="endHl"><span class="w">DESIGN</span><span class="w">YOUR</span><span class="w">DREAM</span><span class="w">RENO</span><br><span class="w t">IN SECONDS.</span></div>
+    <div id="card"><div class="slider" style="height:100%;border-radius:0"><div class="after" id="eA"></div><div class="before" id="eB"></div>
+      <span class="chip" id="eChipB" style="font-size:28px">BEFORE</span><span class="chip r" style="font-size:28px">AFTER</span><div class="line" id="eLine"></div><div class="knob" id="eKnob">&lsaquo;&rsaquo;</div></div></div>
+    <div id="cta">Try a free preview &rarr;</div>
+    <div id="fine">No card needed &middot; <b>renoready.com.au</b></div>
+    <svg class="art" viewBox="0 0 1080 1920"><g filter="url(#wob)" id="hoEnd"></g></svg>
+  </div>
+
+  <!-- headlines (top layer) -->
+  <div class="hl" id="h1"><span class="w">Dreaming</span> <span class="w">of</span> <span class="w">a</span> <span class="w">reno?</span></div>
+  <div class="hl" id="h2"><span class="w">50 saved ideas.</span><br><span class="w t">Zero clue how it all</span><br><span class="w t">fits together.</span></div>
+  <div class="hl" id="h3"><span class="w">3D planners</span><br><span class="w t">too hard?</span></div>
+  <div class="hl" id="h5"><span class="w">Stop guessing.</span><br><span class="w t">Show your space.</span></div>
+  <div class="hl small" id="h6a"><span class="w"><span class="t">1.</span> Snap your room</span></div>
+  <div class="hl small" id="h6b"><span class="w"><span class="t">2.</span> Tap your finishes</span></div>
+  <div class="hl small" id="h6c"><span class="w"><span class="t">3.</span> See it + the price</span></div>
+  <div class="hl" id="h7"><span class="w">$30,800.</span> <span class="w t">Itemised.</span></div>
+  <div class="hl" id="h8"><span class="w">Connect with</span><br><span class="w t">a builder.</span></div>
+</div>
+
+<script src="node_modules/gsap/dist/gsap.min.js"></script>
+<script>
+const DUR = 30, GROUND = 1360;
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+
+/* ── stick figures ───────────────────────────────────────────── */
+// Built around the hip at (x, hipY). Front-facing faces like the contractor cut.
+function figure(host, id, { x, hipY, seated = false, hat = false, arms, legLen = GROUND - hipY, scale = 1 }) {
+  const legs = seated
+    ? `M0 0L100 5L100 ${legLen}M0 0L86 10L84 ${legLen}`
+    : `M0 0L-34 ${legLen}M0 0L34 ${legLen}`;
+  const hair = hat ? "" : `<path class="ink thin" d="M-20 -32L-28 -54M-7 -38L-10 -62M7 -38L10 -62M20 -32L28 -54"/>`;
+  const hatSvg = hat ? `<path d="M-40 -14A40 44 0 0 1 40 -14Z" fill="#D27D5E" class="ink thin"/><path class="ink" d="M-56 -12H56" style="stroke-width:8"/><path class="ink thin" d="M0 -56V-26"/>` : "";
+  host.innerHTML = `
+  <g transform="translate(${x} ${hipY}) scale(${scale})"><g id="${id}">
+    <g id="${id}-legs"><path id="${id}-leg" class="ink" d="${legs}"/></g>
+    <g id="${id}-up">
+      <path class="ink" d="M0 0V-200"/>
+      <path id="${id}-a1" class="ink" d="${arms[0]}"/><path id="${id}-a2" class="ink" d="${arms[1]}"/>
+      <g id="${id}-prop"></g>
+      <g id="${id}-hd" transform="translate(0 -245)">
+        <circle r="40" fill="#F3EEE6" class="ink"/>${hair}${hatSvg}
+        <g id="${id}-eyes"><circle cx="-13" cy="-4" r="4.6" fill="#1d1d1b"/><circle cx="13" cy="-4" r="4.6" fill="#1d1d1b"/></g>
+        <g id="${id}-brows" opacity="0"><path class="ink thin" d="M-22 -20L-6 -16M6 -16L22 -20"/></g>
+        <path id="${id}-m-smile" class="ink thin" d="M-14 12Q0 24 14 12"/>
+        <path id="${id}-m-flat" class="ink thin" d="M-12 16H12" opacity="0"/>
+        <path id="${id}-m-frown" class="ink thin" d="M-13 20Q0 9 13 20" opacity="0"/>
+        <path id="${id}-m-grin" d="M-17 8Q0 34 17 8Z" fill="#1d1d1b" opacity="0"/>
+      </g>
+    </g>
+  </g></g>`;
+}
+const MOUTHS = ["smile", "flat", "frown", "grin"];
+
+// arm poses (relative to the hip; shoulder at 0,-180)
+const ARM = {
+  deskA: "M0 -180L60 -100L125 -75", deskB: "M0 -180L50 -92L115 -68",
+  chin:  "M0 -180L112 -78L28 -206",
+  phoneUp: "M0 -180L66 -128L92 -226",
+  hipL: "M0 -180L-46 -104L-24 -30", downR: "M0 -180L30 -100L40 -20",
+  highR: "M0 -180L64 -262L106 -330",
+  give: "M0 -180L84 -160L170 -168", downL: "M0 -180L-30 -100L-40 -20",
+  readA: "M0 -180L-62 -150L-112 -196", readB: "M0 -180L-48 -140L-104 -150",
+  wave: "M0 -180L56 -250L74 -330",
+};
+
+figure($("#hoDesk"), "ho", { x: 290, hipY: 1180, seated: true, arms: [ARM.deskA, ARM.deskB] });
+figure($("#hoPivot"), "hp", { x: 540, hipY: 1130, arms: [ARM.downR, ARM.hipL] });
+figure($("#hoHand"), "hh", { x: 300, hipY: 1130, arms: [ARM.downR, ARM.downL] });
+figure($("#bldHand"), "bd", { x: 1240, hipY: 1130, hat: true, arms: [ARM.downR, ARM.downL] });
+figure($("#hoEnd"), "he", { x: 120, hipY: 1600, legLen: 230, scale: .72, arms: [ARM.wave, ARM.downL] });
+// the end-card figure is small, like the contractor cut
+
+// props
+$("#ho-prop").innerHTML = `<g id="hoPhone" opacity="0"><rect x="70" y="-300" width="50" height="88" rx="9" fill="#1d1d1b"/><rect x="75" y="-293" width="40" height="72" rx="5" fill="#86b5a0"/></g>`;
+$("#hp-prop").innerHTML = `<g><rect x="70" y="-420" width="80" height="140" rx="12" fill="#1d1d1b"/><rect x="77" y="-410" width="66" height="118" rx="7" fill="#F3EEE6"/>
+  <rect x="96" y="-372" width="28" height="22" rx="4" fill="#2C3E50"/><circle cx="110" cy="-361" r="6" fill="#F3EEE6"/></g>`;
+
+/* thought-bubble cloud */
+(function cloud() {
+  const cx = 330, cy = 640, rx = 214, ry = 140, n = 13; let d = "";
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2, px = cx + rx * Math.cos(a), py = cy + ry * Math.sin(a);
+    d += i === 0 ? `M${px.toFixed(1)} ${py.toFixed(1)}` : `A44 40 0 0 1 ${px.toFixed(1)} ${py.toFixed(1)}`;
+  }
+  $("#cloud").setAttribute("d", d + "Z");
+})();
+
+/* cutouts */
+const CUTS = [
+  // [x, y, rot, style]  — land on the desk, the wall, the floor, and one on the head
+  [430, 1030, -8, "img:after.jpg:30% 40%"], [470, 1050, 12, "zel"], [690, 1040, -14, "terr"], [520, 1028, 6, "img:after.jpg:60% 50%"],
+  [760, 1030, 9, "slate"], [420, 840, -5, "img:after.jpg:70% 30%"], [700, 860, 7, "grid"], [480, 900, 10, "mag"],
+  [150, 1280, -18, "img:after.jpg:30% 70%"], [330, 1295, 22, "gold"], [620, 1290, -9, "zel"], [880, 1285, 15, "mag"],
+  [236, 780, -12, "img:after.jpg:50% 80%", true], [560, 960, -3, "sage"],
+];
+const pattern = {
+  zel: "background:repeating-linear-gradient(0deg,#f3efe7 0 18px,#ded6c9 18px 20px),repeating-linear-gradient(90deg,transparent 0 30px,#ded6c9 30px 32px),#f3efe7",
+  terr: "background:radial-gradient(#b9b1a6 2px,transparent 3px) 0 0/14px 14px,#ece7df",
+  slate: "background:#3b4046", sage: "background:repeating-linear-gradient(0deg,#86b5a0 0 16px,#cfe3d8 16px 18px)",
+  grid: "background:linear-gradient(90deg,#fff 0 2px,transparent 2px) 0 0/38px 100%,linear-gradient(#fff 0 2px,transparent 2px) 0 0/100% 29px,url(assets/after.jpg) center/cover",
+  mag: "background:linear-gradient(#2C3E50 0 14px,transparent 14px) 8px 8px/60% 100% no-repeat,repeating-linear-gradient(0deg,#fff 0 10px,#cfc9c0 10px 12px) 8px 30px/80% 50% no-repeat,#fff",
+  gold: "background:radial-gradient(circle at 50% 40%,#c9a24a 0 16px,transparent 17px),linear-gradient(#c9a24a,#c9a24a) 50% 70%/8px 40px no-repeat,#f7f3ec",
+};
+CUTS.forEach(([x, y, r, s, tall], i) => {
+  const d = document.createElement("div");
+  d.className = "cut" + (tall ? " tall" : ""); d.id = "cut" + i;
+  if (s.startsWith("img:")) { const [, f, pos] = s.split(":"); d.style.cssText = `background:url(assets/${f}) ${pos}/260% auto`; }
+  else d.style.cssText = pattern[s];
+  d.style.left = x + "px"; d.style.top = y + "px";
+  $("#cuts").appendChild(d);
+});
+
+/* ── timeline ────────────────────────────────────────────────── */
+const tl = gsap.timeline({ paused: true });
+const scene = (el, t0, t1) => { tl.set(el, { display: "block" }, t0); if (t1 != null) tl.set(el, { display: "none" }, t1); };
+const show = (el, t0, t1) => { tl.set(el, { visibility: "visible" }, t0); if (t1 != null) tl.set(el, { visibility: "hidden" }, t1); };
+const pop = (el, t, s = .6) => tl.fromTo(el, { opacity: 0, scale: s }, { opacity: 1, scale: 1, duration: .22, ease: "back.out(2.4)" }, t);
+const words = (hl, times) => [...document.querySelectorAll(`${hl} .w`)].forEach((w, i) => pop(w, times[i]));
+const mouth = (id, kind, t) => MOUTHS.forEach((m) => tl.set(`#${id}-m-${m}`, { opacity: m === kind ? 1 : 0 }, t));
+const arm = (id, a, d, t, dur = .25, ease = "power2.inOut") => tl.to(`#${id}-${a}`, { attr: { d }, duration: dur, ease }, t);
+
+// scenes
+scene("#sDesk", 0, 5.4); scene("#sPlan", 5.4, 7.5); scene("#sDesk", 7.5, 11.95);
+scene("#sPivot", 11.95, 14.3); scene("#sPhone", 14.3, 18.55); scene("#sDesk", 18.55, 20.5);
+scene("#sHand", 20.5, 23.5); scene("#sEnd", 23.5);
+
+// 0–1.5 dream
+show("#h1", 0, 1.55); words("#h1", [.2, .52, .66, .9]);
+tl.set("#bubble", { opacity: 0 }, 0);
+tl.fromTo("#bubble", { opacity: 0, scale: .4, svgOrigin: "300 840" }, { opacity: 1, scale: 1, duration: .35, ease: "back.out(1.8)" }, .45);
+tl.to("#bubble", { opacity: 0, scale: .6, svgOrigin: "300 840", duration: .2 }, 1.55);
+arm("ho", "a1", ARM.chin, 0, .01);
+tl.set("#ho-eyes", { y: -5 }, 0);   // gazing up at the dream
+
+// 1.55–5.4 the pile of saved ideas
+show("#h2", 1.55, 5.4); words("#h2", [1.58, 3.22, 3.6]);
+arm("ho", "a1", ARM.deskA, 1.6, .2);
+tl.set("#ho-eyes", { y: 0 }, 1.6);
+CUTS.forEach((c, i) => {
+  const t = 1.65 + i * .11;
+  show("#cut" + i, t);
+  tl.fromTo("#cut" + i, { y: -1250 - (i % 3) * 80, x: (i % 2 ? -1 : 1) * 70, rotation: c[2] + (i % 2 ? 60 : -60) },
+    { y: 0, x: 0, rotation: c[2], duration: .5, ease: "power2.in" }, t - .5 > 1.55 ? t - .5 : 1.55);
+});
+// head swivels between them, then gives up
+[[1.9, -12, -7], [2.3, 12, 7], [2.7, -10, -6], [3.05, 9, 6]].forEach(([t, r, ex]) => {
+  tl.to("#ho-hd", { rotation: r, svgOrigin: "0 -205", duration: .18, ease: "power2.out" }, t);
+  tl.to("#ho-eyes", { x: ex, duration: .12 }, t);
+});
+tl.to("#ho-hd", { rotation: 0, duration: .2 }, 3.3); tl.to("#ho-eyes", { x: 0, duration: .1 }, 3.3);
+mouth("ho", "frown", 3.22);
+["#q1", "#q2", "#q3"].forEach((q, i) => { tl.fromTo(q, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: .18, ease: "back.out(2)" }, 3.3 + i * .12); tl.to(q, { opacity: 0, duration: .15 }, 5.2); });
+
+// 5.4–7.5 the 3D planner
+show("#h3", 5.4, 7.5); words("#h3", [5.45, 6.55]);
+tl.set("#err", { opacity: 0, scale: .9 }, 0);
+tl.fromTo("#tip", { opacity: 0 }, { opacity: 1, duration: .15 }, 5.7);
+tl.to("#tip", { opacity: 0, duration: .1 }, 6.6);
+tl.to("#err", { opacity: 1, scale: 1, duration: .16, ease: "back.out(2)" }, 6.65);
+tl.fromTo("#cursor", { x: 720, y: 520 }, { x: 330, y: 260, duration: .5, ease: "power2.inOut" }, 5.5);
+tl.to("#cursor", { x: 560, y: 380, duration: .35, ease: "power2.inOut" }, 6.05);
+tl.to("#cursor", { x: 300, y: 330, duration: .3, ease: "power2.inOut" }, 6.9);
+
+// 7.5–11.95 three hours later, faceplant
+arm("ho", "a1", ARM.chin, 7.5, .01); mouth("ho", "flat", 7.5);
+show("#later", 8.55, 11.95); tl.fromTo("#later", { opacity: 0 }, { opacity: 1, duration: .25 }, 8.55);
+tl.to("#ho-hd", { rotation: 8, svgOrigin: "0 -205", duration: 1.6, ease: "sine.inOut" }, 8.7);
+tl.to("#ho-eyes", { y: 4, duration: .8 }, 9.2);
+arm("ho", "a1", ARM.deskA, 10.45, .2);
+tl.to("#ho-up", { rotation: 64, svgOrigin: "0 0", duration: .32, ease: "power3.in" }, 10.5);
+tl.set("#ho-hd", { rotation: 0 }, 10.5);
+tl.to("#ho-up", { rotation: 61, svgOrigin: "0 0", duration: .12, ease: "power1.out" }, 10.82);
+mouth("ho", "flat", 10.8);
+tl.fromTo("#stars", { opacity: 0, scale: .4, svgOrigin: "540 990" }, { opacity: 1, scale: 1, duration: .15 }, 10.86);
+tl.to("#stars", { opacity: 0, duration: .3 }, 11.6);
+[3, 13, 1].forEach((k, i) => tl.to("#cut" + k, { y: -60 - i * 20, rotation: "+=25", duration: .18, yoyo: true, repeat: 1, ease: "power2.out" }, 10.82));
+
+// 11.95–14.3 stop guessing
+show("#h5", 11.95, 14.3); words("#h5", [11.97, 13.0]);
+tl.fromTo("#hp", { y: 60, scaleY: .85, svgOrigin: "0 230" }, { y: 0, scaleY: 1, duration: .3, ease: "back.out(3)" }, 11.97);
+arm("hp", "a1", ARM.highR, 12.9, .22, "back.out(2)"); mouth("hp", "grin", 13.0);
+tl.set("#hp-prop", { opacity: 0 }, 0); tl.to("#hp-prop", { opacity: 1, duration: .1 }, 13.0);
+tl.fromTo("#spark", { opacity: 0 }, { opacity: 1, duration: .1 }, 13.66);
+tl.to("#spark", { opacity: 0, duration: .2 }, 14.1);
+
+// 14.3–18.55 the phone
+show("#h6a", 14.3, 15.2); words("#h6a", [14.32]);
+show("#h6b", 15.2, 17.1); words("#h6b", [15.22]);
+show("#h6c", 17.1, 18.55); words("#h6c", [17.12]);
+tl.fromTo("#phone", { y: 260, opacity: 0 }, { y: 0, opacity: 1, duration: .28, ease: "power3.out" }, 14.3);
+show("#p2", 15.2, 17.1); show("#p3", 17.1); tl.set("#p1", { visibility: "hidden" }, 15.2);
+tl.to("#flash", { opacity: .95, duration: .05 }, 14.72); tl.to("#flash", { opacity: 0, duration: .25 }, 14.78);
+tl.to("#p1photo", { opacity: 1, duration: .05 }, 14.76);
+tl.set("#swSage", { className: "sel" }, 15.4); tl.set("#swSage .tick", { opacity: 1 }, 15.4);
+tl.set("#chGold", { className: "sel" }, 16.12); tl.set("#chOak", { className: "sel" }, 16.5);
+tl.to("#gen", { scale: .96, duration: .06, yoyo: true, repeat: 1 }, 16.86);
+// before/after wipe + the estimate
+tl.set("#slB", { clipPath: "inset(0 0% 0 0)" }, 0);
+tl.fromTo("#slB", { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 100% 0 0)", duration: .7, ease: "power2.inOut" }, 17.15);
+tl.fromTo(["#slLine", "#slKnob"], { left: "100%" }, { left: "0%", duration: .7, ease: "power2.inOut" }, 17.15);
+tl.to(["#slLine", "#slKnob", "#slChipB"], { opacity: 0, duration: .15 }, 17.75);
+[".r0", ".r1", ".r2", ".r3", ".r4"].forEach((r, i) => tl.fromTo(`#p3 ${r}`, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .16 }, 17.35 + i * .12));
+tl.fromTo("#tot", { scale: 1 }, { scale: 1.08, duration: .1, yoyo: true, repeat: 1, transformOrigin: "left center" }, 18.05);
+
+// 18.55–20.5 daytime: smiling at the phone, connect with a builder
+tl.set(["#winNight", "#lapOpen", "#glowA", "#cuts", "#later", "#stars"], { opacity: 0 }, 18.55);
+tl.set(["#winDay", "#lapClosed"], { opacity: 1 }, 18.55);
+tl.set("#ho-up", { rotation: 0 }, 18.55); tl.set("#ho-hd", { rotation: 0 }, 18.55); tl.set("#ho-eyes", { x: 6, y: -2 }, 18.55);
+arm("ho", "a1", ARM.phoneUp, 18.55, .01); tl.set("#hoPhone", { opacity: 1 }, 18.55); mouth("ho", "grin", 18.55);
+tl.set("#dreamImg", { opacity: 0 }, 18.55); tl.set("#realImg", { opacity: 1 }, 18.55);
+tl.fromTo("#bubble", { opacity: 0, scale: .4, svgOrigin: "300 840" }, { opacity: 1, scale: 1, duration: .3, ease: "back.out(1.8)", immediateRender: false }, 18.7);
+show("#h7", 18.55, 19.65); words("#h7", [18.6, 18.95]);
+show("#h8", 19.65, 23.5); words("#h8", [19.68, 20.1]);
+show("#mini", 19.55, 20.5);
+tl.fromTo("#mini", { scale: .2, opacity: 0, transformOrigin: "10% 50%" }, { scale: 1, opacity: 1, duration: .25, ease: "back.out(1.6)" }, 19.55);
+tl.to("#bubble", { opacity: 0, duration: .15 }, 19.55);
+tl.fromTo("#miniTap", { left: 215, top: 720, opacity: 0 }, { opacity: 1, duration: .08 }, 19.92);
+tl.to("#miniTap", { scale: .85, duration: .06, yoyo: true, repeat: 1 }, 20.0);
+tl.to("#miniTap", { opacity: 0, duration: .1 }, 20.15);
+tl.fromTo("#miniRing", { left: 215, top: 720, opacity: 1, scale: .6 }, { opacity: 0, scale: 2, duration: .35 }, 20.02);
+tl.to("#miniSent", { opacity: 1, duration: .08 }, 20.05);
+
+// 20.5–23.5 hand the brief to a builder
+show("#pdf", 20.5);
+tl.set("#pdf", { left: 400, top: 900, rotation: -6 }, 20.5);
+arm("hh", "a1", ARM.give, 20.5, .01); mouth("hh", "grin", 20.5);
+tl.to("#bd", { x: -480, duration: .75, ease: "power2.out" }, 20.55);
+tl.fromTo("#bd-leg", { attr: { d: "M0 0L-34 230M0 0L34 230" } }, { attr: { d: "M0 0L30 230M0 0L-30 230" }, duration: .19, repeat: 3, yoyo: true, ease: "sine.inOut" }, 20.55);
+tl.to("#hh", { x: 80, duration: .5, ease: "power2.out" }, 20.6);
+tl.to("#pdf", { left: 480, duration: .5, ease: "power2.out" }, 20.6);
+tl.to("#pdf", { left: 510, top: 940, rotation: 4, duration: .3, ease: "power2.inOut" }, 21.35);
+arm("bd", "a1", ARM.readA, 21.35, .25); arm("bd", "a2", ARM.readB, 21.35, .25);
+arm("hh", "a1", ARM.downR, 21.6, .25);
+tl.to("#pdf", { scaleX: -1, duration: .14, yoyo: true, repeat: 1 }, 21.65);
+tl.set("#bd-brows", { opacity: 1 }, 21.8); tl.fromTo("#bd-brows", { y: 0 }, { y: -10, duration: .12 }, 21.8);
+mouth("bd", "grin", 21.85);
+show("#startBub", 21.9); tl.fromTo("#startBub", { scale: .5, opacity: 0, transformOrigin: "80% 100%" }, { scale: 1, opacity: 1, duration: .22, ease: "back.out(2)" }, 21.9);
+
+// 23.5–30 end card
+tl.fromTo("#logo", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: .3, ease: "power2.out" }, 23.55);
+words("#endHl", [24.5, 24.62, 24.74, 24.9, 25.97]);
+tl.fromTo("#card", { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: .35, ease: "power3.out" }, 23.7);
+tl.fromTo("#eB", { clipPath: "inset(0 0% 0 0)" }, { clipPath: "inset(0 100% 0 0)", duration: .9, ease: "power2.inOut" }, 24.15);
+tl.fromTo(["#eLine", "#eKnob"], { left: "100%" }, { left: "0%", duration: .9, ease: "power2.inOut" }, 24.15);
+tl.to(["#eLine", "#eKnob", "#eChipB"], { opacity: 0, duration: .2 }, 24.95);
+tl.fromTo("#eA", { scale: 1 }, { scale: 1.07, duration: 5, ease: "none" }, 25.0);
+tl.fromTo("#cta", { opacity: 0, scale: .7 }, { opacity: 1, scale: 1, duration: .3, ease: "back.out(2)" }, 26.85);
+tl.to("#cta", { scale: 1.04, duration: .35, yoyo: true, repeat: 3, ease: "sine.inOut" }, 27.4);
+tl.fromTo("#fine", { opacity: 0 }, { opacity: 1, duration: .3 }, 28.75);
+tl.fromTo("#hoEnd", { opacity: 0 }, { opacity: 1, duration: .2 }, 27.0);
+tl.to("#he-a1", { attr: { d: "M0 -180L74 -246L112 -316" }, duration: .22, yoyo: true, repeat: 7, ease: "sine.inOut" }, 27.1);
+tl.set({}, {}, DUR);
+
+/* ── procedural bits, driven straight from the time ──────────── */
+const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+const fmt = (n) => "$" + Math.round(n).toLocaleString("en-AU");
+function frame(t) {
+  // wall clock: slow at night, spins three hours from 7.55 to 8.5
+  const spin = ease((t - 7.55) / .95), mins = 9 * 60 + 40 + t * 2 + spin * 180;
+  $("#mnHand").setAttribute("transform", `rotate(${(mins % 60) * 6} 895 830)`);
+  $("#hrHand").setAttribute("transform", `rotate(${(mins / 60) * 30} 895 830)`);
+  // the grey box spins and wobbles; flips upside down at 7.0
+  const flip = ease((t - 6.95) / .3) * 180;
+  $("#cube").style.transform = `rotateX(${-22 + flip + Math.sin(t * 5) * 6}deg) rotateY(${t * 140}deg)`;
+  // estimate counter
+  $("#tot").textContent = fmt(30800 * ease((t - 17.3) / .75));
+}
+
+/* tap targets inside the phone, measured once the layout is final */
+function placeTaps() {
+  const ph = $("#phone").getBoundingClientRect();
+  const at = (sel, pane) => { const p = $(pane); const v = p.style.visibility; p.style.visibility = "visible";
+    const r = $(sel).getBoundingClientRect(); p.style.visibility = v; return { left: r.left + r.width / 2 - ph.left, top: r.top + r.height / 2 - ph.top }; };
+  const hits = [[14.5, "#choose", "#p1"], [15.34, "#swSage", "#p2"], [16.06, "#chGold", "#p2"], [16.44, "#chOak", "#p2"], [16.8, "#gen", "#p2"]];
+  hits.forEach(([t, sel, pane], i) => {
+    const pos = at(sel, pane);
+    if (i === 0) tl.fromTo("#tap", { ...pos, opacity: 0 }, { opacity: 1, duration: .08 }, t - .12);
+    else tl.to("#tap", { ...pos, duration: .2, ease: "power2.inOut" }, t - .22);
+    tl.to("#tap", { scale: .82, duration: .06, yoyo: true, repeat: 1 }, t);
+    tl.fromTo("#ring", { ...pos, opacity: 1, scale: .6 }, { opacity: 0, scale: 2, duration: .35, immediateRender: false }, t + .02);
+  });
+  tl.to("#tap", { opacity: 0, duration: .12 }, 17.0);
+}
+
+window.seek = (t) => { tl.time(Math.min(t, DUR), false); frame(t); };
+Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => {}))]).then(() => {
+  placeTaps();
+  window.seek(0);
+  if (!location.search.includes("render")) { let t0 = performance.now(); const loop = () => { window.seek(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); }; loop(); }
+  window.__ready = true;
+});
+</script>
+</body>
+</html>

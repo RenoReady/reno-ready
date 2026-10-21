@@ -12,7 +12,7 @@ import PricingPlans from "@/components/ui/PricingPlans";
 import Marquee from "@/components/ui/Marquee";
 import { type PlanKey } from "@/lib/plans";
 import HeroVideo from "@/components/ui/HeroVideo";
-import { MARKETING_VIDEO, ROOM_PAGES } from "@/lib/roomPages";
+import { HOME_VIDEO, ROOM_PAGES } from "@/lib/roomPages";
 
 const HOME_ROOM_CARDS: {
   room:     keyof typeof ROOM_PAGES;
@@ -138,7 +138,7 @@ export default function LandingPage() {
         <div className="absolute top-40 -left-40 w-[400px] h-[400px] rounded-full bg-sand-300/60 blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] gap-10 lg:gap-14 items-center">
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-8 lg:gap-16 items-center">
 
             {/* Left: copy */}
             <ScrollReveal>
@@ -195,11 +195,11 @@ export default function LandingPage() {
               </div>
             </ScrollReveal>
 
-            {/* Right: 15-second walkthrough (not wrapped in ScrollReveal, so the poster paints immediately) */}
+            {/* Right: the 30-second homeowner ad, 9:16 (not wrapped in ScrollReveal, so the poster paints immediately) */}
             <HeroVideo
-              {...MARKETING_VIDEO}
-              className="order-first lg:order-none"
-              label="Reno Ready in 15 seconds: design a bathroom, see the cost, then talk to a builder"
+              {...HOME_VIDEO}
+              className="order-first lg:order-none lg:mr-6"
+              label="Reno Ready in 30 seconds: snap your room, pick finishes, see the AI before and after with an itemised cost, then send the brief to a builder"
             />
 
           </div>

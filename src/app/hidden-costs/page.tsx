@@ -284,6 +284,7 @@ export default function HiddenCostsPage() {
           <Link href="/gallery" className="hover:text-charcoal/70 transition-colors">Design Gallery</Link>
           <Link href="/builder" className="hover:text-charcoal/70 transition-colors">Design Tool</Link>
           <Link href="/privacy" className="hover:text-charcoal/70 transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-charcoal/70 transition-colors">Terms</Link>
         </div>
       </div>
 

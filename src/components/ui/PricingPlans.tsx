@@ -182,9 +182,16 @@ export default function PricingPlans({ compact = false, showTable = !compact }: 
           <span className="flex items-center gap-2"><Lock size={15} className="text-terracotta" /> Secure checkout with Stripe</span>
           {!compact && <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-terracotta" /> 30-Day Money-Back Guarantee</span>}
         </div>
+        {compact && (
+          <p className="text-center text-[11px] text-charcoal/45">
+            Pro renews automatically until you cancel. By buying you agree to our{" "}
+            <Link href="/terms" target="_blank" className="underline underline-offset-2 hover:text-charcoal/70">Terms of Use</Link>.
+          </p>
+        )}
         {!compact && (
           <p className="text-center text-xs text-charcoal/40">
-            *Unlimited means fair use: up to {TIER_LIMITS.pro.renders} renders and {TIER_LIMITS.pro.edits} edits a month. Prices in AUD.
+            *Unlimited means fair use: up to {TIER_LIMITS.pro.renders} renders and {TIER_LIMITS.pro.edits} edits a month. Prices in AUD. Pro renews automatically until you cancel.
+            {" "}By buying a plan you agree to our <Link href="/terms" className="underline underline-offset-2 hover:text-charcoal/70">Terms of Use</Link>.
           </p>
         )}
       </div>

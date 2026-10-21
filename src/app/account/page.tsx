@@ -447,6 +447,7 @@ export default function AccountPage() {
         <p className="text-center text-xs text-charcoal/40">
           Want your account or data deleted? Email <a href="mailto:hello@renoready.com.au" className="underline">hello@renoready.com.au</a>.
           {" "}<Link href="/privacy" className="underline">Privacy policy</Link>
+          {" "}· <Link href="/terms" className="underline">Terms of Use</Link>
         </p>
       </div>
 

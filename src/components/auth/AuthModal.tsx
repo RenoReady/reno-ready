@@ -171,6 +171,8 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
           <span>
             We never sell your data.{" "}
             <a href="/privacy" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-charcoal/70">Privacy Policy</a>
+            {" "}·{" "}
+            <a href="/terms" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-charcoal/70">Terms</a>
           </span>
         </div>
 

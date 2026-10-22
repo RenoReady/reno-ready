@@ -14,9 +14,10 @@
  */
 
 import Stripe from "stripe";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
+import { ATTRIBUTION_COOKIE, attributionMetadata, decodeAttribution, type Attribution } from "@/lib/attribution";
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -68,11 +69,14 @@ export async function createCheckoutSession(
     // ── Resolve the current user so the webhook can attribute the purchase ──
     let userId: string | undefined;
     let email:  string | undefined;
+    let source: Attribution | null = null;
     try {
       const supabase = await createSupabaseServerClient();
       const { data: { user } } = await supabase.auth.getUser();
       userId = user?.id;
       email  = user?.email ?? undefined;
+      // where they first came from: saved on the account at sign-up, else this browser's cookie
+      source = (user?.app_metadata?.attribution as Attribution | undefined) ?? decodeAttribution((await cookies()).get(ATTRIBUTION_COOKIE)?.value);
     } catch { /* not signed in — allow anyway, webhook will log */ }
 
     // Paid access is tied to the account, so buyers sign in first
@@ -82,7 +86,7 @@ export async function createCheckoutSession(
       mode,
       client_reference_id: userId,   // passed back in checkout.session.completed webhook
       customer_email:      email,
-      metadata: { plan },            // lets the webhook know which plan was purchased
+      metadata: { plan, ...attributionMetadata(source) },   // plan for the webhook; src_* = which ad brought them
       line_items: [{ price: priceId, quantity: 1 }],
       // "I agree to the Terms of Service" tickbox (the link is set in Stripe → Settings → Public details)
       consent_collection: { terms_of_service: "required" },

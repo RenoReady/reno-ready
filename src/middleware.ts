@@ -5,11 +5,14 @@
  *   1. Refresh the Supabase auth cookie on every request so server pages
  *      see an up-to-date session.
  *   2. Gate /admin/* — only the email defined in src/lib/config.ts may enter.
+ *   3. Remember where a first-time visitor came from (ad tags / referrer) in
+ *      the rr_src cookie, for the admin "where customers come from" report.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 import { ADMIN_EMAIL } from "@/lib/config";
+import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE, attributionFrom, encodeAttribution } from "@/lib/attribution";
 
 export async function middleware(request: NextRequest) {
   const { response, user } = await updateSupabaseSession(request);
@@ -33,6 +36,16 @@ export async function middleware(request: NextRequest) {
       notFoundUrl.pathname = "/";
       notFoundUrl.searchParams.set("admin_error", "forbidden");
       return NextResponse.redirect(notFoundUrl);
+    }
+  }
+
+  // ── First-touch attribution (page visits only, never overwritten) ──
+  if (request.method === "GET" && !pathname.startsWith("/api/") && !request.cookies.has(ATTRIBUTION_COOKIE)) {
+    const src = attributionFrom(request.nextUrl, request.headers.get("referer"), request.nextUrl.hostname);
+    if (src) {
+      response.cookies.set(ATTRIBUTION_COOKIE, encodeAttribution(src), {
+        maxAge: ATTRIBUTION_MAX_AGE, path: "/", sameSite: "lax", httpOnly: true, secure: request.nextUrl.protocol === "https:",
+      });
     }
   }
 

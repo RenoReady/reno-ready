@@ -20,6 +20,7 @@ import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/l
 import { ADMIN_EMAIL } from "@/lib/config";
 import { tierFor } from "@/lib/plans";
 import { fetchRevenue } from "@/lib/stripeRevenue";
+import { sourceReport, TRACKING_STARTED, type SourceRow } from "@/lib/attributionReport";
 import { listLeads, type LeadWithLinks } from "@/lib/leadStore";
 import LeadStatusSelect from "./LeadStatusSelect";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
@@ -119,17 +120,21 @@ export default async function AdminPage() {
     const { data: { user } } = await supabase.auth.getUser();
     userEmail = user?.email ?? undefined;
   } catch {
-    // Supabase not configured — show setup screen below
+    // Supabase not configured or unreachable: treated as signed out below
   }
 
-  if (userEmail && userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  // Signed out (or the session couldn't be read) must never fall through to the dashboard
+  if (!userEmail) redirect("/?admin_error=signin_required");
+  if (userEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     redirect("/?admin_error=forbidden");
   }
 
-  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }, revenue, leadsResult] =
+  const [{ rows: profiles, error: profilesError }, { designs, total: storedDesigns, error: designsError }, revenue, leadsResult, sources] =
     await Promise.all([
       fetchProfiles(), fetchDesigns(), fetchRevenue(ADMIN_EMAIL),
       listLeads().then((leads) => ({ leads, error: null as string | null })).catch((e: unknown) => ({ leads: [] as LeadWithLinks[], error: e instanceof Error ? e.message : "Couldn't load leads" })),
+      sourceReport(ADMIN_EMAIL).then((r) => ({ ...r, error: null as string | null }))
+        .catch((e: unknown) => ({ rows: [] as SourceRow[], revenueError: null, error: e instanceof Error ? e.message : "Couldn't load sources" })),
     ]);
   const { leads, error: leadsError } = leadsResult;
   const monthKey  = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }).slice(0, 7);
@@ -185,6 +190,54 @@ export default async function AdminPage() {
           <StatCard icon={Sparkles}   accent="charcoal"   label="AI Generations"   value={totalGenerations.toString()} />
           <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={storedDesigns.toString()}
                     hint={totalGenerations > storedDesigns ? "Saving started 8 Oct 2026" : undefined} />
+        </section>
+
+        {/* ── Where customers come from ───────────────────────── */}
+        <section className="mb-10">
+          <div className="flex items-end justify-between mb-4 gap-4 flex-wrap">
+            <h2 className="text-2xl font-bold text-charcoal">Where customers come from</h2>
+            <p className="text-sm text-charcoal/45">
+              First visit before sign-up · tracked since {new Date(TRACKING_STARTED).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          </div>
+          {sources.error ? (
+            <SetupCard title="Sources couldn't load" detail={sources.error} steps={["Check SUPABASE_SERVICE_ROLE_KEY is set, then reload."]} />
+          ) : (
+            <div className="rounded-2xl bg-white border border-sand-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-sand-50 text-left text-xs uppercase tracking-wider text-charcoal/45">
+                  <tr>
+                    <th className="px-4 py-3">Source</th>
+                    <th className="px-4 py-3">Campaign</th>
+                    <th className="px-4 py-3 text-right">Sign-ups</th>
+                    <th className="px-4 py-3 text-right">Paying</th>
+                    <th className="px-4 py-3 text-right">Conversion</th>
+                    <th className="px-4 py-3 text-right">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-sand-100">
+                  {sources.rows.map((r) => (
+                    <tr key={[r.source, r.medium, r.campaign].join("|")} className={r.source === "(before tracking)" ? "text-charcoal/40" : "text-charcoal"}>
+                      <td className="px-4 py-3 font-semibold">
+                        {r.source}{r.medium && <span className="ml-1.5 font-normal text-charcoal/45">/ {r.medium}</span>}
+                      </td>
+                      <td className="px-4 py-3 text-charcoal/70">{r.campaign ?? "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.signups}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.paying}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.signups ? `${Math.round((r.paying / r.signups) * 100)}%` : "—"}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAUD(r.revenue / 100)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-sand-100 px-4 py-3 text-xs leading-relaxed text-charcoal/45">
+                {sources.revenueError ? `Revenue unavailable (Stripe: ${sources.revenueError}). ` : ""}
+                Tag every ad link so it shows here, e.g.{" "}
+                <code className="rounded bg-sand-50 px-1">renoready.com.au/for-builders?utm_source=facebook&amp;utm_medium=paid&amp;utm_campaign=builders</code>.
+                Untagged visits are grouped by the site they came from (e.g. google / organic); no source at all shows as direct.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* ── Builder leads ───────────────────────────────────── */}

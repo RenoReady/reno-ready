@@ -7,7 +7,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { ATTRIBUTION_COOKIE, decodeAttribution } from "@/lib/attribution";
+
+/** Accounts created within this window count as new sign-ups (an older account signing in again keeps no source) */
+const NEW_ACCOUNT_MS = 15 * 60_000;
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -22,11 +26,21 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       console.error("[auth/callback] exchangeCodeForSession error:", error.message);
       return NextResponse.redirect(`${origin}/?auth_error=${encodeURIComponent(error.message)}`);
+    }
+
+    // A brand-new account: record where they came from (first touch), or "direct" when we can't tell
+    const user = data.user;
+    if (user && !user.app_metadata?.attribution && Date.now() - Date.parse(user.created_at) < NEW_ACCOUNT_MS) {
+      const src = decodeAttribution(request.cookies.get(ATTRIBUTION_COOKIE)?.value)
+        ?? { source: "direct", medium: null, campaign: null, content: null, landing: "/", at: new Date().toISOString() };
+      await createSupabaseServiceRoleClient().auth.admin.updateUserById(user.id, {
+        app_metadata: { ...(user.app_metadata ?? {}), attribution: src },
+      }).catch((e) => console.error("[auth/callback] attribution:", e));
     }
 
     // Success — redirect to builder (or wherever `next` points).

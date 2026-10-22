@@ -20,7 +20,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient, readStorageJson } from "@/lib/supabase/server";
 
 export const SHARES_BUCKET = "shares";
 export const MAX_SHARES_PER_USER = 100;
@@ -160,10 +160,8 @@ export async function createShare(ownerId: string, input: {
 export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: string; beforeUrl: string | null; optionUrls: { label: string; url: string }[] }) | null> {
   if (!isShareId(id)) return null;
   const store = await bucket();
-  const { data } = await store.download(`${id}/share.json`);
-  if (!data) return null;
-  let record: ShareRecord;
-  try { record = JSON.parse(await data.text()); } catch { return null; }
+  const record = await readJson<ShareRecord>(`${id}/share.json`);
+  if (!record) return null;
   const sign = async (name: string) => (await store.createSignedUrl(`${id}/${name}`, 60 * 60 * 6)).data?.signedUrl ?? null;
   const afterUrl = await sign("after.jpg");
   if (!afterUrl) return null;
@@ -172,12 +170,10 @@ export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: s
   return { ...record, afterUrl, beforeUrl: record.hasBefore ? await sign("before.jpg") : null, optionUrls };
 }
 
-async function readJson<T>(path: string): Promise<T | null> {
-  const { data } = await (await bucket()).download(path);
-  try { return data ? (JSON.parse(await data.text()) as T) : null; } catch { return null; }
-}
+// always fresh: share.json and replies.json are rewritten, and the Storage CDN can serve the old copy
+const readJson = <T>(path: string) => readStorageJson<T>(SHARES_BUCKET, path);
 
-// overwritten files need cacheControl "0", or reads come back stale for an hour
+// cacheControl "0" too, so browsers and signed URLs never hold an old copy
 async function writeJson(path: string, value: unknown) {
   const { error } = await (await bucket()).upload(path, Buffer.from(JSON.stringify(value)), { contentType: "application/json", upsert: true, cacheControl: "0" });
   if (error) throw new Error(`Couldn't save: ${error.message}`);
@@ -194,6 +190,41 @@ export async function listShares(ownerId: string): Promise<(ShareRecord & { thum
     Promise.all(records.map((r) => readJson<ShareReply[]>(`${r.id}/replies.json`))),
   ]);
   return records.map((r, i) => ({ ...r, thumbUrl: signed[i]?.signedUrl ?? null, replies: replies[i] ?? [] }));
+}
+
+export interface ShareActivity {
+  links: number; opened: number; approved: number; questions: number; withOptions: number;
+  byOwner: { ownerId: string; links: number; opened: number; approved: number; questions: number; lastSharedAt: string }[];
+}
+
+/** Admin dashboard: how Pro users' client links are doing (sent, opened, approved), skipping excluded owners */
+export async function shareActivity(excludeOwnerIds: string[] = []): Promise<ShareActivity> {
+  const store = await bucket();
+  const { data: owners } = await store.list("owners", { limit: 1000 });
+  const ownerIds = (owners ?? []).map((o) => o.name).filter((id) => !excludeOwnerIds.includes(id));
+  const out: ShareActivity = { links: 0, opened: 0, approved: 0, questions: 0, withOptions: 0, byOwner: [] };
+  await Promise.all(ownerIds.map(async (ownerId) => {
+    const ids = await ownedIds(ownerId);
+    const shares = await Promise.all(ids.map(async (id) => ({
+      record: await readJson<ShareRecord>(`${id}/share.json`),
+      replies: (await readJson<ShareReply[]>(`${id}/replies.json`)) ?? [],
+    })));
+    const row = { ownerId, links: 0, opened: 0, approved: 0, questions: 0, lastSharedAt: "" };
+    for (const { record, replies } of shares) {
+      if (!record || record.ownerId !== ownerId) continue;
+      row.links++;
+      if (record.firstViewedAt) row.opened++;
+      if (replies.some((r) => r.kind === "approve")) row.approved++;
+      row.questions += replies.filter((r) => r.kind === "question").length;
+      if ((record.options?.length ?? 0) > 1) out.withOptions++;
+      if (record.createdAt > row.lastSharedAt) row.lastSharedAt = record.createdAt;
+    }
+    if (!row.links) return;
+    out.links += row.links; out.opened += row.opened; out.approved += row.approved; out.questions += row.questions;
+    out.byOwner.push(row);
+  }));
+  out.byOwner.sort((a, b) => b.links - a.links || b.lastSharedAt.localeCompare(a.lastSharedAt));
+  return out;
 }
 
 /** Records the first time someone other than the owner opens the link */
@@ -235,10 +266,8 @@ export async function shareOwner(ownerId: string): Promise<{ brand: ShareBrand |
 export async function deleteShare(ownerId: string, id: string): Promise<boolean> {
   if (!isShareId(id)) return false;
   const store = await bucket();
-  const { data } = await store.download(`${id}/share.json`);
-  if (!data) return false;
-  const record = JSON.parse(await data.text()) as ShareRecord;
-  if (record.ownerId !== ownerId) return false;
+  const record = await readJson<ShareRecord>(`${id}/share.json`);
+  if (!record || record.ownerId !== ownerId) return false;
   await store.remove([...SHARE_FILES.map((f) => `${id}/${f}`), `owners/${ownerId}/${id}`]);
   return true;
 }

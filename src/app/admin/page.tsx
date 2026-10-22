@@ -21,6 +21,7 @@ import { ADMIN_EMAIL } from "@/lib/config";
 import { tierFor } from "@/lib/plans";
 import { fetchRevenue } from "@/lib/stripeRevenue";
 import { sourceReport, TRACKING_STARTED, type SourceRow } from "@/lib/attributionReport";
+import { shareActivity, type ShareActivity } from "@/lib/shareStore";
 import { listLeads, type LeadWithLinks } from "@/lib/leadStore";
 import LeadStatusSelect from "./LeadStatusSelect";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
@@ -137,6 +138,11 @@ export default async function AdminPage() {
         .catch((e: unknown) => ({ rows: [] as SourceRow[], revenueError: null, error: e instanceof Error ? e.message : "Couldn't load sources" })),
     ]);
   const { leads, error: leadsError } = leadsResult;
+  // Pro users' client links (the admin's own test links left out)
+  const adminId = profiles.find((p) => p.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase())?.id;
+  const shares: ShareActivity | { error: string } = await shareActivity(adminId ? [adminId] : [])
+    .catch((e: unknown) => ({ error: e instanceof Error ? e.message : "Couldn't load share links" }));
+  const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : "—");
   const monthKey  = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }).slice(0, 7);
   const leadsThisMonth = leads.filter((l) => monthKey(l.createdAt) === monthKey(new Date().toISOString())).length;
   const openLeads = leads.filter((l) => l.status === "new").length;
@@ -236,6 +242,64 @@ export default async function AdminPage() {
                 <code className="rounded bg-sand-50 px-1">renoready.com.au/for-builders?utm_source=facebook&amp;utm_medium=paid&amp;utm_campaign=builders</code>.
                 Untagged visits are grouped by the site they came from (e.g. google / organic); no source at all shows as direct.
               </p>
+            </div>
+          )}
+        </section>
+
+        {/* ── Client share links (Pro) ───────────────────────── */}
+        <section className="mb-10">
+          <div className="flex items-end justify-between mb-4 gap-4 flex-wrap">
+            <h2 className="text-2xl font-bold text-charcoal">Client share links</h2>
+            <p className="text-sm text-charcoal/45">Links Pro users send their clients: opened, approved, questions</p>
+          </div>
+          {"error" in shares ? (
+            <SetupCard title="Share links couldn't load" detail={shares.error} steps={["Check SUPABASE_SERVICE_ROLE_KEY is set, then reload."]} />
+          ) : shares.links === 0 ? (
+            <div className="rounded-2xl bg-white border border-sand-200 p-10 text-center">
+              <p className="text-sm text-charcoal/55">No client links yet. They&apos;ll appear here once Pro users start sharing designs.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {[
+                  { label: "Links sent", value: shares.links, hint: `${shares.withOptions} with several options` },
+                  { label: "Opened by client", value: shares.opened, hint: `${pct(shares.opened, shares.links)} of links` },
+                  { label: "Approved", value: shares.approved, hint: `${pct(shares.approved, shares.links)} of links · ${pct(shares.approved, shares.opened)} of opened` },
+                  { label: "Questions asked", value: shares.questions, hint: "Clients asking the builder something" },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-2xl bg-white border border-sand-200 p-5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-charcoal/45">{s.label}</p>
+                    <p className="mt-1 text-3xl font-bold text-charcoal tabular-nums">{s.value}</p>
+                    <p className="mt-1 text-xs text-charcoal/45">{s.hint}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-2xl bg-white border border-sand-200 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-sand-50 text-left text-xs uppercase tracking-wider text-charcoal/45">
+                    <tr>
+                      <th className="px-4 py-3">Pro user</th>
+                      <th className="px-4 py-3 text-right">Links</th>
+                      <th className="px-4 py-3 text-right">Opened</th>
+                      <th className="px-4 py-3 text-right">Approved</th>
+                      <th className="px-4 py-3 text-right">Questions</th>
+                      <th className="px-4 py-3 text-right">Last shared</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-sand-100">
+                    {shares.byOwner.map((o) => (
+                      <tr key={o.ownerId}>
+                        <td className="px-4 py-3 font-semibold text-charcoal">{emailById.get(o.ownerId) ?? o.ownerId.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{o.links}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{o.opened}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{o.approved}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{o.questions}</td>
+                        <td className="px-4 py-3 text-right text-charcoal/55">{new Date(o.lastSharedAt).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>

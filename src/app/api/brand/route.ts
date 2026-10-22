@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient, downloadFresh } from "@/lib/supabase/server";
 import { getAllowance } from "@/lib/usage";
 import { isProTier } from "@/lib/plans";
 import type { ReportBrand } from "@/lib/generateProReportPDF";
@@ -50,7 +50,8 @@ export async function GET() {
 
   let logo: string | null = null;
   if (stored.hasLogo) {
-    const { data } = await (await bucket()).download(`${user.id}/logo.png`);
+    // fresh: a replaced logo must show straight away, not the CDN's old copy
+    const data = await downloadFresh(BUCKET, `${user.id}/logo.png`).catch(() => null);
     if (data) logo = `data:image/png;base64,${Buffer.from(await data.arrayBuffer()).toString("base64")}`;
   }
   const { hasLogo: _h, ...fields } = stored;

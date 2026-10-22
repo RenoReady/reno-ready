@@ -10,7 +10,7 @@
  * Each account keeps its most recent MAX_DRAFTS drafts.
  */
 
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient, readStorageJson } from "@/lib/supabase/server";
 import { estimateFromSnapshot } from "@/lib/projectEstimate";
 
 export const DRAFTS_BUCKET = "drafts";
@@ -73,10 +73,9 @@ function decodeImage(dataUrl: unknown): Buffer | null {
   return buf.length > 0 && buf.length <= MAX_IMAGE_BYTES ? buf : null;
 }
 
+// always fresh: drafts are rewritten on every autosave, and the Storage CDN can serve the old copy
 async function readRecord(userId: string, id: string): Promise<DraftRecord | null> {
-  const { data, error } = await (await bucket()).download(`${userId}/${id}/draft.json`);
-  if (error || !data) return null;
-  try { return JSON.parse(await data.text()) as DraftRecord; } catch { return null; }
+  return readStorageJson<DraftRecord>(DRAFTS_BUCKET, `${userId}/${id}/draft.json`);
 }
 
 /** Creates or updates a draft. Images are only re-uploaded when sent. */

@@ -30,6 +30,7 @@ import PreviewWatermark from "@/components/ui/PreviewWatermark";
 import { downloadImage, toJpeg } from "@/lib/watermark";
 import ResumeDraftModal, { type ResumeOffer } from "@/components/builder/ResumeDraftModal";
 import ShareModal from "@/components/builder/ShareModal";
+import ProWelcome, { brandPromptDismissed } from "@/components/account/ProWelcome";
 import {
   useDraftAutosave, loadLocalDraft, isResumable, applyDraft, startNewDraft,
   fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, type LocalDraft,
@@ -1211,6 +1212,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Incremented to force useUserStatus to re-fetch after payment
   const [statusRefreshKey,     setStatusRefreshKey]     = useState(0);
   const [paymentBanner,        setPaymentBanner]         = useState(false);
+  // after buying Pro: "waiting" until Pro is active, then "open" if they have no branding yet
+  const [brandPrompt,          setBrandPrompt]           = useState<"waiting" | "open" | null>(null);
   // Local bump so the counter decrements immediately without waiting for a re-fetch
   const [localGenerationBump,  setLocalGenerationBump]  = useState(0);
   const [localEditBump,        setLocalEditBump]        = useState(0);
@@ -1258,6 +1261,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     }
 
     if (params.get("payment_success") === "true") {
+      // just went Pro: offer to set up their branding once Pro is active
+      if (["proMonthly", "proAnnual"].includes(params.get("plan") ?? "") && !brandPromptDismissed()) setBrandPrompt("waiting");
       const clean = new URL(window.location.href);
       clean.searchParams.delete("payment_success");
       clean.searchParams.delete("plan");
@@ -1318,6 +1323,17 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const roomType = room ?? storeRoomType;
 
   const userStatus = useUserStatus(statusRefreshKey);
+
+  // Once the new Pro plan is active (Stripe's confirmation can lag the redirect), open the
+  // branding prompt unless they've already set it up. Saving branding needs Pro, hence the wait.
+  useEffect(() => {
+    if (brandPrompt !== "waiting" || !hasProTier(userStatus)) return;
+    let live = true;
+    fetch("/api/brand", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (live) setBrandPrompt(d && !d.brand ? "open" : null); })
+      .catch(() => { if (live) setBrandPrompt(null); });
+    return () => { live = false; };
+  }, [brandPrompt, userStatus]);
 
   // ── Photo-first flow: upload → design → estimate ──
   // Back-navigation (e.g. from /preview) resumes where the user left off.
@@ -3009,6 +3025,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         />
       )}
 
+      {brandPrompt === "open" && <ProWelcome onClose={() => setBrandPrompt(null)} />}
       {shareOpen && (
         <ShareModal estimate={shownEstimate} onClose={() => setShareOpen(false)}
           options={variations.filter((v) => v.status === "done" && v.url).map((v) => ({ label: variationLabel(v), url: v.url! }))} />

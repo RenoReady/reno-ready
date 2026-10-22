@@ -82,6 +82,8 @@ export default function AccountPage() {
   const [avatarFailed, setAvatarFailed] = useState(false);
   // Pro: client share links
   const [shares, setShares] = useState<ShareSummary[] | null>(null);
+  // Pro only: false = no report branding yet, so reports and client links go out unbranded
+  const [branded, setBranded] = useState<boolean | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [briefs, setBriefs] = useState<BriefSummary[] | null>(null);
 
@@ -98,6 +100,7 @@ export default function AccountPage() {
       if (acct.plan.kind === "pro" || acct.plan.kind === "admin") {
         const r = await fetch("/api/shares", { cache: "no-store" }).catch(() => null);
         setShares(r?.ok ? (await r.json()).shares : []);
+        fetch("/api/brand", { cache: "no-store" }).then((b) => (b.ok ? b.json() : null)).then((d) => d && setBranded(!!d.brand)).catch(() => {});
       }
     } catch {
       setState("error");
@@ -168,6 +171,15 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-sand pb-20">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10">
+
+        {/* ── Pro without branding: their reports and links go out unbranded ── */}
+        {branded === false && (
+          <a href="#branding" className="flex items-center gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 px-4 py-3 text-sm text-charcoal/75 hover:border-terracotta/45">
+            <Palette size={18} className="flex-shrink-0 text-terracotta" />
+            <span className="flex-1"><strong className="text-charcoal">Add your branding.</strong> Your logo and details go on every PDF report and client link, so clients see your business.</span>
+            <ArrowRight size={16} className="flex-shrink-0 text-terracotta" />
+          </a>
+        )}
 
         {/* ── Profile + plan ───────────────────────────────────── */}
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -418,7 +430,7 @@ export default function AccountPage() {
               <h2 className="flex items-center gap-2 text-lg font-bold text-charcoal"><Palette size={18} className="text-terracotta" /> Report branding</h2>
               <p className="text-sm text-charcoal/50">Your logo, details and colour on every PDF Pro Report you download, in place of Reno Ready&apos;s.</p>
             </div>
-            <BrandForm />
+            <BrandForm onSaved={() => setBranded(true)} />
           </section>
         )}
 

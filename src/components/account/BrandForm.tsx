@@ -20,7 +20,7 @@ const FIELDS: { key: keyof Omit<ReportBrand, "logo" | "accent">; label: string; 
 
 const DEFAULT_ACCENT = "#D27D5E";
 
-export default function BrandForm() {
+export default function BrandForm({ onSaved }: { onSaved?: () => void } = {}) {
   const [brand, setBrand]   = useState<ReportBrand>({ businessName: "", accent: DEFAULT_ACCENT, logo: null });
   const [logoChanged, setLogoChanged] = useState(false);
   const [state, setState]   = useState<"loading" | "idle" | "saving" | "saved">("loading");
@@ -55,6 +55,7 @@ export default function BrandForm() {
     if (!res?.ok) { setError(data?.error ?? "Couldn't save. Please try again."); setState("idle"); return; }
     setLogoChanged(false);
     setState("saved");
+    onSaved?.();
   };
 
   if (state === "loading") return <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-sand-300"><Loader2 className="animate-spin text-charcoal/30" /></div>;

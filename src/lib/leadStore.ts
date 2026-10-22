@@ -15,7 +15,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient, readStorageJson } from "@/lib/supabase/server";
 
 export const LEADS_BUCKET = "leads";
 export const LEAD_STATUSES = ["new", "contacted", "quoted", "won", "lost"] as const;
@@ -86,10 +86,9 @@ export async function saveLead(
   return id;
 }
 
+// always fresh: a lead is rewritten when its status changes, and the Storage CDN can serve the old copy
 async function readLead(id: string): Promise<LeadRecord | null> {
-  const { data } = await (await bucket()).download(`${id}/lead.json`);
-  if (!data) return null;
-  try { return JSON.parse(await data.text()) as LeadRecord; } catch { return null; }
+  return readStorageJson<LeadRecord>(LEADS_BUCKET, `${id}/lead.json`);
 }
 
 async function writeLead(record: LeadRecord): Promise<void> {

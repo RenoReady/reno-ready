@@ -18,7 +18,6 @@ import {
   Wrench,
   ImageOff,
   Info,
-  Ruler,
   MapPin,
   CalendarClock,
 } from "lucide-react";
@@ -32,7 +31,6 @@ import {
   TAPWARE_OPTIONS,
   TILE_STYLE_OPTIONS,
   FLOOR_FORMATS,
-  WALL_FORMATS,
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,
@@ -127,10 +125,7 @@ export default function ConnectPage() {
     generatedImageUrl,
     roomPhotoUrl,
     bathroomSize, customLength, customWidth,
-    projectBrief,
     lightingOption,
-    useCustomDimensions,
-    generateDescription,
     keepExisting,
   } = useBuilderStore();
 

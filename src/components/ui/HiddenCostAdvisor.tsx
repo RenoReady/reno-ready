@@ -12,7 +12,6 @@
 
 import { TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import type { RoomType } from "@/lib/roomTypes";
 
 const ADVISORIES: Record<string, { headline: string; body: string; cost: string } | null> = {

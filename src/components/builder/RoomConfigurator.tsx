@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Upload, ImagePlus, Sparkles, SlidersHorizontal, Layers, Droplets,
+  Sparkles, SlidersHorizontal, Layers, Droplets,
   CheckCircle2, X, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
@@ -21,7 +21,7 @@ import {
   LIGHTING_OPTIONS,
   COST_BREAKDOWN, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP,
   BATHROOM_SIZE_OPTIONS,
-  TileOption, VanityType, TapwareFinish, TileStyle, ShowerNiche, ShowerFixtures,
+  TileOption, VanityType, TapwareFinish, ShowerNiche, ShowerFixtures,
   BathroomSize, LightingOption,
   calcEstimatedCost,
 } from "@/lib/types";
@@ -44,7 +44,7 @@ import { StylePicker } from "@/components/builder/SurfacePicker";
 import { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import BrushMask, { BRUSH_SIZES, type BrushMaskHandle, type BrushSize } from "@/components/builder/BrushMask";
 import RoomRouter from "@/components/ui/RoomRouter";
-import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, STAGES, type Stage } from "@/components/builder/Steps";
+import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import DesignNote from "@/components/builder/DesignNote";
 import { isKept } from "@/lib/keepExisting";
@@ -64,7 +64,6 @@ import {
 } from "@/lib/projectBrief";
 import {
   type RoomType,
-  ROOM_LABELS,
   calcKitchenCost,
   calcBedroomCost,
 } from "@/lib/roomTypes";
@@ -604,8 +603,8 @@ function getRegionLabel(xPct: number, yPct: number): string {
 }
 
 function ArchitectViewport({
-  onGenerate, onRegionClick, onZoneClick, isGenerating,
-  viewportState, generateDescription, generateError, activeZone, refinementMode,
+  onGenerate, onRegionClick, isGenerating,
+  viewportState, generateDescription, generateError, refinementMode,
   historyLength, historyIdx, onNavigateHistory, brushRef, brushSize = "M", onMaskChange,
   watermark = false, onUpgrade, canExport4k = false, on4kLocked,
 }: {
@@ -1291,10 +1290,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     customNote,         setCustomNote,
     customFloorColor,   setCustomFloorColor,
     customWallColor,    setCustomWallColor,
-    tileStyle,          setTileStyle,
     structuralChanges,  setStructuralChanges,
     bathroomSize,       setBathroomSize,
-    useCustomDimensions, setUseCustomDimensions,
+    setUseCustomDimensions,
     customLength,       setCustomLength,
     customWidth,        setCustomWidth,
     setGeneratedImageUrl,

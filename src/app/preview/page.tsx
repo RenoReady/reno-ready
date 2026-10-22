@@ -30,7 +30,6 @@ import {
   VANITY_OPTIONS,
   TAPWARE_OPTIONS,
   FLOOR_FORMATS,
-  WALL_FORMATS,
   surfaceLabel,
   calcEstimatedCost,
   buildItemisedCosts,

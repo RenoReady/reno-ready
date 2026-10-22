@@ -1,16 +1,14 @@
 import Link from "next/link";
 import {
   ArrowRight, Sparkles, DollarSign, Users, CheckCircle2,
-  ChevronDown, PencilRuler, FileText, BadgeCheck,
-  Zap, Repeat2, Check, TriangleAlert, Home,
+  ChevronDown, FileText,
+  Zap, TriangleAlert, Home,
   Bath, ChefHat, BedDouble,
 } from "lucide-react";
-import Button from "@/components/ui/Button";
 import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
 import ScrollReveal from "@/components/ui/ScrollReveal";
 import PricingPlans from "@/components/ui/PricingPlans";
 import Marquee from "@/components/ui/Marquee";
-import { type PlanKey } from "@/lib/plans";
 import HeroVideo from "@/components/ui/HeroVideo";
 import { HOME_VIDEO, ROOM_PAGES } from "@/lib/roomPages";
 

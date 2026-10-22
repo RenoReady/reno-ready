@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
       "react-hooks/refs": "warn",
       "react-hooks/preserve-manual-memoization": "warn",
       "react-hooks/immutability": "warn",
+      // `const { secret: _s, ...rest } = obj` drops a field on purpose
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }],
     },
   },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "marketing/**", "scripts/**", ".claude/**"]),

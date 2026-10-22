@@ -2,7 +2,7 @@
  * Where a visitor came from (first touch), so the admin dashboard can show
  * which ads bring sign-ups and sales.
  *
- *  - middleware.ts sets the `rr_src` cookie on the first visit that carries
+ *  - src/proxy.ts sets the `rr_src` cookie on the first visit that carries
  *    UTM tags, an ad click id (fbclid / gclid) or an outside referrer, and
  *    never overwrites it (90 days).
  *  - /auth/callback copies it onto brand-new accounts (app_metadata.attribution).

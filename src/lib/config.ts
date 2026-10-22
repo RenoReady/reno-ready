@@ -3,7 +3,7 @@
  *
  * Single source of truth for admin email + lead-notification destination.
  * Used by:
- *   - middleware.ts        (gates /admin)
+ *   - src/proxy.ts         (gates /admin)
  *   - app/admin/page.tsx   (verifies session email)
  *   - app/actions/contact.ts (Resend destination fallback)
  *

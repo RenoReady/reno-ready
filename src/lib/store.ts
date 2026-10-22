@@ -379,7 +379,7 @@ function releaseKeep(st: { keepExisting: BathroomKeepKey[] }, key: BathroomKeepK
 
 const BLANK_ROOMS: Record<RoomType, boolean> = { bathroom: false, kitchen: false, bedroom: false };
 
-export const useBuilderStore = create<BuilderStore>((set, get) => ({
+export const useBuilderStore = create<BuilderStore>((set) => ({
   ...defaults,
 
   // ── Session state ──────────────────────────────────────────────────────────

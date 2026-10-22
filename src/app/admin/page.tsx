@@ -1,7 +1,7 @@
 /**
  * Admin Dashboard — /admin
  *
- * Access is gated by middleware.ts (only ADMIN_EMAIL signed in via Supabase
+ * Access is gated by proxy.ts (only ADMIN_EMAIL signed in via Supabase
  * may reach this route). This page additionally re-checks the session
  * server-side as a defence-in-depth measure.
  *

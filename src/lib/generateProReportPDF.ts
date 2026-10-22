@@ -14,8 +14,8 @@ import { jsPDF } from "jspdf";
 import type { BuilderSelections } from "./types";
 import type { ProjectBrief } from "./projectBrief";
 import type { RoomType, KitchenSelections, BedroomSelections } from "./roomTypes";
-import { calcBriefCostItems, needsAsbestosCheck, calcBriefTotal } from "./projectBrief";
-import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, WALL_FORMATS, surfaceLabel, bathroomWallLabel } from "./types";
+import { calcBriefCostItems, needsAsbestosCheck } from "./projectBrief";
+import { buildItemisedCosts, VANITY_OPTIONS, TAPWARE_OPTIONS, FLOOR_FORMATS, surfaceLabel, bathroomWallLabel } from "./types";
 import { DESIGN_STYLES, isDesignStyle } from "./designStyles";
 import {
   calcKitchenCost, calcBedroomCost,

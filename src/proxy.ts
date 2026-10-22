@@ -1,5 +1,5 @@
 /**
- * Next.js middleware — runs on every request that matches `config.matcher`.
+ * Next.js proxy (called "middleware" before Next 16) — runs on every request that matches `config.matcher`.
  *
  * Responsibilities:
  *   1. Refresh the Supabase auth cookie on every request so server pages
@@ -14,7 +14,7 @@ import { updateSupabaseSession } from "@/lib/supabase/middleware";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE, attributionFrom, encodeAttribution } from "@/lib/attribution";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { response, user } = await updateSupabaseSession(request);
 
   const pathname = request.nextUrl.pathname;

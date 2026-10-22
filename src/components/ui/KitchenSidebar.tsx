@@ -31,7 +31,7 @@ import {
   KITCHEN_BUDGET_MAX,
   KITCHEN_BUDGET_STEP,
 } from "@/lib/roomTypes";
-import { Flame, Zap, CheckCircle2, ToggleLeft, Info, Ruler, SlidersHorizontal } from "lucide-react";
+import { Flame, Zap, Ruler, SlidersHorizontal } from "lucide-react";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import { isKept, keepPatch, KITCHEN_KEEP_FIELDS, type KitchenKeepKey } from "@/lib/keepExisting";
 import { SURFACE_TONES, surfaceSwatch, paintSwatch, findPaintFinish, paintToneFor, type FloorFormat } from "@/lib/types";

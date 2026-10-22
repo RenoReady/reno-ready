@@ -8,8 +8,9 @@ import Button from "@/components/ui/Button";
 
 export const metadata: Metadata = {
   title: "Bathroom Renovation: Where to Start in Australia",
+  alternates: { canonical: "/guide" },
   description:
-    "A step-by-step guide to starting your Australian bathroom renovation — from asbestos testing ($2,271) to design and builder quotes. Real costs, real advice.",
+    "A step-by-step guide to starting your Australian bathroom renovation — from asbestos removal ($2,271) to design and builder quotes. Real costs, real advice.",
   keywords: [
     "where to start bathroom renovation",
     "bathroom renovation guide Australia",

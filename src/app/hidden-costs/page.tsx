@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 
 export const metadata: Metadata = {
   title: "Hidden Costs of Australian Bathroom Renovations",
+  alternates: { canonical: "/hidden-costs" },
   description:
     "The costs that blow out Australian bathroom renovation budgets — based on real 2026 invoices. Hardware, glass, asbestos, waterproofing, and more. Know before you start.",
   keywords: [

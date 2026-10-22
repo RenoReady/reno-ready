@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 
 export const metadata: Metadata = {
   title: "AI Bathroom Design Gallery — Better Than Pinterest",
+  alternates: { canonical: "/gallery" },
   description:
     "Browse AI-generated Australian bathroom designs across every style — from Zellige and Terrazzo to Marble and Travertine. See what's possible before you renovate.",
   keywords: [

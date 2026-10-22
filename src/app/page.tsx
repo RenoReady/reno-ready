@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight, Sparkles, DollarSign, Users, CheckCircle2,
@@ -81,6 +82,11 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 // ── JSON-LD structured data ────────────────────────────────────────
+// one official address for the home page (title and description come from the root layout)
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",

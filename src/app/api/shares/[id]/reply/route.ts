@@ -1,6 +1,7 @@
 /**
  * /api/shares/:id/reply — the client's reply on a shared design (public, no account).
- *   POST { kind: "approve" | "question", name, contact, message?, website? }
+ *   POST { kind: "approve" | "question", option?, name, contact, message?, website? }
+ *        option: the label they were looking at, when several options were shared
  *        `website` is a honeypot: real people never see it, bots fill it in.
  *
  * The reply is saved with the share (the owner sees it under Client links in
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!isEmail && !isPhone) return NextResponse.json({ error: "Add an email or phone number so they can get back to you." }, { status: 400 });
   if (kind === "question" && !message) return NextResponse.json({ error: "Type your question." }, { status: 400 });
 
-  const reply: Omit<ShareReply, "at"> = { kind, name, contact, message };
+  const option = text(body.option, 8) || null;
+  const reply: Omit<ShareReply, "at"> = { kind, option, name, contact, message };
   let share;
   try {
     share = await addShareReply(id, reply);
@@ -54,8 +56,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const { email } = await shareOwner(share.ownerId);
       if (email) {
         const link = `${req.nextUrl.origin}/s/${id}`;
-        const what = kind === "approve" ? `approved “${share.title}”` : `has a question about “${share.title}”`;
-        const subject = kind === "approve" ? `${name} approved the ${share.roomType} design` : `${name} has a question about the ${share.roomType} design`;
+        const picked = option && share.options?.includes(option) ? option : null;
+        const what = kind === "approve" ? `approved ${picked ? `option ${picked} of ` : ""}“${share.title}”` : `has a question about ${picked ? `option ${picked} of ` : ""}“${share.title}”`;
+        const subject = kind === "approve" ? `${name} approved ${picked ? `option ${picked} of ` : ""}the ${share.roomType} design` : `${name} has a question about the ${share.roomType} design`;
         const lines = [
           `<p style="font-size:16px"><strong>${esc(name)}</strong> ${esc(what)}.</p>`,
           message ? `<blockquote style="margin:0 0 16px;padding:12px 16px;background:#F6F1EA;border-radius:10px;font-size:15px;white-space:pre-line">${esc(message)}</blockquote>` : "",
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           from: sender, to: email, subject,
           ...(isEmail && { replyTo: contact }),
           html: `<div style="font-family:Arial,sans-serif;color:#2C3E50;max-width:560px">${lines.join("")}</div>`,
-          text: `${name} ${kind === "approve" ? "approved" : "has a question about"} "${share.title}".\n\n${message ? message + "\n\n" : ""}Get back to them: ${contact}\n\n${link}`,
+          text: `${name} ${kind === "approve" ? "approved" : "has a question about"} ${picked ? `option ${picked} of ` : ""}"${share.title}".\n\n${message ? message + "\n\n" : ""}Get back to them: ${contact}\n\n${link}`,
         });
       }
     } catch (err) {

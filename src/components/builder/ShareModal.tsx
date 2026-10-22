@@ -11,9 +11,25 @@ import { X, Link2, Copy, Check, Loader2, ExternalLink, Share2 } from "lucide-rea
 import { useBuilderStore } from "@/lib/store";
 import { shareRows } from "@/lib/shareRows";
 import { toJpeg } from "@/lib/watermark";
+import { cn } from "@/lib/utils";
 
-export default function ShareModal({ estimate, onClose }: { estimate: string | null; onClose: () => void }) {
+const MAX_OPTIONS = 4;
+
+export default function ShareModal({ estimate, options = [], onClose }: {
+  estimate: string | null;
+  /** Pro variations (and edits) to offer as options; the client picks one */
+  options?: { label: string; url: string }[];
+  onClose: () => void;
+}) {
   const roomType = useBuilderStore((s) => s.roomType);
+  const currentUrl = useBuilderStore((s) => s.generatedImageUrl);
+  // start with the design on screen plus the other original takes
+  const [picked, setPicked] = useState<string[]>(() => {
+    const current = options.find((o) => o.url === currentUrl);
+    const rest = options.filter((o) => o !== current && !/\d/.test(o.label)).map((o) => o.label);
+    return [...(current ? [current.label] : []), ...rest].slice(0, MAX_OPTIONS);
+  });
+  const togglePick = (label: string) => setPicked((p) => (p.includes(label) ? p.filter((l) => l !== label) : p.length < MAX_OPTIONS ? [...p, label] : p));
   const room = roomType[0].toUpperCase() + roomType.slice(1);
   const [title, setTitle] = useState(`${room} renovation concept`);
   const [message, setMessage] = useState("");
@@ -41,16 +57,21 @@ export default function ShareModal({ estimate, onClose }: { estimate: string | n
     setBusy(true);
     setError(null);
     try {
-      const [after, before] = await Promise.all([
-        toJpeg(st.generatedImageUrl, 0.9),
-        st.roomPhotoUrl ? toJpeg(st.roomPhotoUrl, 0.88) : Promise.resolve(null),
+      // capped at 1600px wide so up to four options plus the photo stay under the 4.5 MB request limit
+      const chosen = options.filter((o) => picked.includes(o.label)).sort((a, b) => picked.indexOf(a.label) - picked.indexOf(b.label));
+      const multi = chosen.length > 1;
+      const [after, before, ...optionImages] = await Promise.all([
+        multi ? Promise.resolve(null) : toJpeg(chosen[0]?.url ?? st.generatedImageUrl, 0.88, 1600),
+        st.roomPhotoUrl ? toJpeg(st.roomPhotoUrl, 0.85, 1600) : Promise.resolve(null),
+        ...(multi ? chosen.map((o) => toJpeg(o.url, 0.85, 1600)) : []),
       ]);
       const res = await fetch("/api/shares", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           roomType: st.roomType, title, message: message || null,
-          estimate: withEstimate ? estimate : null, rows: shareRows(), after, before,
+          estimate: withEstimate ? estimate : null, rows: shareRows(), before,
+          ...(multi ? { options: chosen.map((o, i) => ({ label: o.label, image: optionImages[i] })) } : { after }),
         }),
       });
       const data = await res.json();
@@ -84,6 +105,32 @@ export default function ShareModal({ estimate, onClose }: { estimate: string | n
 
         {!url ? (
           <div className="flex flex-col gap-4 p-5 sm:p-6">
+            {options.length > 1 && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-semibold text-charcoal/80">
+                  Which options? <span className="font-normal text-charcoal/45">Pick up to {MAX_OPTIONS}; your client chooses one.</span>
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {options.map((o) => {
+                    const on = picked.includes(o.label);
+                    return (
+                      <button key={o.label} type="button" onClick={() => togglePick(o.label)} aria-pressed={on}
+                        disabled={!on && picked.length >= MAX_OPTIONS}
+                        className={cn("relative aspect-[4/3] w-20 flex-shrink-0 overflow-hidden rounded-xl ring-offset-2 transition disabled:opacity-35",
+                          on ? "ring-2 ring-terracotta" : "opacity-60 hover:opacity-100")}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={o.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                        <span className="absolute left-1 top-1 rounded-md bg-black/55 px-1.5 text-[10px] font-bold text-white">{o.label}</span>
+                        {on && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-terracotta text-white"><Check size={10} strokeWidth={3} /></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-charcoal/45">
+                  {picked.length > 1 ? `Sharing ${picked.length} options: ${picked.join(", ")}.` : "Sharing one design. Tick more to let your client choose."}
+                </p>
+              </div>
+            )}
             <label className="flex flex-col gap-1.5 text-sm font-semibold text-charcoal/80">
               Title
               <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80}

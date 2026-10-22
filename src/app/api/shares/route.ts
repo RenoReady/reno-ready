@@ -1,8 +1,8 @@
 /**
  * /api/shares — client share links (Reno Ready Pro)
  *   GET   → { shares }  the signed-in user's links, newest first
- *   POST  → { share, url }  body: { roomType, title?, message?, estimate?, rows?, after, before? }
- *          (images as JPEG data URLs)
+ *   POST  → { share, url }  body: { roomType, title?, message?, estimate?, rows?, after | options, before? }
+ *          options: [{ label, image }] (2–4) to let the client choose. Images as JPEG data URLs.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
       rows:     body.rows,
       after:    body.after,
       before:   body.before,
+      options:  body.options,
     });
     return NextResponse.json({ share, url: `${req.nextUrl.origin}/s/${share.id}` });
   } catch (err) {

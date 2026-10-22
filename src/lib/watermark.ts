@@ -59,18 +59,20 @@ export async function watermarkImage(src: string): Promise<string> {
 }
 
 /**
- * Re-encodes an image as JPEG at full size. 2K renders come back as large
- * PNGs; re-sending one for an edit would blow the 4.5 MB request limit.
+ * Re-encodes an image as JPEG, at full size unless maxWidth is given. 2K renders
+ * come back as large PNGs; re-sending one for an edit would blow the 4.5 MB request limit.
  */
-export async function toJpeg(src: string, quality = 0.92): Promise<string> {
-  if (src.startsWith("data:image/jpeg")) return src;
+export async function toJpeg(src: string, quality = 0.92, maxWidth?: number): Promise<string> {
+  if (src.startsWith("data:image/jpeg") && !maxWidth) return src;
   const img = await loadImage(src);
+  const scale = maxWidth ? Math.min(1, maxWidth / img.naturalWidth) : 1;
+  if (scale === 1 && src.startsWith("data:image/jpeg")) return src;
   const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
   const ctx = canvas.getContext("2d");
   if (!ctx) return src;
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/jpeg", quality);
 }
 

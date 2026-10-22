@@ -3,14 +3,15 @@
  * Public but unlisted: no account needed, not indexed by search engines.
  *
  * Branded as the business that shared it (their report branding), with a
- * reply panel so the client can approve it or ask a question.
+ * reply panel so the client can approve it or ask a question. When several
+ * options were shared, the client flips between them and approves one.
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Globe, Mail, Phone } from "lucide-react";
-import BeforeAfterSlider from "@/components/ui/BeforeAfterSlider";
+import { ShareDesignView, ShareOptionsProvider } from "@/components/share/ShareOptions";
 import ShareReplyPanel from "@/components/share/ShareReplyPanel";
 import { getShare, markShareViewed, shareOwner } from "@/lib/shareStore";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -78,15 +79,9 @@ export default async function SharedDesignPage({ params }: Props) {
           {share.message && <p className="mt-3 max-w-2xl whitespace-pre-line text-base text-charcoal/70">{share.message}</p>}
         </div>
 
+        <ShareOptionsProvider options={share.optionUrls}>
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-          <div className="overflow-hidden rounded-3xl shadow-warm-xl">
-            {share.beforeUrl ? (
-              <BeforeAfterSlider beforeSrc={share.beforeUrl} afterSrc={share.afterUrl} beforeLabel="Before" afterLabel="After" hideSwatches height={560} />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={share.afterUrl} alt={`${room} design`} className="w-full object-cover" />
-            )}
-          </div>
+          <ShareDesignView beforeUrl={share.beforeUrl} afterUrl={share.afterUrl} room={room} accent={accent} />
 
           <div className="flex flex-col gap-4">
             {share.estimate && (
@@ -115,6 +110,7 @@ export default async function SharedDesignPage({ params }: Props) {
             </p>
           </div>
         </div>
+        </ShareOptionsProvider>
 
         <p className="text-center text-xs text-charcoal/40">
           Visualised with <Link href="/" className="font-semibold text-charcoal/55 hover:text-charcoal">Reno Ready</Link>

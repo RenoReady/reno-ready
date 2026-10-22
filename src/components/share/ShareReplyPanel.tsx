@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { Check, Loader2, MessageCircleQuestion, ThumbsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useShareOption } from "@/components/share/ShareOptions";
 
 type Kind = "approve" | "question";
 
@@ -20,6 +21,7 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<Kind | null>(null);
+  const option = useShareOption();   // set when several options were shared
   // trailing full stop dropped so "Coastal Build Co." doesn't end a sentence as "Co.."
   const who = sharedBy?.replace(/\.+$/, "") ?? "the person who sent you this";
 
@@ -32,7 +34,7 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
       const res = await fetch(`/api/shares/${shareId}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, name, contact, message, website }),
+        body: JSON.stringify({ kind, option, name, contact, message, website }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Couldn't send that. Please try again.");
@@ -48,7 +50,7 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
     return (
       <div className="flex flex-col items-center gap-2 rounded-3xl border border-sand-200 bg-white/80 px-6 py-8 text-center shadow-warm-sm">
         <span className="flex h-11 w-11 items-center justify-center rounded-full text-white" style={{ background: accent }}><Check size={22} /></span>
-        <p className="text-lg font-bold text-charcoal">{sent === "approve" ? "Approved. Thanks!" : "Question sent"}</p>
+        <p className="text-lg font-bold text-charcoal">{sent === "approve" ? (option ? `Option ${option} approved. Thanks!` : "Approved. Thanks!") : "Question sent"}</p>
         <p className="max-w-sm text-sm text-charcoal/60">We&apos;ve let {who} know. They&apos;ll be in touch soon.</p>
       </div>
     );
@@ -58,10 +60,12 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
   return (
     <div className="rounded-3xl border border-sand-200 bg-white/80 p-5 shadow-warm-sm sm:p-6">
       <p className="text-lg font-bold text-charcoal">What do you think?</p>
-      <p className="mt-0.5 text-sm text-charcoal/55">Your reply goes straight to {who}.</p>
+      <p className="mt-0.5 text-sm text-charcoal/55">
+        {option ? "Pick the option you like above, then approve it or ask a question. " : ""}Your reply goes straight to {who}.
+      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        {([["approve", "Approve this design", ThumbsUp], ["question", "Ask a question", MessageCircleQuestion]] as const).map(([k, label, Icon]) => (
+        {([["approve", option ? `Approve option ${option}` : "Approve this design", ThumbsUp], ["question", "Ask a question", MessageCircleQuestion]] as const).map(([k, label, Icon]) => (
           <button key={k} type="button" onClick={() => { setKind(k); setError(null); }} aria-pressed={kind === k}
             className={cn("flex items-center justify-center gap-2 rounded-2xl border-2 px-3 py-3 text-sm font-bold transition-colors",
               kind === k ? "border-transparent text-white" : "border-sand-200 bg-white text-charcoal/75 hover:border-charcoal/20")}
@@ -83,7 +87,7 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button type="submit" disabled={busy} className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold text-white shadow-warm-sm transition-opacity hover:opacity-90 disabled:opacity-60" style={{ background: accent }}>
             {busy && <Loader2 size={16} className="animate-spin" />}
-            {kind === "approve" ? "Send my approval" : "Send my question"}
+            {kind === "approve" ? (option ? `Approve option ${option}` : "Send my approval") : "Send my question"}
           </button>
         </form>
       )}

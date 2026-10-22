@@ -29,8 +29,8 @@ import { ROOM_PAGES } from "@/lib/roomPages";
 import type { RoomType } from "@/lib/roomTypes";
 import type { AccountResponse } from "@/app/api/account/route";
 
-interface ShareReplySummary { kind: "approve" | "question"; name: string; contact: string; message: string | null; at: string }
-interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null; firstViewedAt?: string | null; replies: ShareReplySummary[] }
+interface ShareReplySummary { kind: "approve" | "question"; option?: string | null; name: string; contact: string; message: string | null; at: string }
+interface ShareSummary { id: string; title: string; roomType: string; createdAt: string; thumbUrl: string | null; options?: string[]; firstViewedAt?: string | null; replies: ShareReplySummary[] }
 interface BriefSummary { id: string; createdAt: string; room: string; estimate: number; timeline: string | null; address: string | null; reportUrl: string | null; renderUrl: string | null }
 import { cn, formatAUD } from "@/lib/utils";
 
@@ -445,12 +445,14 @@ export default function AccountPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-charcoal">{sh.title}</p>
                       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-charcoal/50">
-                        <span>{roomName(sh.roomType)} · shared {fmtDate(sh.createdAt)}</span>
+                        <span>{roomName(sh.roomType)}{sh.options && sh.options.length > 1 ? ` · ${sh.options.length} options` : ""} · shared {fmtDate(sh.createdAt)}</span>
                         <span className={cn("flex items-center gap-1 font-semibold", sh.firstViewedAt ? "text-charcoal/60" : "text-charcoal/35")}>
                           <Eye size={12} /> {sh.firstViewedAt ? `Opened ${fmtDate(sh.firstViewedAt)}` : "Not opened yet"}
                         </span>
                         {sh.replies.some((r) => r.kind === "approve") && (
-                          <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-bold text-emerald-700"><ThumbsUp size={11} /> Approved</span>
+                          <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 font-bold text-emerald-700">
+                            <ThumbsUp size={11} /> Approved{(() => { const o = sh.replies.filter((r) => r.kind === "approve").at(-1)?.option; return o ? ` option ${o}` : ""; })()}
+                          </span>
                         )}
                         {sh.replies.filter((r) => r.kind === "question").length > 0 && (
                           <span className="flex items-center gap-1 rounded-md bg-terracotta/10 px-1.5 py-0.5 font-bold text-terracotta">
@@ -476,7 +478,7 @@ export default function AccountPage() {
                         <li key={i} className="rounded-xl bg-sand-50 px-3 py-2 text-sm">
                           <p className="flex flex-wrap items-center gap-x-2 text-xs text-charcoal/50">
                             <span className="font-bold text-charcoal">{r.name}</span>
-                            <span className={r.kind === "approve" ? "font-semibold text-emerald-700" : "font-semibold text-terracotta"}>{r.kind === "approve" ? "approved it" : "asked a question"}</span>
+                            <span className={r.kind === "approve" ? "font-semibold text-emerald-700" : "font-semibold text-terracotta"}>{r.kind === "approve" ? (r.option ? `approved option ${r.option}` : "approved it") : r.option ? `asked about option ${r.option}` : "asked a question"}</span>
                             <span>{fmtDate(r.at)}</span>
                           </p>
                           {r.message && <p className="mt-1 whitespace-pre-line text-charcoal/75">{r.message}</p>}

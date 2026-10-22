@@ -3009,7 +3009,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         />
       )}
 
-      {shareOpen && <ShareModal estimate={shownEstimate} onClose={() => setShareOpen(false)} />}
+      {shareOpen && (
+        <ShareModal estimate={shownEstimate} onClose={() => setShareOpen(false)}
+          options={variations.filter((v) => v.status === "done" && v.url).map((v) => ({ label: variationLabel(v), url: v.url! }))} />
+      )}
 
       {resumeOffer && (
         <ResumeDraftModal

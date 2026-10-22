@@ -9,6 +9,7 @@
  *   <id>/share.json          ShareRecord
  *   <id>/after.jpg           the render
  *   <id>/before.jpg          the original photo, if any
+ *   <id>/opt-<n>.jpg         when several options are shared (opt-0 is also after.jpg)
  *   <id>/replies.json        ShareReply[]: the client approving it or asking a question
  *   owners/<user_id>/<id>    empty marker, so an owner can list and delete theirs
  *
@@ -24,10 +25,15 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 export const SHARES_BUCKET = "shares";
 export const MAX_SHARES_PER_USER = 100;
 export const MAX_REPLIES_PER_SHARE = 20;
+export const MAX_SHARE_OPTIONS = 4;
+/** Every file a share can have, for clean-up */
+export const SHARE_FILES = ["share.json", "after.jpg", "before.jpg", "replies.json", ...Array.from({ length: MAX_SHARE_OPTIONS }, (_, i) => `opt-${i}.jpg`)];
 const MAX_IMAGE_BYTES = 4_000_000;
 
 export interface ShareReply {
   kind:    "approve" | "question";
+  /** Which option they were looking at, when several were shared (e.g. "B1") */
+  option?: string | null;
   name:    string;
   /** Email or phone, whichever the client gave */
   contact: string;
@@ -57,6 +63,8 @@ export interface ShareRecord {
   estimate:   string | null;
   rows:       { label: string; value: string }[];
   hasBefore:  boolean;
+  /** Labels of the options when several were shared, in order (opt-0.jpg, opt-1.jpg…) */
+  options?:   string[];
   /** When someone other than the owner first opened it */
   firstViewedAt?: string | null;
 }
@@ -98,10 +106,19 @@ export async function createShare(ownerId: string, input: {
   message?: string | null;
   estimate?: string | null;
   rows?: unknown;
-  after: unknown;
+  after?: unknown;
   before?: unknown;
+  /** Several takes for the client to choose between: [{ label, image }] */
+  options?: unknown;
 }): Promise<ShareRecord> {
-  const after = jpeg(input.after);
+  const options = Array.isArray(input.options)
+    ? input.options.slice(0, MAX_SHARE_OPTIONS).map((o) => ({
+        label: typeof o?.label === "string" ? o.label.trim().slice(0, 8) : "",
+        image: jpeg(o?.image),
+      }))
+    : [];
+  if (options.some((o) => !o.label || !o.image)) throw new Error("Invalid option");
+  const after = options[0]?.image ?? jpeg(input.after);
   if (!after) throw new Error("Invalid render");
   const before = input.before ? jpeg(input.before) : null;
   if ((await ownedIds(ownerId)).length >= MAX_SHARES_PER_USER) {
@@ -123,6 +140,7 @@ export async function createShare(ownerId: string, input: {
     estimate:  input.estimate?.slice(0, 40) || null,
     rows,
     hasBefore: !!before,
+    ...(options.length > 1 && { options: options.map((o) => o.label) }),
   };
 
   const store = await bucket();
@@ -132,13 +150,14 @@ export async function createShare(ownerId: string, input: {
   };
   await put(`${id}/after.jpg`, after, "image/jpeg");
   if (before) await put(`${id}/before.jpg`, before, "image/jpeg");
+  if (options.length > 1) await Promise.all(options.map((o, i) => put(`${id}/opt-${i}.jpg`, o.image!, "image/jpeg")));
   // uncached: it's rewritten when the client first opens it
   await put(`${id}/share.json`, Buffer.from(JSON.stringify(record)), "application/json", "0");
   await put(`owners/${ownerId}/${id}`, Buffer.from(""), "text/plain");
   return record;
 }
 
-export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: string; beforeUrl: string | null }) | null> {
+export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: string; beforeUrl: string | null; optionUrls: { label: string; url: string }[] }) | null> {
   if (!isShareId(id)) return null;
   const store = await bucket();
   const { data } = await store.download(`${id}/share.json`);
@@ -148,7 +167,9 @@ export async function getShare(id: string): Promise<(ShareRecord & { afterUrl: s
   const sign = async (name: string) => (await store.createSignedUrl(`${id}/${name}`, 60 * 60 * 6)).data?.signedUrl ?? null;
   const afterUrl = await sign("after.jpg");
   if (!afterUrl) return null;
-  return { ...record, afterUrl, beforeUrl: record.hasBefore ? await sign("before.jpg") : null };
+  const optionUrls = (await Promise.all((record.options ?? []).map(async (label, i) => ({ label, url: await sign(`opt-${i}.jpg`) }))))
+    .filter((o): o is { label: string; url: string } => !!o.url);
+  return { ...record, afterUrl, beforeUrl: record.hasBefore ? await sign("before.jpg") : null, optionUrls };
 }
 
 async function readJson<T>(path: string): Promise<T | null> {
@@ -189,7 +210,9 @@ export async function addShareReply(id: string, reply: Omit<ShareReply, "at">): 
   if (!record) throw new Error("Not found");
   const replies = (await readJson<ShareReply[]>(`${id}/replies.json`)) ?? [];
   if (replies.length >= MAX_REPLIES_PER_SHARE) throw new Error("Too many replies");
-  await writeJson(`${id}/replies.json`, [...replies, { ...reply, at: new Date().toISOString() }]);
+  // only keep an option label that was actually shared
+  const option = reply.option && record.options?.includes(reply.option) ? reply.option : null;
+  await writeJson(`${id}/replies.json`, [...replies, { ...reply, option, at: new Date().toISOString() }]);
   return record;
 }
 
@@ -216,6 +239,6 @@ export async function deleteShare(ownerId: string, id: string): Promise<boolean>
   if (!data) return false;
   const record = JSON.parse(await data.text()) as ShareRecord;
   if (record.ownerId !== ownerId) return false;
-  await store.remove([`${id}/share.json`, `${id}/after.jpg`, `${id}/before.jpg`, `${id}/replies.json`, `owners/${ownerId}/${id}`]);
+  await store.remove([...SHARE_FILES.map((f) => `${id}/${f}`), `owners/${ownerId}/${id}`]);
   return true;
 }

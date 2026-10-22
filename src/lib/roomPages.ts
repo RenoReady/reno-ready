@@ -18,6 +18,14 @@ export interface RoomVideo {
   portrait?:  boolean;
 }
 
+/** /for-builders hero: the 30-second contractor ad, "Show them the reno before they sign" (9:16) */
+export const CONTRACTOR_VIDEO: RoomVideo = {
+  src:       "/videos/renoready-contractor-video.mp4",
+  mobileSrc: "/videos/renoready-contractor-video-720.mp4",
+  poster:    "/videos/renoready-contractor-video-poster.jpg",
+  portrait:  true,
+};
+
 /** Home page hero: the 30-second homeowner ad (9:16) */
 export const HOME_VIDEO: RoomVideo = {
   src:       "/videos/renoready-homeowner-video.mp4",

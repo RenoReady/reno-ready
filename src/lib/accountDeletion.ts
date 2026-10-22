@@ -18,6 +18,7 @@ import Stripe from "stripe";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
+import { SHARE_FILES } from "@/lib/shareStore";
 
 type Storage = ReturnType<typeof createSupabaseServiceRoleClient>["storage"];
 
@@ -73,7 +74,7 @@ export async function deleteStoredFiles(uid: string): Promise<number> {
   files += await removeAll(storage, "generations", await listAll(storage, "generations", uid));
   files += await removeAll(storage, "drafts", await listAll(storage, "drafts", uid));
   files += await removeAll(storage, "brands", await listAll(storage, "brands", uid));
-  files += await removeOwned(storage, "shares", uid, ["share.json", "after.jpg", "before.jpg", "replies.json"]);
+  files += await removeOwned(storage, "shares", uid, SHARE_FILES);
   files += await removeOwned(storage, "leads", uid, ["lead.json", "report.pdf", "render.jpg"]);
   return files;
 }

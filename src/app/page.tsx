@@ -639,6 +639,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-charcoal/40">
               <Link href="#pricing"      className="hover:text-charcoal/70 transition-colors">Pricing</Link>
               <Link href="#how-it-works" className="hover:text-charcoal/70 transition-colors">How it works</Link>
+              <Link href="/for-builders" className="hover:text-charcoal/70 transition-colors">For builders</Link>
               <Link href="/guide"        className="hover:text-charcoal/70 transition-colors">Renovation Guide</Link>
               <Link href="/gallery"      className="hover:text-charcoal/70 transition-colors">Design Gallery</Link>
               <Link href="/hidden-costs" className="hover:text-charcoal/70 transition-colors">Hidden Costs</Link>

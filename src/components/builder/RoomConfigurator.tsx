@@ -1951,7 +1951,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
           : "bg-sand-100 text-charcoal/55 border border-sand-200 hover:border-terracotta/30",
       )}
     >
-      <span>{outOfRenders ? (userStatus.tier === "pass" ? "Pass renders used \u2014 go Pro for unlimited" : "Free preview used \u2014 tap to upgrade") : freeLeftLabel}</span>
+      <span>{outOfRenders ? (userStatus.tier === "pass" ? "Pass renders used \u2014 go Pro for 500 a month" : "Free preview used \u2014 tap to upgrade") : freeLeftLabel}</span>
       <span className="font-bold text-terracotta underline underline-offset-2 whitespace-nowrap">{userStatus.tier === "pass" ? "Go Pro" : "Upgrade"}</span>
     </button>
   );

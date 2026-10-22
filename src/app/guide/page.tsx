@@ -94,9 +94,9 @@ export default function GuidePage() {
       <section className="bg-charcoal py-6 px-6">
         <div className="max-w-3xl mx-auto flex flex-wrap justify-center gap-8">
           {[
-            { label: "Average bathroom reno", value: "$18k–$30k+" },
-            { label: "Average overrun (no brief)", value: "23%" },
-            { label: "Asbestos homes pre-1990", value: ">40%" },
+            { label: "Typical bathroom reno", value: "$18k–$30k+" },
+            { label: "Contingency to set aside", value: "15–20%" },
+            { label: "Built before this? Test for asbestos", value: "1990" },
           ].map(({ label, value }) => (
             <div key={label} className="text-center">
               <p className="text-2xl font-bold text-terracotta">{value}</p>
@@ -111,7 +111,7 @@ export default function GuidePage() {
         <div className="max-w-3xl mx-auto">
 
           <StepCard number="01" icon={AlertTriangle} title="Test for Asbestos (Pre-1990 Homes)"
-            warning="If your home was built or renovated before 1990, asbestos-containing materials (ACM) may be present in bathroom walls, floor adhesives, and ceiling sheeting. Starting demolition without testing is illegal in Australia and extremely dangerous. Budget $300–$600 for professional testing before any other work begins."
+            warning="If your home was built or renovated before 1990, asbestos-containing materials (ACM) may be present in bathroom walls, floor adhesives, and ceiling sheeting. Disturbing asbestos is extremely dangerous, and every state has strict rules on how it must be identified and removed, so get it tested before any demolition starts. Budget $300–$600 for professional testing before any other work begins."
           >
             <p>
               This is the step most homeowners overlook — and it&apos;s the one that can derail
@@ -130,7 +130,7 @@ export default function GuidePage() {
               <CostRow label="Asbestos testing (licensed assessor)" amount="$300–$600" />
               <CostRow label="Removal & safe disposal (licensed contractor)" amount="$800–$1,800" />
               <CostRow label="Clearance certificate" amount="$200–$400" />
-              <CostRow label="Real-world example (Cleanaway, Feb 2026)" amount="$2,271.50 inc. GST" note="Full bathroom strip-out, Brisbane" />
+              <CostRow label="Real-world example (licensed removalist, Feb 2026)" amount="$2,271.50 inc. GST" note="Full bathroom strip-out, Brisbane" />
             </div>
           </StepCard>
 

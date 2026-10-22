@@ -102,9 +102,9 @@ export default function HiddenCostsPage() {
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Hardware & fittings",    value: "$3,484",  sub: "BDW quote #235561"               },
-              { label: "Shower screen (custom)",  value: "$1,925",  sub: "Millennium Glass invoice"        },
-              { label: "Asbestos removal",        value: "$2,272",  sub: "Cleanaway INV2652"               },
+              { label: "Hardware & fittings",    value: "$3,484",  sub: "Fittings supplier quote"          },
+              { label: "Shower screen (custom)",  value: "$1,925",  sub: "Glazier invoice"                  },
+              { label: "Asbestos removal",        value: "$2,272",  sub: "Licensed removalist invoice"      },
               { label: "Total hidden line items", value: "$7,681+", sub: "Before tiling, labour, or vanity" },
             ].map(({ label, value, sub }) => (
               <div key={label} className="bg-white/8 border border-white/10 rounded-2xl p-5 text-center">
@@ -134,8 +134,8 @@ export default function HiddenCostsPage() {
               title="Asbestos Testing & Removal"
               range="$1,200–$3,500"
               real="$2,271.50 inc. GST"
-              realLabel="Cleanaway INV2652"
-              description="Homes built or renovated before 1990 frequently contain asbestos in bathroom walls, floor adhesives, and ceiling materials. Professional testing is mandatory before demolition, and removal must be performed by a licensed contractor with safe disposal certificates."
+              realLabel="Licensed removalist invoice"
+              description="Homes built or renovated before 1990 frequently contain asbestos in bathroom walls, floor adhesives, and ceiling materials. Get it professionally tested before demolition. Removing more than a small amount must be done by a licensed removalist, with proof of safe disposal."
               tip="Budget this as a fixed cost if your home is pre-1990 — don't wait for test results before building it into your estimate. In QLD the average is $2,000–$2,500 for a standard bathroom."
               accent
             />
@@ -145,7 +145,7 @@ export default function HiddenCostsPage() {
               title="Hardware, Fittings & Accessories"
               range="$2,000–$4,500"
               real="$3,484.44 inc. GST"
-              realLabel="BDW quote #235561"
+              realLabel="Fittings supplier quote"
               description="This covers toilet suite, tapware, shower head and arm, waste fittings, towel rails, toilet roll holder, soap dishes, and mirror cabinet. Most quotes from builders don't include fixtures at this level of specificity — they assume a 'standard' allowance that's often well below what good fittings actually cost."
               tip="Get an itemised hardware quote before signing your builder contract. The $1,000 'fixtures allowance' in many builder quotes won't cover quality tapware alone."
             />
@@ -155,7 +155,7 @@ export default function HiddenCostsPage() {
               title="Custom Shower Screen & Glass"
               range="$900–$2,500"
               real="$1,925.00 inc. GST"
-              realLabel="Millennium Glass invoice"
+              realLabel="Glazier invoice"
               description="A frameless or semi-frameless shower screen made to measure for your bathroom. Off-the-shelf screens rarely fit properly — most bathrooms require custom glass, which means a separate quote from a glazier after tiling is complete (so exact dimensions can be measured)."
               tip="Don't let your builder include a generic shower screen allowance. Get a separate quote from a glazier early — they can measure from drawings and provide a firm figure."
             />
@@ -173,7 +173,7 @@ export default function HiddenCostsPage() {
               title="Electrical (Exhaust, Lighting, Heated Rails)"
               range="$400–$1,200"
               description="A licensed electrician is required for any new circuits. A quality 3-in-1 heat/exhaust/light unit (like the Marvel units common in Brisbane bathrooms) costs $280–$350 for the fixture plus $150–$200 for installation. Heated towel rails and LED mirror lighting add another $300–$600."
-              tip="Exhaust fans are mandatory under the National Construction Code. Budget at minimum $400 for a decent unit and install — or $900+ for a 3-in-1 heat exhaust with LED lighting."
+              tip="The National Construction Code requires bathrooms to be ventilated, and an exhaust fan is the usual way to meet it. Budget at minimum $400 for a decent unit and install — or $900+ for a 3-in-1 heat exhaust with LED lighting."
             />
 
             <CostCard

@@ -190,7 +190,7 @@ export default function PricingPlans({ compact = false, showTable = !compact }: 
         )}
         {!compact && (
           <p className="text-center text-xs text-charcoal/40">
-            *Unlimited means fair use: up to {TIER_LIMITS.pro.renders} renders and {TIER_LIMITS.pro.edits} edits a month. Prices in AUD. Pro renews automatically until you cancel.
+            Pro includes up to {TIER_LIMITS.pro.renders} renders and {TIER_LIMITS.pro.edits} edits each calendar month. Prices in AUD. Pro renews automatically until you cancel.
             {" "}By buying a plan you agree to our <Link href="/terms" className="underline underline-offset-2 hover:text-charcoal/70">Terms of Use</Link>.
           </p>
         )}

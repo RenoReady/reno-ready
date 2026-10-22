@@ -47,7 +47,7 @@ const FAQ = [
   { q: "Do my clients need an account?", a: "No. Share links open on any phone or computer, no sign-up. They can approve the design or ask you a question straight from the page." },
   { q: "Will my clients see Reno Ready or my business?", a: "Your business. Add your logo, licence and contact details once under My Account, and they appear on your PDF reports and share links." },
   { q: "Which rooms does it work for?", a: "Bathrooms, kitchens, and bedrooms and living areas. Start from a photo of the real room, or a sample if you don't have one handy." },
-  { q: "How many designs can I make?", a: "Pro includes unlimited 2K renders and edits under fair use, plus 4K exports, for one monthly or yearly price." },
+  { q: "How many designs can I make?", a: "Pro includes up to 500 2K renders and 500 edits every month, plus 4K exports, for one monthly or yearly price." },
   { q: "Can I cancel?", a: "Yes. No contracts, cancel anytime in 1-click from My Account. You keep Pro until the end of the period you've paid for." },
 ];
 
@@ -153,7 +153,7 @@ export default function ForBuildersPage() {
       <section id="pricing" className="scroll-mt-28 px-6 py-16 sm:py-24">
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-3xl font-bold text-charcoal sm:text-4xl">One job pays for a year of Pro</h2>
-          <p className="mx-auto mt-3 max-w-xl text-center text-base text-charcoal/60">Unlimited designs under fair use, your branding on everything, and no contract.</p>
+          <p className="mx-auto mt-3 max-w-xl text-center text-base text-charcoal/60">Up to 500 designs a month, your branding on everything, and no contract.</p>
           <div className="mt-10 grid gap-5 md:grid-cols-2">
             <div className="flex flex-col gap-5 rounded-3xl border border-sand-200 bg-white p-7 shadow-warm-sm">
               <div>

@@ -44,7 +44,7 @@ const PRO_PERKS = [
   { title: "No watermark",                 body: "Clean images to share with family, builders and designers." },
   { title: "More \u201cNot quite right?\u201d edits", body: "Highlight any spot and change just that part." },
   { title: "Contractor PDF Pro Reports",   body: "Materials, itemised costs and your render, ready to quote from." },
-  { title: "Unlimited renders and edits",  body: "Design every room, as many times as you like (fair use)." },
+  { title: "500 renders and edits a month", body: "Design every room as many times as you need, up to 500 renders and 500 edits each month." },
   { title: "4K exports",                   body: "Print-quality images for listings, brochures and presentations." },
   { title: "Multi-room reports",           body: "Bathroom, kitchen and bedroom in one builder brief." },
   { title: "Commercial use licence",       body: "Use your renders in property listings and marketing." },
@@ -232,7 +232,7 @@ export default function AccountPage() {
               <>
                 <p className="text-sm text-white/60">
                   {plan.kind === "pass" && plan.expiresAt && <>2K renders, edits and PDF Pro Reports until {fmtDate(plan.expiresAt)}. Nothing renews.</>}
-                  {plan.kind === "pro" && <>Unlimited renders and edits, 4K exports and a commercial use licence. Cancel anytime in 1-click.</>}
+                  {plan.kind === "pro" && <>Up to 500 renders and 500 edits a month, 4K exports and a commercial use licence. Cancel anytime in 1-click.</>}
                   {plan.kind === "admin" && <>Every feature is unlocked on this account.</>}
                 </p>
                 {plan.kind === "pass" && usage.rendersLimit !== null && usage.editsLimit !== null && (
@@ -250,7 +250,7 @@ export default function AccountPage() {
                   )}
                   {plan.kind === "pass" && (
                     <button onClick={() => setPaywall("upgrade")} className="flex items-center gap-2 rounded-xl bg-terracotta px-4 py-2.5 text-sm font-bold text-white hover:bg-terracotta/90">
-                      <Sparkles size={15} /> Go Pro for unlimited
+                      <Sparkles size={15} /> Go Pro for 500 a month
                     </button>
                   )}
                 </div>

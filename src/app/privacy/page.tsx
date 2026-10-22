@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "21 October 2026";
+const LAST_UPDATED = "22 October 2026";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -83,7 +83,8 @@ export default function PrivacyPage() {
             ]} />
             <p>
               <strong>Builders.</strong> When you submit a builder enquiry, your details and design brief are sent to
-              Reno Ready, and we pass them to the builder(s) we connect you with. We don&apos;t share your details
+              Reno Ready, and we pass them to a local building company we work with, who may contact you to arrange a
+              site visit and quote. They use your details only for your enquiry. We don&apos;t share your details
               with builders unless you&apos;ve asked to be connected.
             </p>
             <p>

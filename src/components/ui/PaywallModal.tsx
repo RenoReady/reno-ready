@@ -16,7 +16,7 @@ export type PaywallReason = "limit" | "pass_limit" | "refine" | "report" | "wate
 
 const REASON_COPY: Record<PaywallReason, { title: string; body: string }> = {
   limit:      { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "You’ve used your free preview. Keep designing in full 2K, with no watermark." },
-  pass_limit: { title: "Keep going with Reno Ready Pro",                   body: "You’ve used everything in your Project Pass. Pro gives you unlimited renders and edits." },
+  pass_limit: { title: "Keep going with Reno Ready Pro",                   body: "You’ve used everything in your Project Pass. Pro gives you up to 500 renders and 500 edits a month." },
   refine:     { title: "Unlock more “Not quite right?” edits",   body: "You’ve used your free edit. Every paid plan includes more." },
   report:     { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "The contractor-ready PDF Pro Report is included with every paid plan." },
   watermark:  { title: "Unlock Full 2K Designs & Contractor PDF Reports", body: "Upgrade to remove the watermark and unlock 2K exports." },

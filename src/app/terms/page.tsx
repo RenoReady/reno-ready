@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "21 October 2026";
+const LAST_UPDATED = "22 October 2026";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -84,7 +84,7 @@ export default function TermsPage() {
             <List items={[
               <><strong>Free.</strong> {TIER_LIMITS.free.renders} AI preview and {TIER_LIMITS.free.edits} &ldquo;Not quite right?&rdquo; edit per account, at standard quality with a watermark.</>,
               <><strong>7-Day Project Pass ($19, one-time).</strong> {pass.renders} renders and {pass.edits} edits in 2K, no watermark and downloadable PDF Pro Reports, for 7 days from purchase. It does not renew and you won&apos;t be charged again. Unused renders and edits expire at the end of the 7 days.</>,
-              <><strong>Reno Ready Pro (${PRO_PRICING.monthly.price} a month or ${PRO_PRICING.annual.price} a year).</strong> Unlimited renders and edits (see fair use below), 4 variations per click, 4K exports, client share links, branded and multi-room PDF reports, a commercial use licence and priority support. Pro is a subscription: it <strong>renews automatically</strong> at the end of each month or year, and we charge the card you used, until you cancel.</>,
+              <><strong>Reno Ready Pro (${PRO_PRICING.monthly.price} a month or ${PRO_PRICING.annual.price} a year).</strong> Up to {pro.renders} renders and {pro.edits} edits each calendar month (see fair use below), 4 variations per click, 4K exports, client share links, branded and multi-room PDF reports, a commercial use licence and priority support. Pro is a subscription: it <strong>renews automatically</strong> at the end of each month or year, and we charge the card you used, until you cancel.</>,
             ]} />
             <p>
               The features of each plan are as described on our <Link href="/pricing" className="font-semibold text-terracotta hover:underline">pricing page</Link> when
@@ -103,7 +103,7 @@ export default function TermsPage() {
 
           <Section id="fair-use" title="5. Fair use">
             <p>
-              {`“Unlimited” on Reno Ready Pro means unlimited for normal personal and professional use, up to ${pro.renders} renders and ${pro.edits} edits each calendar month.`}
+              {`Reno Ready Pro includes up to ${pro.renders} renders and ${pro.edits} edits each calendar month.`}
               {" "}That&apos;s far more than any one person
               designing rooms by hand will use. The limit exists to stop automated or bulk use, which costs us money for
               every image. If you reach it, you can keep using everything else and your allowance resets at the start of

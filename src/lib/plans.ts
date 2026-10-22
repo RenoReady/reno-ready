@@ -6,7 +6,7 @@
  *
  *   Free          1 preview + 1 edit, 1K, watermarked
  *   projectPass   $19 once  — 20 renders + 10 edits in 2K and PDF Pro Reports for 7 days
- *   proMonthly    $49/mo    — Pro: unlimited (fair use), 4K exports, commercial licence
+ *   proMonthly    $49/mo    — Pro: up to 500 renders + 500 edits a month, 4K exports, commercial licence
  *   proAnnual     $399/yr   — Pro, billed yearly
  *
  * Live price IDs are below; a sandbox overrides them with
@@ -58,7 +58,7 @@ export type Tier = "free" | "pass" | "pro" | "admin";
  * Renders and edits allowed per period.
  *   free  — once, ever
  *   pass  — per pass (7 days)
- *   pro   — per calendar month (fair use; "unlimited" on the cards)
+ *   pro   — per calendar month (shown as "up to 500 a month" on the cards)
  */
 export const TIER_LIMITS: Record<Exclude<Tier, "admin">, { renders: number; edits: number }> = {
   free: { renders: 1,   edits: 1 },
@@ -135,10 +135,10 @@ export const PLAN_CARDS: Record<PlanCard["id"], PlanCard> = {
   pro: {
     id: "pro",
     name: "Reno Ready Pro",
-    tagline: "For agents, designers, investors and multi-room renovators.",
-    pitch: "Unlimited designs, 4K exports and a commercial licence.",
+    tagline: "For builders, designers, agents and investors.",
+    pitch: `Up to ${TIER_LIMITS.pro.renders} designs a month, 4K exports and a commercial licence.`,
     features: [
-      "Unlimited 2K renders and edits",
+      `Up to ${TIER_LIMITS.pro.renders} 2K renders and ${TIER_LIMITS.pro.edits} edits a month`,
       "4 design variations per click",
       "Client share links (before/after)",
       "4K exports for print and listings",
@@ -154,8 +154,8 @@ export const PLAN_CARDS: Record<PlanCard["id"], PlanCard> = {
 
 /** The comparison table under the cards: true / false / text */
 export const PLAN_COMPARISON: { label: string; free: boolean | string; pass: boolean | string; pro: boolean | string; soon?: boolean }[] = [
-  { label: "AI renders",                         free: "1",            pass: "20",           pro: "Unlimited*" },
-  { label: "“Not quite right?” edits", free: "1",            pass: "10",           pro: "Unlimited*" },
+  { label: "AI renders",                         free: "1",            pass: "20",           pro: `${TIER_LIMITS.pro.renders} a month` },
+  { label: "“Not quite right?” edits", free: "1",            pass: "10",           pro: `${TIER_LIMITS.pro.edits} a month` },
   { label: "Image quality",                      free: "Standard",     pass: "2K HD",        pro: "2K HD + 4K export" },
   { label: "Watermark-free",                     free: false,          pass: true,           pro: true },
   { label: "Instant cost estimate",              free: true,           pass: true,           pro: true },

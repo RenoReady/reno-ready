@@ -6,7 +6,7 @@ import { CONTACT_EMAIL } from "@/lib/config";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Start free with an AI preview and an edit of your room. Upgrade to the $19 7-Day Project Pass for 2K renders and contractor PDF reports, or Reno Ready Pro for unlimited designs and 4K exports.",
+    "Start free with an AI preview and an edit of your room. Upgrade to the $19 7-Day Project Pass for 2K renders and contractor PDF reports, or Reno Ready Pro for up to 500 designs a month, 4K exports and your branding.",
   alternates: { canonical: "/pricing" },
 };
 

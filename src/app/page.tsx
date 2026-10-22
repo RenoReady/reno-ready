@@ -38,7 +38,7 @@ const HOME_ROOM_CARDS: {
   {
     room: "kitchen", title: "Kitchen",
     bullets: ["Stone benchtops & cabinetry", "Island & appliance planning"],
-    cost: "$22k – $45k", ctaLabel: "Design my kitchen", trend: "Average ROI: 85%",
+    cost: "$22k – $45k", ctaLabel: "Design my kitchen", trend: "2026 Trend: Timber & Stone",
     hover: "hover:border-amber-500/50 hover:shadow-[0_8px_32px_rgba(245,158,11,0.15)]",
     pill:  "bg-amber-50 border-amber-200 text-amber-700",
     dot:   "bg-amber-500",
@@ -104,7 +104,7 @@ const jsonLd = {
     "offers": [
       { "@type": "Offer", "name": "Free",               "price": "0",   "priceCurrency": "AUD", "description": "1 AI preview and 1 edit, no credit card required" },
       { "@type": "Offer", "name": "7-Day Project Pass", "price": "19",  "priceCurrency": "AUD", "description": "One-time: 20 renders and 10 edits in 2K plus PDF Pro Reports, for 7 days" },
-      { "@type": "Offer", "name": "Reno Ready Pro",     "price": "49",  "priceCurrency": "AUD", "description": "Monthly: unlimited 2K renders and edits, 4K exports, multi-room reports, commercial use licence" },
+      { "@type": "Offer", "name": "Reno Ready Pro",     "price": "49",  "priceCurrency": "AUD", "description": "Monthly: up to 500 2K renders and 500 edits a month, 4K exports, multi-room reports, commercial use licence" },
       { "@type": "Offer", "name": "Reno Ready Pro (annual)", "price": "399", "priceCurrency": "AUD", "description": "Yearly: everything in Pro" },
     ],
   },
@@ -145,19 +145,20 @@ export default function LandingPage() {
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-terracotta/10 border border-terracotta/20 w-fit">
                   <span className="w-2 h-2 rounded-full bg-terracotta animate-pulse" />
                   <span className="text-sm font-semibold text-terracotta tracking-tight">
-                    Australia&apos;s #1 Home Renovation Design Engine
+                    Built in Brisbane for Australian renovations
                   </span>
                 </div>
 
-                {/* Headline */}
+                {/* Headline (matches the ads and the share image) */}
                 <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-charcoal leading-[1.05] text-balance">
-                  Renovation Planning,{" "}
-                  <span className="text-terracotta">Made Simple.</span>
+                  Design your dream reno{" "}
+                  <span className="text-terracotta">in seconds.</span>
                 </h1>
 
                 {/* Sub-headline */}
                 <p className="text-xl text-charcoal/60 leading-relaxed max-w-[540px]">
-                  Design your bathroom, kitchen, or bedroom in seconds, get an instant itemised
+                  Design your <span className="font-semibold text-terracotta">bathroom</span>, <span className="font-semibold text-terracotta">kitchen</span>,
+                  or <span className="font-semibold text-terracotta">bedroom</span> in seconds, get an instant itemised
                   cost estimate, and generate a builder brief.
                 </p>
 
@@ -165,7 +166,7 @@ export default function LandingPage() {
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
                   <Link
                     href={ROOM_PAGES.bathroom.path}
-                    className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-blue-600 text-white text-lg font-bold shadow-[0_8px_24px_rgba(37,99,235,0.35)] hover:bg-blue-700 transition-all duration-200"
+                    className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-terracotta text-white text-lg font-bold shadow-[0_8px_24px_rgba(210,125,94,0.35)] hover:bg-terracotta-600 transition-all duration-200"
                   >
                     Design Bathroom
                     <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform duration-200" />
@@ -210,20 +211,10 @@ export default function LandingPage() {
       <section className="py-4 bg-charcoal overflow-hidden">
         <Marquee duration={45}>
           <div className="flex items-center gap-8 px-10 whitespace-nowrap">
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {["bg-terracotta", "bg-stone-300", "bg-sand-300", "bg-charcoal/40"].map((c, i) => (
-                  <div key={i} className={`w-6 h-6 rounded-full border-2 border-charcoal ${c}`} />
-                ))}
-              </div>
-              <p className="text-white font-semibold text-sm">
-                Join{" "}
-                <span className="text-terracotta font-bold" style={{ textShadow: "0 0 18px rgba(210,125,94,0.55)" }}>
-                  1,200+
-                </span>{" "}
-                Australians planning their renovations smarter
-              </p>
-            </div>
+            <p className="text-white font-semibold text-sm">
+              <span className="text-terracotta font-bold" style={{ textShadow: "0 0 18px rgba(210,125,94,0.55)" }}>Itemised</span>{" "}
+              cost estimates in seconds, built on Australian rates
+            </p>
             <span className="text-white/20 text-base select-none">◆</span>
             <p className="text-white/45 text-xs">
               Bathrooms · Kitchens · Bedrooms —{" "}
@@ -233,8 +224,8 @@ export default function LandingPage() {
             <p className="text-white/45 text-xs">Your first AI preview is free — no credit card required</p>
             <span className="text-white/20 text-base select-none">◆</span>
             <p className="text-white/45 text-xs">
-              Average saving:{" "}
-              <span className="text-terracotta/75 font-semibold">$2,400</span> in architect fees
+              A whole project from{" "}
+              <span className="text-terracotta/75 font-semibold">$19</span>, built in Brisbane
             </p>
             <span className="text-white/20 text-base select-none">◆</span>
           </div>
@@ -388,7 +379,7 @@ export default function LandingPage() {
               },
               {
                 n: "03", icon: Users, title: "Share Your Builder Brief",
-                desc: "Download a multi-room PDF report and share with pre-vetted local builders who can quote with confidence — no wasted meetings, no scope surprises.",
+                desc: "Send your brief to a trusted local builder we work with, who can come out and quote with confidence. Or download the multi-room PDF report and take it to your own builder.",
               },
             ].map(({ n, icon: Icon, title, desc }, i) => (
               <ScrollReveal key={n} delay={i * 0.14}>
@@ -584,11 +575,11 @@ export default function LandingPage() {
               { q: "Can I show this design to my builder?",
                 a: "Absolutely. The AI preview and cost breakdown are designed to start the conversation. You can download a Pro Report — a multi-page A4 PDF with your room render, materials specification, and itemised cost breakdown — and hand it directly to any builder or architect to get an accurate quote faster." },
               { q: "How accurate is the cost estimate?",
-                a: "Our estimates use current Australian market averages for materials and labour, including real invoice data from QLD projects. While every home is unique, the estimate gives you a realistic baseline. We also surface hidden costs — like asbestos removal, plumbing relocations, and electrical rough-ins — that most builders don't mention upfront." },
+                a: "Our estimates use current Australian market averages for materials and labour, checked against real invoices from a 2026 Brisbane renovation. While every home is unique, the estimate gives you a realistic baseline. We also surface hidden costs — like asbestos removal, plumbing relocations, and electrical rough-ins — that most builders don't mention upfront." },
               { q: "Does the AI understand my specific room layout?",
                 a: "Yes. When you upload a photo of your current room, our AI analyses the image to identify plumbing points, walls, windows, and structural elements — ensuring the redesign fits your actual space. Without a photo, we generate a high-quality concept room using your selected materials from scratch." },
               { q: "What do I get for free, and what do the paid plans add?",
-                a: "Every account gets 1 free AI preview and 1 \u201cNot quite right?\u201d edit of any room, with no credit card required. Free images carry a small watermark. The 7-Day Project Pass ($19, one-time) gives you 20 renders and 10 edits in 2K, no watermark and downloadable PDF Pro Reports for 7 days. Reno Ready Pro ($49/mo, or $399/yr) is for agents, designers, investors and multi-room renovators: unlimited renders and edits (fair use), 4K exports, multi-room reports, a commercial use licence and priority support. Cancel anytime in 1-click." },
+                a: "Every account gets 1 free AI preview and 1 \u201cNot quite right?\u201d edit of any room, with no credit card required. Free images carry a small watermark. The 7-Day Project Pass ($19, one-time) gives you 20 renders and 10 edits in 2K, no watermark and downloadable PDF Pro Reports for 7 days. Reno Ready Pro ($49/mo, or $399/yr) is for builders, designers, agents and investors: up to 500 renders and 500 edits a month, 4K exports, client share links, your branding on reports, multi-room reports, a commercial use licence and priority support. Cancel anytime in 1-click." },
               { q: "Can I use the images commercially?",
                 a: "With Reno Ready Pro, yes: you can use your renders in property listings, marketing, brochures and client presentations. Free and Project Pass images are for personal use, such as planning your renovation and sharing it with your builder, family and friends." },
             ].map(({ q, a }, i) => (
@@ -613,13 +604,13 @@ export default function LandingPage() {
             Ready to reimagine your home?
           </h2>
           <p className="text-xl text-white/55 mb-4">
-            Join 1,200+ Australians who planned smarter before they renovated.
+            See your own room transformed, with the cost, before you spend a dollar.
           </p>
           <p className="text-sm text-white/35 mb-10">
-            Bathrooms · Kitchens · Master Suites — one platform, one project report.
+            Bathrooms · Kitchens · Bedrooms — one platform, one project report.
           </p>
           <Link href="/builder">
-            <button className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-blue-600 text-white text-lg font-bold shadow-[0_8px_32px_rgba(37,99,235,0.45)] hover:bg-blue-700 hover:scale-[1.02] active:scale-100 transition-all duration-200">
+            <button className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-terracotta text-white text-lg font-bold shadow-[0_8px_32px_rgba(210,125,94,0.45)] hover:bg-terracotta-600 hover:scale-[1.02] active:scale-100 transition-all duration-200">
               Start My Free Preview
               <ArrowRight size={20} />
             </button>

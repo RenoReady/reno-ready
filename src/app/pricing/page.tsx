@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PricingPlans from "@/components/ui/PricingPlans";
+import { CONTACT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -23,7 +24,7 @@ export default function PricingPage() {
           </div>
           <PricingPlans />
           <p className="mt-10 text-center text-sm text-charcoal/50">
-            Questions about plans? Email <a href="mailto:hello@renoready.com.au" className="font-semibold underline underline-offset-2">hello@renoready.com.au</a>
+            Questions about plans? Email <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold underline underline-offset-2">{CONTACT_EMAIL}</a>
             {" "}or read the <Link href="/#faq" className="font-semibold underline underline-offset-2">FAQ</Link>.
           </p>
         </div>

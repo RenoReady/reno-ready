@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TIER_LIMITS, PRO_PRICING } from "@/lib/plans";
+import { CONTACT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -10,7 +11,6 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "21 October 2026";
-const CONTACT_EMAIL = "braiden@renoready.com.au";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (

@@ -23,6 +23,9 @@ export const ADMIN_EMAIL: string =
 export const LEAD_NOTIFICATION_DESTINATION: string =
   process.env.CONTACT_EMAIL_DESTINATION?.trim() || ADMIN_EMAIL;
 
+/** The contact address shown to customers (Terms, Privacy, Pricing, payment pages) */
+export const CONTACT_EMAIL = "braiden@renoready.com.au";
+
 /** Verified Resend sender. Defaults to Resend's onboarding domain if unset. */
 export const RESEND_FROM: string =
   process.env.RESEND_FROM_EMAIL?.trim() || "Reno Ready <onboarding@resend.dev>";

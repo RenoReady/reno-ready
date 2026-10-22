@@ -11,6 +11,7 @@ import { CheckCircle2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import Stripe from "stripe";
+import { CONTACT_EMAIL } from "@/lib/config";
 
 async function SuccessContent({
   sessionId,
@@ -107,8 +108,8 @@ async function SuccessContent({
 
         <p className="text-xs text-charcoal/35">
           Questions? Email us at{" "}
-          <a href="mailto:hello@renoready.com.au" className="underline hover:text-charcoal/60">
-            hello@renoready.com.au
+          <a href={`mailto:${CONTACT_EMAIL}`} className="underline hover:text-charcoal/60">
+            {CONTACT_EMAIL}
           </a>
         </p>
       </div>

@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import { Globe, Mail, Phone } from "lucide-react";
 import { ShareDesignView, ShareOptionsProvider } from "@/components/share/ShareOptions";
 import ShareReplyPanel from "@/components/share/ShareReplyPanel";
-import { getShare, markShareViewed, shareOwner } from "@/lib/shareStore";
+import { getShare, latestApproval, markShareViewed, shareOwner, shareReplies } from "@/lib/shareStore";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +36,14 @@ export default async function SharedDesignPage({ params }: Props) {
   const share = await getShare((await params).id).catch(() => null);
   if (!share) notFound();
 
-  const [{ brand }, viewer] = await Promise.all([
+  const [{ brand }, viewer, replies] = await Promise.all([
     shareOwner(share.ownerId).catch(() => ({ brand: null })),
     createSupabaseServerClient().then((s) => s.auth.getUser()).then((r) => r.data.user).catch(() => null),
+    shareReplies(share.id).catch(() => []),
   ]);
+  // once approved, the page says so (first name only: anyone with the link can see it)
+  const approval = latestApproval(replies);
+  const approved = approval ? { firstName: approval.name.split(/\s+/)[0], at: approval.at, option: approval.option ?? null } : null;
   // the owner checking their own link doesn't count as the client opening it
   // (inline rather than after(): it only happens once per link, on the first visit)
   if (viewer?.id !== share.ownerId && !share.firstViewedAt) await markShareViewed(share.id).catch((e) => console.error("[share] mark viewed:", e));
@@ -91,7 +95,7 @@ export default async function SharedDesignPage({ params }: Props) {
                 <p className="mt-1 text-xs text-white/40">Indicative, based on Australian market rates. {brand ? `${brand.businessName} will` : "Your builder will"} confirm the final quote.</p>
               </div>
             )}
-            <ShareReplyPanel shareId={share.id} sharedBy={brand?.businessName ?? null} accent={accent} />
+            <ShareReplyPanel shareId={share.id} sharedBy={brand?.businessName ?? null} accent={accent} approved={approved} />
             {share.rows.length > 0 && (
               <div className="rounded-3xl border border-sand-200 bg-white/80 p-5 shadow-warm-sm">
                 <p className="mb-3 text-sm font-bold text-charcoal">The finishes</p>

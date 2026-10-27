@@ -105,7 +105,7 @@ export default function Header() {
   if (pathname.startsWith("/s/")) return null;
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-sand-50/90 backdrop-blur-md border-b border-sand-200">
+    <header className="sticky top-0 z-50 w-full bg-sand-50/90 backdrop-blur-md border-b border-sand-200 print:hidden">
       <div className={cn(
         "max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2 sm:gap-6",
         isAppRoute ? "h-16 sm:h-28" : "h-16 sm:h-28",

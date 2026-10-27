@@ -164,6 +164,12 @@ export async function listDrafts(userId: string): Promise<DraftSummary[]> {
   });
 }
 
+/** A user's drafts with their full choices, no image links (for the admin design insights) */
+export async function listDraftRecords(userId: string): Promise<DraftRecord[]> {
+  const ids = await draftIds(userId);
+  return (await Promise.all(ids.map((id) => readRecord(userId, id)))).filter((r): r is DraftRecord => !!r);
+}
+
 /** Every user id that has drafts (for the reminder job) */
 export async function draftOwners(): Promise<string[]> {
   const { data } = await (await bucket()).list("", { limit: 1000 });

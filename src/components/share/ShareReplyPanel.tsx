@@ -12,7 +12,10 @@ import { useShareOption } from "@/components/share/ShareOptions";
 
 type Kind = "approve" | "question";
 
-export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId: string; sharedBy: string | null; accent: string }) {
+/** An approval already on the link, shown to whoever opens it */
+export interface ApprovedInfo { firstName: string; at: string; option: string | null }
+
+export default function ShareReplyPanel({ shareId, sharedBy, accent, approved }: { shareId: string; sharedBy: string | null; accent: string; approved?: ApprovedInfo | null }) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -51,7 +54,11 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
       <div className="flex flex-col items-center gap-2 rounded-3xl border border-sand-200 bg-white/80 px-6 py-8 text-center shadow-warm-sm">
         <span className="flex h-11 w-11 items-center justify-center rounded-full text-white" style={{ background: accent }}><Check size={22} /></span>
         <p className="text-lg font-bold text-charcoal">{sent === "approve" ? (option ? `Option ${option} approved. Thanks!` : "Approved. Thanks!") : "Question sent"}</p>
-        <p className="max-w-sm text-sm text-charcoal/60">We&apos;ve let {who} know. They&apos;ll be in touch soon.</p>
+        <p className="max-w-sm text-sm text-charcoal/60">
+          {sent === "approve"
+            ? <>We&apos;ve let {who} know. Next, they&apos;ll be in touch to confirm the details and your written quote.</>
+            : <>We&apos;ve let {who} know. They&apos;ll be in touch soon.</>}
+        </p>
       </div>
     );
   }
@@ -59,7 +66,17 @@ export default function ShareReplyPanel({ shareId, sharedBy, accent }: { shareId
   const field = "w-full rounded-xl border border-sand-300 bg-white px-3.5 py-2.5 text-base text-charcoal outline-none placeholder:text-charcoal/30 focus:border-charcoal/40 focus:ring-2 focus:ring-charcoal/10";
   return (
     <div className="rounded-3xl border border-sand-200 bg-white/80 p-5 shadow-warm-sm sm:p-6">
-      <p className="text-lg font-bold text-charcoal">What do you think?</p>
+      {approved && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-3.5 text-sm text-emerald-900">
+          <span className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white"><Check size={14} /></span>
+          <p>
+            <span className="font-bold">{approved.option ? `Option ${approved.option} approved` : "Approved"}</span> by {approved.firstName} on{" "}
+            {new Date(approved.at).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" })}.{" "}
+            Next, {who} will be in touch to confirm the details and your written quote.
+          </p>
+        </div>
+      )}
+      <p className="text-lg font-bold text-charcoal">{approved ? "Anything else?" : "What do you think?"}</p>
       <p className="mt-0.5 text-sm text-charcoal/55">
         {option ? "Pick the option you like above, then approve it or ask a question. " : ""}Your reply goes straight to {who}.
       </p>

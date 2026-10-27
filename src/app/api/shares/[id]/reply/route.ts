@@ -59,17 +59,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const picked = option && share.options?.includes(option) ? option : null;
         const what = kind === "approve" ? `approved ${picked ? `option ${picked} of ` : ""}“${share.title}”` : `has a question about ${picked ? `option ${picked} of ` : ""}“${share.title}”`;
         const subject = kind === "approve" ? `${name} approved ${picked ? `option ${picked} of ` : ""}the ${share.roomType} design` : `${name} has a question about the ${share.roomType} design`;
+        const record = `${req.nextUrl.origin}/account/approval/${id}`;
         const lines = [
           `<p style="font-size:16px"><strong>${esc(name)}</strong> ${esc(what)}.</p>`,
           message ? `<blockquote style="margin:0 0 16px;padding:12px 16px;background:#F6F1EA;border-radius:10px;font-size:15px;white-space:pre-line">${esc(message)}</blockquote>` : "",
           `<p style="font-size:15px">Get back to them: <strong>${esc(contact)}</strong></p>`,
-          `<p style="font-size:14px"><a href="${link}">Open the design</a> · <a href="${req.nextUrl.origin}/account">All replies in My Account</a></p>`,
+          // an approval is the go-ahead: what to do with it
+          kind === "approve" ? `<p style="font-size:15px;margin:18px 0 6px"><strong>Next steps</strong></p>
+<ol style="font-size:15px;line-height:1.6;margin:0 0 16px;padding-left:20px">
+  <li>Call or email ${esc(name)} to confirm, and book a site measure.</li>
+  <li>Save the <a href="${record}">approval record</a> to the job file: the approved ${picked ? `option (${esc(picked)})` : "design"}, the estimate and finishes, and when they approved it. It prints or saves as a PDF.</li>
+  <li>Send your written quote.</li>
+</ol>` : "",
+          `<p style="font-size:14px"><a href="${link}">Open the design</a> · ${kind === "approve" ? `<a href="${record}">Approval record</a> · ` : ""}<a href="${req.nextUrl.origin}/account">All replies in My Account</a></p>`,
         ];
         await new Resend(process.env.RESEND_API_KEY).emails.send({
           from: sender, to: email, subject,
           ...(isEmail && { replyTo: contact }),
           html: `<div style="font-family:Arial,sans-serif;color:#2C3E50;max-width:560px">${lines.join("")}</div>`,
-          text: `${name} ${kind === "approve" ? "approved" : "has a question about"} ${picked ? `option ${picked} of ` : ""}"${share.title}".\n\n${message ? message + "\n\n" : ""}Get back to them: ${contact}\n\n${link}`,
+          text: `${name} ${kind === "approve" ? "approved" : "has a question about"} ${picked ? `option ${picked} of ` : ""}"${share.title}".\n\n${message ? message + "\n\n" : ""}Get back to them: ${contact}\n\n${kind === "approve" ? `Next steps: confirm with them and book a site measure, save the approval record (${record}) to the job file, then send your written quote.\n\n` : ""}${link}`,
         });
       }
     } catch (err) {

@@ -234,6 +234,15 @@ export async function markShareViewed(id: string): Promise<void> {
   await writeJson(`${id}/share.json`, { ...record, firstViewedAt: new Date().toISOString() });
 }
 
+/** A link's client replies, oldest first */
+export async function shareReplies(id: string): Promise<ShareReply[]> {
+  if (!isShareId(id)) return [];
+  return (await readJson<ShareReply[]>(`${id}/replies.json`)) ?? [];
+}
+
+/** The client's latest approval, if they've approved */
+export const latestApproval = (replies: ShareReply[]) => replies.filter((r) => r.kind === "approve").at(-1) ?? null;
+
 /** Saves a client's reply; returns the share so the caller can notify its owner */
 export async function addShareReply(id: string, reply: Omit<ShareReply, "at">): Promise<ShareRecord> {
   if (!isShareId(id)) throw new Error("Not found");

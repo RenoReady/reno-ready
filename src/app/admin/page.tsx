@@ -29,6 +29,8 @@ import { cn, formatAUD } from "@/lib/utils";
 import UserDesigns, { type AdminDesign } from "./UserDesigns";
 import Journey, { UserJourney } from "./Journey";
 import { journeyReport } from "@/lib/journeyReport";
+import DesignInsights from "./DesignInsights";
+import { designInsights } from "@/lib/designInsights";
 
 export const dynamic = "force-dynamic";
 
@@ -144,11 +146,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { leads, error: leadsError } = leadsResult;
   // Pro users' client links (the admin's own test links left out)
   const adminId = profiles.find((p) => p.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase())?.id;
-  const [shares, journey] = await Promise.all([
+  const [shares, journey, insights] = await Promise.all([
     shareActivity(adminId ? [adminId] : [])
       .catch((e: unknown): { error: string } => ({ error: e instanceof Error ? e.message : "Couldn't load share links" })),
     journeyReport(days, adminId ? [adminId] : [])
       .catch((e: unknown): { error: string } => ({ error: e instanceof Error ? e.message : "Couldn't load the visitor journey" })),
+    designInsights(adminId ? [adminId] : [])
+      .catch((e: unknown): { error: string } => ({ error: e instanceof Error ? e.message : "Couldn't load design choices" })),
   ]);
   const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : "—");
   const monthKey  = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }).slice(0, 7);
@@ -217,6 +221,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </section>
         ) : (
           <Journey report={journey} />
+        )}
+
+        {/* ── Popular choices per room ────────────────────────── */}
+        {"error" in insights ? (
+          <section className="mb-10">
+            <h2 className="text-2xl font-bold text-charcoal mb-4">What people design</h2>
+            <SetupCard title="Design choices couldn't load" detail={insights.error} steps={["Check SUPABASE_SERVICE_ROLE_KEY is set, then reload."]} />
+          </section>
+        ) : (
+          <DesignInsights rooms={insights} />
         )}
 
         {/* ── Where customers come from ───────────────────────── */}

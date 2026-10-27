@@ -12,7 +12,7 @@ import Link from "next/link";
 import {
   Sparkles, History, Image as ImageIcon, Lock, Check, CreditCard, Loader2, Trash2,
   ArrowRight, Download, X, Bath, ChefHat, BedDouble, MessageSquare, Crown, CalendarClock,
-  Link2, Copy, ExternalLink, Palette, Hammer, FileText, Eye, ThumbsUp, MessageCircleQuestion,
+  Link2, Copy, ExternalLink, Palette, Hammer, FileText, Eye, ThumbsUp, MessageCircleQuestion, FileCheck,
 } from "lucide-react";
 import BrandForm from "@/components/account/BrandForm";
 import ProjectPlanner from "@/components/account/ProjectPlanner";
@@ -474,6 +474,11 @@ export default function AccountPage() {
                       </p>
                     </div>
                     <div className="flex flex-shrink-0 gap-1.5">
+                      {sh.replies.some((r) => r.kind === "approve") && (
+                        <a href={`/account/approval/${sh.id}`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-2 text-xs font-bold text-white hover:bg-emerald-700">
+                          <FileCheck size={13} /><span className="hidden sm:inline">Approval record</span>
+                        </a>
+                      )}
                       <button onClick={() => copyShare(sh.id)} className="flex items-center gap-1 rounded-lg bg-charcoal px-2.5 py-2 text-xs font-bold text-white hover:bg-charcoal/90">
                         {copiedId === sh.id ? <Check size={13} /> : <Copy size={13} />}<span className="hidden sm:inline">{copiedId === sh.id ? "Copied" : "Copy link"}</span>
                       </button>

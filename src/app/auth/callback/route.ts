@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ATTRIBUTION_COOKIE, decodeAttribution } from "@/lib/attribution";
+import { RETURN_COOKIE, safeReturnPath } from "@/lib/authReturn";
 
 /** Accounts created within this window count as new sign-ups (an older account signing in again keeps no source) */
 const NEW_ACCOUNT_MS = 15 * 60_000;
@@ -16,9 +17,11 @@ const NEW_ACCOUNT_MS = 15 * 60_000;
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // Same-site paths only — "//host" or a full URL here would be an open redirect
-  const rawNext = searchParams.get("next") ?? "";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/builder";
+  // the page they signed in from (cookie set by AuthModal); ?next= still honoured for old links
+  const fromCookie = request.cookies.get(RETURN_COOKIE)?.value;
+  let cookieNext: string | null = null;
+  try { cookieNext = fromCookie ? decodeURIComponent(fromCookie) : null; } catch { /* mangled cookie: use the default */ }
+  const next = safeReturnPath(searchParams.get("next") ?? cookieNext);
 
   if (!code) {
     return NextResponse.redirect(`${origin}/?auth_error=no_code`);
@@ -47,7 +50,9 @@ export async function GET(request: NextRequest) {
     // Append `?authed=1` so client-side gates can sync localStorage too.
     const redirectUrl = new URL(next, origin);
     redirectUrl.searchParams.set("authed", "1");
-    return NextResponse.redirect(redirectUrl.toString());
+    const res = NextResponse.redirect(redirectUrl.toString());
+    res.cookies.delete(RETURN_COOKIE);
+    return res;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "config";
     console.error("[auth/callback] Supabase init failed:", msg);

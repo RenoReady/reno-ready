@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, ShieldCheck, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { RETURN_COOKIE } from "@/lib/authReturn";
 import { cn } from "@/lib/utils";
 
 // ── Supabase client (browser-side, cookie-backed for SSR) ────────
@@ -83,11 +84,14 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
     setError(null);
     try {
       const supabase = getSupabase();
+      document.cookie = `${RETURN_COOKIE}=${encodeURIComponent(returnPath())}; path=/; max-age=900; samesite=lax${location.protocol === "https:" ? "; secure" : ""}`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          // Come back to the page they signed in from (e.g. /bathroom), not always /builder
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath())}`,
+          // The return address must match Supabase's allow list exactly: a ?next= on it
+          // made Supabase drop it and send people to the home page signed out (3–27 Oct 2026).
+          // The page to come back to (e.g. /bathroom) travels in a short-lived cookie instead.
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: { access_type: "offline", prompt: "consent" },
         },
       });

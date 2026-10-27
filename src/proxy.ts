@@ -7,6 +7,7 @@
  *   2. Gate /admin/* — only the email defined in src/lib/config.ts may enter.
  *   3. Remember where a first-time visitor came from (ad tags / referrer) in
  *      the rr_src cookie, for the admin "where customers come from" report.
+ *   4. Pass a Google sign-in code that lands on the home page on to /auth/callback.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -15,9 +16,18 @@ import { ADMIN_EMAIL } from "@/lib/config";
 import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE, attributionFrom, encodeAttribution } from "@/lib/attribution";
 
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateSupabaseSession(request);
-
   const pathname = request.nextUrl.pathname;
+
+  // ── Sign-in safety net ─────────────────────────────────────────
+  // When Supabase doesn't recognise a return address it sends the sign-in code
+  // to the Site URL (the home page), where nothing would use it. Finish it.
+  if (pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = "/auth/callback";
+    return NextResponse.redirect(callback);
+  }
+
+  const { response, user } = await updateSupabaseSession(request);
 
   // ── /admin gate ────────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {

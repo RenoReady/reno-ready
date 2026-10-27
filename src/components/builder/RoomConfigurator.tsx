@@ -44,6 +44,7 @@ import { StylePicker } from "@/components/builder/SurfacePicker";
 import { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import BrushMask, { BRUSH_SIZES, type BrushMaskHandle, type BrushSize } from "@/components/builder/BrushMask";
 import RoomRouter from "@/components/ui/RoomRouter";
+import { track } from "@/lib/track";
 import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import DesignNote from "@/components/builder/DesignNote";
@@ -1354,6 +1355,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // Back-navigation from /preview must NOT re-show the picker.
   const [showRoomRouter,     setShowRoomRouter]     = useState(!room && !roomConfirmed);
 
+  // journey funnel: which room they're designing (a room page, or picked on /builder)
+  useEffect(() => {
+    if (room || roomConfirmed) track("room", { room: roomType });
+  }, [room, roomConfirmed, roomType]);
+
   // Room pages own their room: sync the store to it on arrival
   useEffect(() => {
     if (!room) return;
@@ -1539,6 +1545,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setRoomPhotoUrl(canvas.toDataURL("image/jpeg", 0.85));
         setPhotoBusy(false);
+        track("photo", { room: useBuilderStore.getState().roomType, detail: file.name.startsWith("sample-") ? "sample" : "own photo" });
         goTo("design");
       };
       img.src = e.target?.result as string;
@@ -1570,6 +1577,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const handleStyle = useCallback((id: string) => {
     const st = useBuilderStore.getState();
     const style = isDesignStyle(id) ? id : null;
+    if (style) track("style", { room: st.roomType, detail: style });
     if (st.roomType === "kitchen") { setKitchenSelections({ designStyle: st.kitchenSelections.designStyle === style ? null : style }); return; }
     if (st.roomType === "bedroom") { setBedroomSelections({ designStyle: st.bedroomSelections.designStyle === style ? null : style }); return; }
     setDesignStyle(st.designStyle === style ? null : style);
@@ -1588,6 +1596,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   }, []);
 
   const executeGenerate = useCallback(async (count: number = 1) => {
+    track("generate", { room: useBuilderStore.getState().roomType });
     if (!isAuthed()) {
       saveBuilderStateForAuth(true); // snapshot before OAuth redirect
       setShowAuthModal(true);

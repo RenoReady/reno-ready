@@ -3,12 +3,14 @@
  *
  * Vercel sends "Authorization: Bearer $CRON_SECRET". The admin can also open
  * it while signed in; add ?dry=1 to see who would be emailed without sending.
+ * After the reminders it sends the admin's daily health email (src/lib/healthReport.ts).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { runDraftReminders } from "@/lib/reminders";
+import { sendHealthEmail } from "@/lib/healthReport";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,5 +30,8 @@ export async function GET(req: NextRequest) {
   const dryRun = req.nextUrl.searchParams.get("dry") === "1";
   const result = await runDraftReminders({ dryRun });
   console.info("[reminders]", JSON.stringify(result));
-  return NextResponse.json(result);
+  // then the admin's daily health email (not on a dry run)
+  const health = dryRun ? { sent: false, error: "dry run" } : await sendHealthEmail();
+  console.info("[health]", JSON.stringify(health));
+  return NextResponse.json({ ...result, health });
 }

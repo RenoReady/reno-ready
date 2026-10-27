@@ -7,13 +7,15 @@
  *   2. Gate /admin/* — only the email defined in src/lib/config.ts may enter.
  *   3. Remember where a first-time visitor came from (ad tags / referrer) in
  *      the rr_src cookie, for the admin "where customers come from" report.
- *   4. Pass a Google sign-in code that lands on the home page on to /auth/callback.
+ *   4. Give each browser an anonymous visitor id (rr_vid) for the admin journey funnel.
+ *   5. Pass a Google sign-in code that lands on the home page on to /auth/callback.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE, attributionFrom, encodeAttribution } from "@/lib/attribution";
+import { VISITOR_COOKIE, VISITOR_MAX_AGE } from "@/lib/visitor";
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -47,6 +49,13 @@ export async function proxy(request: NextRequest) {
       notFoundUrl.searchParams.set("admin_error", "forbidden");
       return NextResponse.redirect(notFoundUrl);
     }
+  }
+
+  // ── Anonymous visitor id for the journey funnel (src/lib/funnel.ts) ──
+  if (!request.cookies.has(VISITOR_COOKIE)) {
+    response.cookies.set(VISITOR_COOKIE, crypto.randomUUID(), {
+      maxAge: VISITOR_MAX_AGE, path: "/", sameSite: "lax", httpOnly: true, secure: request.nextUrl.protocol === "https:",
+    });
   }
 
   // ── First-touch attribution (page visits only, never overwritten) ──

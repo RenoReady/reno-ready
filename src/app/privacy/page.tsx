@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "22 October 2026";
+const LAST_UPDATED = "27 October 2026";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -56,6 +56,7 @@ export default function PrivacyPage() {
               <><strong>Usage of free previews.</strong> How many previews you&apos;ve generated, so we can apply the free limit.</>,
               <><strong>Payments.</strong> Your plan and when it expires. Card details are entered directly with Stripe, our payment processor; we never see or store your full card number.</>,
               <><strong>Builder enquiries.</strong> If you ask to be connected with a builder, the name, email, phone number, property address, preferred timeline and message you enter, together with your design, estimate and the PDF report made from them. We keep each brief so we can follow it up, and if you were signed in, you can see the briefs you&apos;ve sent under My Account.</>,
+              <><strong>How you use the site.</strong> Which steps of the design tool you reach (for example choosing a room, adding a photo, generating a preview), the room type and style you pick, your device type, and your approximate area (city or region, worked out from your internet connection; we don&apos;t store your IP address for this). If you type in a property postcode, we keep that too and add it to your builder brief. Before you sign in this is linked only to a random ID in a cookie; once you sign in it&apos;s linked to your account. We use it to see where people get stuck and to improve the tool.</>,
               <><strong>Technical information.</strong> Standard server logs from our hosting provider (such as IP address, browser type and pages visited), used to keep the site running and secure.</>,
             ]} />
           </Section>
@@ -118,8 +119,10 @@ export default function PrivacyPage() {
           <Section id="browser" title="Cookies and browser storage">
             <p>
               We use essential cookies to keep you signed in, and your browser&apos;s local storage to remember your
-              sign-in state and to hold your design temporarily while you sign in. We don&apos;t use advertising or
-              tracking cookies.
+              sign-in state and to hold your design temporarily while you sign in. We also set two first-party
+              cookies of our own: one with a random ID so we can count visits and see how far people get in the
+              design tool, and one that remembers which ad or website first brought you here. They&apos;re only used
+              by Reno Ready. We don&apos;t use advertising cookies or third-party trackers.
             </p>
           </Section>
 

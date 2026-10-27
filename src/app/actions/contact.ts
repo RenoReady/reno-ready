@@ -18,6 +18,8 @@ import { LEAD_NOTIFICATION_DESTINATION, RESEND_FROM } from "@/lib/config";
 import type { ProReportInput } from "@/lib/generateProReportPDF";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { saveLead, markLeadEmailed } from "@/lib/leadStore";
+import { logEvent } from "@/lib/funnel";
+import { cookies, headers } from "next/headers";
 
 // ── Inbound payload from the Connect form ──────────────────────────
 export interface ConnectSubmission {
@@ -331,6 +333,11 @@ async function keepLead(payload: ConnectSubmission, pdf: Buffer | null): Promise
   const d = payload.design;
   const clip = (v: string | null | undefined, n: number) => v?.trim().slice(0, n) || null;
   const render = payload.reportInput?.generatedImageUrl;
+  // journey funnel: the last step
+  try {
+    const [h, c] = await Promise.all([headers(), cookies()]);
+    await logEvent({ headers: h, cookies: c }, { step: "brief", userId, room: /kitchen/i.test(d.room ?? "") ? "kitchen" : /bed/i.test(d.room ?? "") ? "bedroom" : "bathroom" });
+  } catch { /* never block the brief */ }
   return saveLead({
     userId,
     name:       payload.name.trim().slice(0, 120),

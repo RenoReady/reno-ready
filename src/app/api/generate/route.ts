@@ -26,6 +26,7 @@ import { buildGeminiPrompt as buildSharedPrompt } from "@/lib/buildPrompt";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ADMIN_EMAIL } from "@/lib/config";
 import { saveGeneration } from "@/lib/generations";
+import { logEvent } from "@/lib/funnel";
 import { isPaidTier, isProTier } from "@/lib/plans";
 import { getAllowance, canUse, recordUsage, type UsageKind } from "@/lib/usage";
 
@@ -361,6 +362,8 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
 
 // ── Route handler ──────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse<GenerateResponse>> {
+  // for the journey funnel's "preview failed" when something throws
+  let failedFor: { userId: string; room: string | undefined; edit: boolean } | null = null;
   try {
     const body: GenerateRequest = await req.json();
 
@@ -380,6 +383,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const kind: UsageKind = body.mode === "refine" ? "edit" : "render";
+    failedFor = { userId: user.id, room: body.roomType, edit: kind === "edit" };
     const allowance = await getAllowance(user);
     const hasPro = isPaidTier(allowance.tier);
 
@@ -415,6 +419,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       result = await handleReal(body, hasPro ? "2K" : "1K");
     }
 
+    await logEvent(req, result.success
+      ? { step: kind === "edit" ? "edit" : "preview", userId: user.id, room: body.roomType, detail: body.variation ? "variations" : null }
+      : { step: "preview_failed", userId: user.id, room: body.roomType, detail: (kind === "edit" ? "edit: " : "") + (result.error ?? "failed") });
+    failedFor = null;
+
     // ── After a successful generation ─────────────────────────────
     // Runs once the response has been sent (after() keeps the function
     // alive on Vercel until it finishes), so the user never waits on it.
@@ -449,6 +458,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[generate] Error:", message);
+    if (failedFor) await logEvent(req, { step: "preview_failed", userId: failedFor.userId, room: failedFor.room, detail: (failedFor.edit ? "edit: " : "") + message });
     return NextResponse.json(
       { success: false, error: message },
       { status: 500 },

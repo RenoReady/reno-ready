@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
+import { logEvent } from "@/lib/funnel";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "DB update failed" }, { status: 500 });
     }
 
+    await logEvent(null, { step: "paid", userId, detail: plan });
     console.info(`[stripe-webhook] ✓ User ${userId} upgraded to ${planLabel} (expires ${expiresAt.toISOString()}, customer ${stripeCustomerId ?? "guest"})`);
   }
 

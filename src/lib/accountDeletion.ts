@@ -93,7 +93,17 @@ export async function deleteAccount(user: User): Promise<DeletionSummary> {
   // 2. stored files
   const files = await deleteStoredFiles(uid);
 
-  // 3. the account itself (profiles + generations rows go with it)
+  // 3. their journey events, including the ones from before they signed in on the same browsers
+  try {
+    const { data: mine } = await svc.from("funnel_events").select("visitor_id").eq("user_id", uid).limit(1000);
+    const visitors = [...new Set((mine ?? []).map((r) => r.visitor_id as string))];
+    if (visitors.length) await svc.from("funnel_events").delete().in("visitor_id", visitors);
+    await svc.from("funnel_events").delete().eq("user_id", uid);
+  } catch (err) {
+    console.warn("[account-deletion] journey events:", err instanceof Error ? err.message : err);
+  }
+
+  // 4. the account itself (profiles + generations rows go with it)
   const { error } = await svc.auth.admin.deleteUser(uid);
   if (error) throw new Error(`Couldn't delete the account: ${error.message}`);
   return { files, subscriptionsCancelled };

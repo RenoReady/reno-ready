@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AuthModal from "@/components/auth/AuthModal";
 import { createCheckoutSession } from "@/app/actions/stripe";
+import { track } from "@/lib/track";
 import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
 import { ROOM_PAGES } from "@/lib/roomPages";
 import { useBuilderStore } from "@/lib/store";
@@ -51,6 +52,7 @@ export function useCheckout(resumeFor?: PlanKey | PlanKey[]) {
       const result = await createCheckoutSession(plan, back);
       if ("url" in result) {
         writePending(null);
+        track("checkout", { detail: plan });
         window.location.href = result.url;
         return;   // keep the spinner while the browser navigates
       }

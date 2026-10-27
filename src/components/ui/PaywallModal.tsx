@@ -11,6 +11,7 @@
 import { useEffect } from "react";
 import { X, Sparkles } from "lucide-react";
 import PricingPlans from "@/components/ui/PricingPlans";
+import { track } from "@/lib/track";
 
 export type PaywallReason = "limit" | "pass_limit" | "refine" | "report" | "watermark" | "upgrade" | "4k" | "variations" | "share" | "project";
 
@@ -33,6 +34,8 @@ interface PaywallModalProps {
 }
 
 export default function PaywallModal({ onClose, reason = "limit" }: PaywallModalProps) {
+  useEffect(() => { track("paywall", { detail: reason }); }, [reason]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);

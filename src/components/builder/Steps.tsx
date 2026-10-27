@@ -11,7 +11,8 @@
  *   Panel       — an unnumbered section inside a step
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { savedPostcode, savePostcode, track } from "@/lib/track";
 import { Check, ArrowLeftRight, Camera, ImagePlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RoomType } from "@/lib/roomTypes";
@@ -225,6 +226,32 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
         </span>
         <span className="text-lg font-bold text-terracotta" aria-hidden>→</span>
       </button>
+
+      <PostcodeField room={room} />
     </div>
+  );
+}
+
+/** Optional property postcode: kept on this device, added to their builder brief, and counted (as a postcode only) in the admin dashboard */
+function PostcodeField({ room }: { room: RoomType }) {
+  const [value, setValue] = useState("");
+  useEffect(() => { setValue(savedPostcode()); }, []);
+  const change = (raw: string) => {
+    const pc = raw.replace(/\D/g, "").slice(0, 4);
+    setValue(pc);
+    if (pc.length === 4) { savePostcode(pc); track("postcode", { postcode: pc, room }); }
+    else if (!pc) savePostcode("");
+  };
+  return (
+    <label className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-charcoal/55">
+      <span>Property postcode <span className="text-charcoal/35">(optional)</span></span>
+      <input
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        inputMode="numeric" autoComplete="postal-code" placeholder="e.g. 4000" aria-label="Property postcode"
+        className="w-24 rounded-xl border-2 border-sand-200 bg-white px-3 py-1.5 text-center font-semibold text-charcoal outline-none focus:border-terracotta/60"
+      />
+      <span className="w-full text-center text-xs text-charcoal/40">We&apos;ll add it to your builder brief.</span>
+    </label>
   );
 }

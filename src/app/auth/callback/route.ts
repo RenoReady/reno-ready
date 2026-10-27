@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { ATTRIBUTION_COOKIE, decodeAttribution } from "@/lib/attribution";
 import { RETURN_COOKIE, safeReturnPath } from "@/lib/authReturn";
+import { logEvent } from "@/lib/funnel";
 
 /** Accounts created within this window count as new sign-ups (an older account signing in again keeps no source) */
 const NEW_ACCOUNT_MS = 15 * 60_000;
@@ -45,6 +46,8 @@ export async function GET(request: NextRequest) {
         app_metadata: { ...(user.app_metadata ?? {}), attribution: src },
       }).catch((e) => console.error("[auth/callback] attribution:", e));
     }
+
+    if (user) await logEvent(request, { step: "signed_in", userId: user.id, page: next.split("?")[0], detail: Date.now() - Date.parse(user.created_at) < NEW_ACCOUNT_MS ? "new account" : null });
 
     // Success — redirect to builder (or wherever `next` points).
     // Append `?authed=1` so client-side gates can sync localStorage too.

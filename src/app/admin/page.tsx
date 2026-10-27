@@ -21,12 +21,14 @@ import { ADMIN_EMAIL } from "@/lib/config";
 import { tierFor } from "@/lib/plans";
 import { fetchRevenue } from "@/lib/stripeRevenue";
 import { sourceReport, TRACKING_STARTED, type SourceRow } from "@/lib/attributionReport";
-import { shareActivity, type ShareActivity } from "@/lib/shareStore";
+import { shareActivity } from "@/lib/shareStore";
 import { listLeads, type LeadWithLinks } from "@/lib/leadStore";
 import LeadStatusSelect from "./LeadStatusSelect";
 import { GENERATIONS_BUCKET } from "@/lib/generations";
 import { cn, formatAUD } from "@/lib/utils";
 import UserDesigns, { type AdminDesign } from "./UserDesigns";
+import Journey, { UserJourney } from "./Journey";
+import { journeyReport } from "@/lib/journeyReport";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +114,9 @@ async function fetchDesigns(): Promise<{ designs: StoredDesign[]; total: number;
 }
 
 // ── Page ──────────────────────────────────────────────────────────
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+  const wantDays = Number((await searchParams).days);
+  const days = [7, 30, 90].includes(wantDays) ? wantDays : 30;
   // Defence-in-depth — middleware should have already gated this, but
   // re-verify in case the matcher misses or the cookie is stale.
   let userEmail: string | undefined;
@@ -140,8 +144,12 @@ export default async function AdminPage() {
   const { leads, error: leadsError } = leadsResult;
   // Pro users' client links (the admin's own test links left out)
   const adminId = profiles.find((p) => p.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase())?.id;
-  const shares: ShareActivity | { error: string } = await shareActivity(adminId ? [adminId] : [])
-    .catch((e: unknown) => ({ error: e instanceof Error ? e.message : "Couldn't load share links" }));
+  const [shares, journey] = await Promise.all([
+    shareActivity(adminId ? [adminId] : [])
+      .catch((e: unknown): { error: string } => ({ error: e instanceof Error ? e.message : "Couldn't load share links" })),
+    journeyReport(days, adminId ? [adminId] : [])
+      .catch((e: unknown): { error: string } => ({ error: e instanceof Error ? e.message : "Couldn't load the visitor journey" })),
+  ]);
   const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : "—");
   const monthKey  = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "Australia/Brisbane" }).slice(0, 7);
   const leadsThisMonth = leads.filter((l) => monthKey(l.createdAt) === monthKey(new Date().toISOString())).length;
@@ -197,6 +205,19 @@ export default async function AdminPage() {
           <StatCard icon={ImageIcon}  accent="charcoal"   label="Stored Designs"   value={storedDesigns.toString()}
                     hint={totalGenerations > storedDesigns ? "Saving started 8 Oct 2026" : undefined} />
         </section>
+
+        {/* ── Visitor journey (funnel, rooms, areas, devices) ─── */}
+        {"error" in journey ? (
+          <section className="mb-10">
+            <h2 className="text-2xl font-bold text-charcoal mb-4">Visitor journey</h2>
+            <SetupCard title="Visitor journey not set up yet" detail={journey.error} steps={[
+              "Run supabase/migrations/20261027_funnel_events.sql in the Supabase SQL editor.",
+              "Reload this page.",
+            ]} />
+          </section>
+        ) : (
+          <Journey report={journey} />
+        )}
 
         {/* ── Where customers come from ───────────────────────── */}
         <section className="mb-10">
@@ -355,6 +376,7 @@ export default async function AdminPage() {
                       <Th>Plan</Th>
                       <Th align="right">Generations</Th>
                       <Th>Designs</Th>
+                      <Th>Journey ({days} days)</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -385,6 +407,9 @@ export default async function AdminPage() {
                         </Td>
                         <Td>
                           <UserDesigns email={p.email ?? "—"} designs={designsByUser.get(p.id) ?? []} />
+                        </Td>
+                        <Td>
+                          {"error" in journey ? <span className="text-xs text-charcoal/35">—</span> : <UserJourney person={journey.byUser.get(p.id)} />}
                         </Td>
                       </tr>
                     ))}

@@ -14,6 +14,7 @@ import Image from "next/image";
 import { X, ShieldCheck, Loader2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { RETURN_COOKIE } from "@/lib/authReturn";
+import { track } from "@/lib/track";
 import { cn } from "@/lib/utils";
 
 // ── Supabase client (browser-side, cookie-backed for SSR) ────────
@@ -58,6 +59,8 @@ export default function AuthModal({ onSuccess, onClose, title, message }: AuthMo
   const overlayRef          = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
+
+  useEffect(() => { track("signin_shown"); }, []);
 
   // Close on Escape
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -60,6 +60,7 @@ import { calcBriefCostItems } from "@/lib/projectBrief";
 import type { ProReportInput } from "@/lib/generateProReportPDF";
 import { submitConnectForm } from "@/app/actions/contact";
 import { cn, formatAUD } from "@/lib/utils";
+import { savedPostcode } from "@/lib/track";
 
 interface FormState {
   name:     string;
@@ -308,6 +309,11 @@ export default function ConnectPage() {
     : "Bathroom";
 
   const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", address: "", timeline: "", message: "" });
+  // the postcode from Step 1 (if they gave one) starts the address off
+  useEffect(() => {
+    const pc = savedPostcode();
+    if (pc) setForm((f) => (f.address ? f : { ...f, address: pc }));
+  }, []);
   const [errors, setErrors]       = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);

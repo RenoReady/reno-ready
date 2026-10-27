@@ -1247,6 +1247,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       const pending = restoreBuilderStateFromAuth();
       const restored = useBuilderStore.getState();
       if (restored.roomPhotoUrl) {
+        // the room picker decided to open before the hand-off restored their room
+        setShowRoomRouter(false);
         setStage("design");
         // Only resume the generation if their photo survived the redirect
         if (pending) setShouldAutoGenerate(true);
@@ -1478,6 +1480,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     (async () => {
       const local = await loadLocalDraft();
       if (cancelled) return;
+      // Only offer a design they never generated. Once there's a preview they've seen
+      // the result; it stays in My Account, and a fresh start mustn't overwrite it here.
+      if (local?.render) { await startNewDraft(); return; }
       if (isResumable(local)) {
         setResumeOffer({ local, offer: {
           roomType: local.roomType, updatedAt: local.updatedAt, thumbUrl: local.render ?? local.photo,
@@ -1488,7 +1493,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       // Nothing on this device: offer the newest draft saved to their account
       if (!isAuthed()) return;
       const latest = (await listAccountDrafts())?.[0];
-      if (cancelled || !latest || (!latest.hasPhoto && !latest.hasRender)) return;
+      if (cancelled || !latest || !latest.hasPhoto || latest.hasRender) return;
       setResumeOffer({ accountId: latest.id, offer: {
         roomType: latest.roomType, updatedAt: Date.parse(latest.updatedAt), thumbUrl: latest.thumbUrl,
         hasRender: latest.hasRender, estimate: latest.estimate,

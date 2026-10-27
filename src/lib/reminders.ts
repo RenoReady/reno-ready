@@ -20,7 +20,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { Resend } from "resend";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { RESEND_FROM } from "@/lib/config";
+import { ADMIN_EMAIL, RESEND_FROM } from "@/lib/config";
 import { draftOwners, listDrafts, markDraftReminded, draftImageLink, type DraftSummary } from "@/lib/draftStore";
 import { listLeadsFor } from "@/lib/leadStore";
 import { formatAUD } from "@/lib/utils";
@@ -79,14 +79,18 @@ export function reminderEmail(d: Pick<DraftSummary, "id" | "roomType" | "title" 
   const lead = d.hasRender
     ? `Your ${room} design is saved${d.estimateTotal ? `, with an estimate of <strong>${formatAUD(d.estimateTotal)}</strong>` : ""}. Pick up where you left off: try another look, or send it to a builder for a quote.`
     : `You started designing your ${room} on Reno Ready. Your photo and choices are saved, and it only takes about 30 seconds to see your room transformed.`;
+  const heading = d.hasRender ? `Your ${room} design is ready when you are` : `Your ${room} is one click from a makeover`;
+  // without a render the image is their own "before" photo, so say so
+  const photoLabel = d.hasRender ? "Your design" : "Your photo";
   const unsub = unsubscribeUrl(userId);
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(subject)}</title></head>
 <body style="margin:0;padding:24px 12px;background:#F5F0E6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#2C3E50;">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #EDE5D8;">
-    ${d.thumbUrl ? `<img src="${esc(d.thumbUrl)}" alt="Your ${room} design" width="560" style="display:block;width:100%;height:auto;max-height:320px;object-fit:cover;">` : ""}
+    ${d.thumbUrl ? `<img src="${esc(d.thumbUrl)}" alt="${photoLabel}" width="560" style="display:block;width:100%;height:auto;max-height:320px;object-fit:cover;">
+    <p style="margin:0;padding:8px 28px;background:#F5F0E6;font-size:12px;font-weight:600;color:#6B7480;">${photoLabel}${d.hasRender ? "" : ": here&#39;s where you left off"}</p>` : ""}
     <div style="padding:28px 28px 8px;">
       <p style="margin:0;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#D27D5E;">Reno Ready</p>
-      <h1 style="margin:8px 0 14px;font-size:22px;line-height:1.3;">${esc(d.title)}</h1>
+      <h1 style="margin:8px 0 14px;font-size:22px;line-height:1.3;">${esc(heading)}</h1>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#3E4A57;">${hi}</p>
       <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#3E4A57;">${lead}</p>
       <a href="${link}" style="display:inline-block;background:#D27D5E;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:12px;">Pick up where you left off</a>
@@ -123,6 +127,7 @@ export async function runDraftReminders({ dryRun = false, now = Date.now() } = {
     const { data } = await svc.auth.admin.getUserById(userId);
     const user = data.user;
     if (!user?.email) { skip("no email"); continue; }
+    if (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) { skip("admin"); continue; }   // the owner's test designs
     if (!remindersOn(user)) { skip("unsubscribed"); continue; }
     const last = (user.app_metadata?.reminders as { lastSentAt?: string } | undefined)?.lastSentAt;
     if (last && now - Date.parse(last) < PER_PERSON_GAP) { skip("emailed this week"); continue; }

@@ -551,7 +551,9 @@ function LeadCard({ lead: l }: { lead: LeadWithLinks }) {
           {l.phone && <a href={`tel:${l.phone}`} className="flex items-center gap-1 hover:text-terracotta"><Phone size={12} /> {l.phone}</a>}
           {l.address && <span className="flex items-center gap-1"><MapPin size={12} /> {l.address}</span>}
           {l.timeline && <span className="rounded-full bg-terracotta/10 px-2 py-0.5 font-semibold text-terracotta">{l.timeline}</span>}
+          {l.propertyType && <span className="rounded-full bg-charcoal/5 px-2 py-0.5 font-semibold text-charcoal/70">{l.propertyType}</span>}
         </div>
+        {!!l.otherAreas?.length && <p className="mt-1.5 text-xs text-charcoal/60">Also interested in: <span className="font-semibold text-charcoal/80">{l.otherAreas.join(", ")}</span></p>}
         {l.message && <p className="mt-2 line-clamp-2 text-xs italic text-charcoal/60">&ldquo;{l.message}&rdquo;</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           {l.reportUrl && (

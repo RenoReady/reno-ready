@@ -19,6 +19,7 @@ import type { ProReportInput } from "@/lib/generateProReportPDF";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { saveLead, markLeadEmailed } from "@/lib/leadStore";
 import { logEvent } from "@/lib/funnel";
+import { cleanPropertyType, cleanOtherAreas, strataNote } from "@/lib/property";
 import { cookies, headers } from "next/headers";
 
 // ── Inbound payload from the Connect form ──────────────────────────
@@ -31,6 +32,10 @@ export interface ConnectSubmission {
   address?:  string;
   /** Preferred timeline label, e.g. "1 to 3 Months" */
   timeline?: string;
+  /** e.g. "Townhouse or terrace" (a PROPERTY_TYPES label) */
+  propertyType?: string;
+  /** Other areas they'd like quoted, e.g. ["Laundry", "Outdoor, deck or patio"] */
+  otherAreas?: string[];
   /** Everything needed to build the client's Pro Report PDF here on the server (photos as small JPEG data URLs) */
   reportInput?: ProReportInput;
   /** Why the report couldn't be attached, when it couldn't */
@@ -152,7 +157,9 @@ function renderEmailHtml(s: ConnectSubmission, hasReport = false): string {
               <a href="mailto:${escape(s.email)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.email)}</a>${s.phone ? `  ·  <a href="tel:${escape(s.phone)}" style="color:rgba(255,255,255,0.9);text-decoration:none;">${escape(s.phone)}</a>` : ""}
             </p>
             ${s.address ? `<p style="margin:4px 0 0 0;font-size:13px;color:rgba(255,255,255,0.7);">${escape(s.address)}</p>` : ""}
-            ${s.timeline ? `<p style="margin:10px 0 0 0;"><span style="display:inline-block;background:#D27D5E;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;">Timeline: ${escape(s.timeline)}</span></p>` : ""}
+            ${s.timeline || s.propertyType ? `<p style="margin:10px 0 0 0;">${[s.timeline && `Timeline: ${s.timeline}`, s.propertyType].filter(Boolean).map((t) => `<span style="display:inline-block;background:#D27D5E;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;margin:0 6px 4px 0;">${escape(t as string)}</span>`).join("")}</p>` : ""}
+            ${strataNote(s.propertyType) ? `<p style="margin:4px 0 0 0;font-size:12px;color:#F3C9B7;">${escape(strataNote(s.propertyType)!)}</p>` : ""}
+            ${s.otherAreas?.length ? `<p style="margin:6px 0 0 0;font-size:12px;color:rgba(255,255,255,0.8);">Also interested in: <strong style="color:#fff;">${escape(s.otherAreas.join(", "))}</strong></p>` : ""}
           </td>
           <td align="right" valign="top" style="padding-left:16px;">
             <div style="background:rgba(210,125,94,0.18);border:1px solid rgba(210,125,94,0.4);border-radius:12px;padding:10px 14px;text-align:center;">
@@ -246,6 +253,8 @@ async function buildReportAttachment(payload: ConnectSubmission): Promise<{ atta
       address:  payload.address?.trim().slice(0, 160) || null,
       timeline: payload.timeline?.slice(0, 60) || null,
       message:  payload.message?.trim().slice(0, 1_500) || null,
+      propertyType: payload.propertyType ?? null,
+      otherAreas:   payload.otherAreas ?? [],
     };
     safe.selections = { ...safe.selections, roomPhotoUrl: safe.roomPhotoUrl, generatedImageUrl: safe.generatedImageUrl };
     const { proReportPdfBytes } = await import("@/lib/generateProReportPDF");
@@ -269,6 +278,8 @@ export async function submitConnectForm(payload: ConnectSubmission): Promise<Con
   if (!payload.email?.trim()) return { ok: false, error: "Email is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))
     return { ok: false, error: "Please enter a valid email." };
+  // only values from the lists go to the builder
+  payload = { ...payload, propertyType: cleanPropertyType(payload.propertyType) ?? undefined, otherAreas: cleanOtherAreas(payload.otherAreas) };
 
   // Build the Pro Report here so the attachment never depends on the client's browser
   const { attachment, reportProblem } = await buildReportAttachment(payload);
@@ -345,6 +356,8 @@ async function keepLead(payload: ConnectSubmission, pdf: Buffer | null): Promise
     phone:      clip(payload.phone, 40),
     address:    clip(payload.address, 160),
     timeline:   clip(payload.timeline, 60),
+    propertyType: payload.propertyType ?? null,
+    otherAreas:   payload.otherAreas ?? [],
     message:    clip(payload.message, 1_500),
     room:       (d.room ?? "Bathroom").slice(0, 20),
     estimate:   Number.isFinite(d.estimatedCost) ? d.estimatedCost : 0,

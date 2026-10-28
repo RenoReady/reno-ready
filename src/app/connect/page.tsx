@@ -20,7 +20,10 @@ import {
   Info,
   MapPin,
   CalendarClock,
+  Home,
+  ChevronDown,
 } from "lucide-react";
+import { PROPERTY_TYPES, propertyTypeLabel, otherAreasFor, isStrata } from "@/lib/property";
 import Button from "@/components/ui/Button";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import Card from "@/components/ui/Card";
@@ -69,6 +72,10 @@ interface FormState {
   address:  string;
   timeline: string;
   message:  string;
+  /** PROPERTY_TYPES id */
+  propertyType: string;
+  /** Labels from otherAreasFor */
+  otherAreas:   string[];
 }
 
 interface FormErrors {
@@ -77,6 +84,7 @@ interface FormErrors {
   phone?:    string;
   address?:  string;
   timeline?: string;
+  propertyType?: string;
 }
 
 /** The homeowner's preferred timeline — shown to the builder on the report and email */
@@ -96,6 +104,7 @@ function validate(form: FormState): FormErrors {
                            errors.phone = "Please enter a valid phone number.";
   if (form.address.trim().length < 3) errors.address = "Please add the property address or suburb.";
   if (!form.timeline)      errors.timeline = "Please choose a timeline.";
+  if (!form.propertyType)  errors.propertyType = "Please choose the type of property.";
   return errors;
 }
 
@@ -308,7 +317,7 @@ export default function ConnectPage() {
     : roomType === "bedroom" ? "Bedroom"
     : "Bathroom";
 
-  const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", address: "", timeline: "", message: "" });
+  const [form, setForm]           = useState<FormState>({ name: "", email: "", phone: "", address: "", timeline: "", message: "", propertyType: "", otherAreas: [] });
   // the postcode from Step 1 (if they gave one) starts the address off
   useEffect(() => {
     const pc = savedPostcode();
@@ -383,6 +392,8 @@ export default function ConnectPage() {
         message: form.message.trim() || undefined,
         address:  form.address.trim(),
         timeline: TIMELINE_OPTIONS.find((t) => t.id === form.timeline)?.label,
+        propertyType: propertyTypeLabel(form.propertyType) ?? undefined,
+        otherAreas:   form.otherAreas,
         design: {
           floorTile:        floorLabel ? { id: floorTile?.id ?? floorFormat ?? "custom", name: floorLabel } : null,
           wallTile:         wallLabel  ? { id: wallTile?.id  ?? wallFormat  ?? "custom", name: wallLabel  } : null,
@@ -513,6 +524,66 @@ export default function ConnectPage() {
           {/* ── LEFT: Form + Information Summary ────────────────────── */}
           <div className="flex flex-col gap-6">
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+
+              {/* About the property — the first thing a builder asks */}
+              <Card variant="default" padding="lg">
+                <h2 className="text-lg font-bold text-charcoal mb-6">About Your Property</h2>
+                <div className="flex flex-col gap-5">
+                  <div>
+                    <label htmlFor="property-type" className="mb-2 flex items-center gap-2 text-sm font-semibold text-charcoal">
+                      <Home size={16} className="text-charcoal/50" />
+                      What type of property is it?
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="property-type"
+                        value={form.propertyType}
+                        onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, propertyType: v })); setErrors((er) => ({ ...er, propertyType: undefined })); }}
+                        aria-invalid={!!errors.propertyType}
+                        className={cn(
+                          "w-full appearance-none rounded-2xl border-2 bg-white/70 px-4 py-3 pr-10 text-sm font-semibold transition-colors focus:outline-none focus:border-terracotta",
+                          form.propertyType ? "text-charcoal" : "text-charcoal/45",
+                          errors.propertyType ? "border-red-300" : "border-sand-200 hover:border-terracotta/40",
+                        )}
+                      >
+                        <option value="" disabled>Choose one</option>
+                        {PROPERTY_TYPES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                      </select>
+                      <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-charcoal/40" />
+                    </div>
+                    {errors.propertyType
+                      ? <p className="mt-1.5 text-xs font-medium text-red-600">{errors.propertyType}</p>
+                      : isStrata(form.propertyType)
+                        ? <p className="mt-1.5 text-xs text-charcoal/50">Most apartments and many townhouses need body corporate approval before work starts. We&apos;ll flag it for the builder.</p>
+                        : null}
+                  </div>
+
+                  <fieldset>
+                    <legend className="mb-1 text-sm font-semibold text-charcoal">Thinking about renovating anywhere else?</legend>
+                    <p className="mb-2.5 text-xs text-charcoal/50">Optional. Tick any that apply and the builder can quote them together.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {otherAreasFor(roomType).map((area) => {
+                        const on = form.otherAreas.includes(area);
+                        return (
+                          <button
+                            key={area}
+                            type="button"
+                            role="checkbox"
+                            aria-checked={on}
+                            onClick={() => setForm((f) => ({ ...f, otherAreas: on ? f.otherAreas.filter((a) => a !== area) : [...f.otherAreas, area] }))}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-full border-2 px-3.5 py-1.5 text-xs font-bold transition-all duration-200",
+                              on ? "border-terracotta bg-terracotta/5 text-terracotta" : "border-sand-200 bg-white/60 text-charcoal/65 hover:border-terracotta/40",
+                            )}
+                          >
+                            {on && <CheckCircle2 size={13} />} {area}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                </div>
+              </Card>
 
               <Card variant="default" padding="lg">
                 <h2 className="text-lg font-bold text-charcoal mb-6">Your Contact Details</h2>

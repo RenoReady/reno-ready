@@ -29,6 +29,7 @@ import {
 const styleRows = (id: string | null | undefined): MatRow[] =>
   isDesignStyle(id) ? [{ label: "Style", value: DESIGN_STYLES[id].name }] : [];
 import { formatAUD } from "./utils";
+import { strataNote } from "./property";
 import { isKept, selectionText, KEEP_TEXT } from "./keepExisting";
 
 // ── Input ────────────────────────────────────────────────────────────────────
@@ -95,6 +96,10 @@ export interface ReportClient {
   address?:  string | null;
   /** e.g. "ASAP / Ready to Start" */
   timeline?: string | null;
+  /** e.g. "Townhouse or terrace" */
+  propertyType?: string | null;
+  /** Other areas they'd like quoted */
+  otherAreas?: string[];
   /** The "Additional Notes" the client wrote for the builder */
   message?:  string | null;
 }
@@ -461,9 +466,10 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
     if (client.timeline) { pdf.setFontSize(9.5); pdf.text(client.timeline, col2, y + 11.5); }
     sf(pdf, "normal"); pdf.setFontSize(8); pdf.setTextColor(...CHARCOAL);
     pdf.text([client.phone, client.email].filter(Boolean).join("   ·   ").slice(0, 70), col1, y + 17);
-    if (client.address) {
+    const where = [client.propertyType, client.address].filter(Boolean).join("   ·   ");
+    if (where) {
       sf(pdf, "normal"); pdf.setFontSize(8);
-      const addr = pdf.splitTextToSize(client.address, IW / 2 - 9) as string[];
+      const addr = pdf.splitTextToSize(where, IW / 2 - 9) as string[];
       addr.slice(0, 1).forEach((l) => pdf.text(l, col2, y + 17));
     }
     y += cardH + 5;
@@ -694,6 +700,9 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   const briefLines: { text: string; warn?: boolean }[] = [
     ...(client?.timeline ? [{ text: `Preferred timeline: ${client.timeline}` }] : []),
     ...(client?.address  ? [{ text: `Property: ${client.address}` }] : []),
+    ...(client?.propertyType ? [{ text: `Property type: ${client.propertyType}` }] : []),
+    ...(strataNote(client?.propertyType) ? [{ text: strataNote(client?.propertyType)!, warn: true }] : []),
+    ...(client?.otherAreas?.length ? [{ text: `Also interested in: ${client.otherAreas.join(", ")}` }] : []),
     ...(projectBrief ? [
       { text: `Year of Construction: ${projectBrief.yearBuilt > 0 ? projectBrief.yearBuilt : "Not given"}` },
       { text: `Renovation Scope: ${projectBrief.scope === "full-stripout" ? "Full Strip-out & Rebuild" : projectBrief.scope === "cosmetic-refresh" ? "Cosmetic Refresh" : "Not specified"}` },

@@ -30,6 +30,10 @@ export interface LeadRecord {
   phone:      string | null;
   address:    string | null;
   timeline:   string | null;
+  /** e.g. "Apartment or unit" (briefs from before 28 Oct 2026 don't have it) */
+  propertyType?: string | null;
+  /** Other areas they'd like quoted */
+  otherAreas?:   string[];
   message:    string | null;
   room:       string;
   estimate:   number;

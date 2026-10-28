@@ -30,6 +30,7 @@ import UserDesigns, { type AdminDesign } from "./UserDesigns";
 import Journey, { UserJourney } from "./Journey";
 import { journeyReport } from "@/lib/journeyReport";
 import DesignInsights from "./DesignInsights";
+import GrantPassButton from "./GrantPassButton";
 import { designInsights } from "@/lib/designInsights";
 
 export const dynamic = "force-dynamic";
@@ -415,6 +416,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         </Td>
                         <Td>
                           <PlanPill plan={p.subscription_plan} />
+                          {/* survey thank-you: free accounts only */}
+                          {p.id !== adminId && tierFor(p.subscription_plan, p.subscription_expires_at) === "free" && (
+                            <GrantPassButton userId={p.id} email={p.email ?? "this account"} />
+                          )}
                         </Td>
                         <Td align="right">
                           <span className="font-bold text-charcoal tabular-nums">{p.generation_count ?? 0}</span>

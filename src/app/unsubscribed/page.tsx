@@ -12,7 +12,7 @@ export default async function UnsubscribedPage({ searchParams }: { searchParams:
         <p className="text-sm leading-relaxed text-charcoal/60">
           {failed
             ? "The unsubscribe link looks incomplete. Sign in and turn reminders off under My Account, or email us and we’ll do it."
-            : "We won’t send you any more reminders about unfinished designs. You can turn them back on anytime under My Account."}
+            : "We won’t send you any more reminders or update emails. Emails about things you’ve asked for, like a builder brief or a payment, still come through. You can turn reminders back on anytime under My Account."}
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Link href="/account" className="rounded-xl bg-terracotta px-5 py-2.5 text-sm font-bold text-white hover:bg-terracotta/90">My Account</Link>

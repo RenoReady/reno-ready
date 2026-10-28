@@ -1626,6 +1626,13 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     setVariations(count > 1 ? Array.from({ length: count }, (_, i) => ({ status: "pending" as const, root: i, edit: 0 })) : []);
     goTo("estimate");
 
+    // Something that reset the room while this ran (e.g. the room picker) clears the photo.
+    // The preview is still of that photo, so put it back: the brief and report need both.
+    const keepPhoto = () => {
+      const now = useBuilderStore.getState();
+      if (store.roomPhotoUrl && !now.roomPhotoUrl && now.roomType === store.roomType) setRoomPhotoUrl(store.roomPhotoUrl);
+    };
+
     try {
       const roomLabel = store.roomType === "kitchen" ? "kitchen"
         : store.roomType === "bedroom" ? "bedroom"
@@ -1688,6 +1695,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             pushToHistory(d.imageUrl);
             if (!shown) {
               shown = true;
+              keepPhoto();
               setGeneratedImageUrl(d.imageUrl);
               setGenerateDescription(d.description ?? null);
               setGenerateError(null);
@@ -1732,6 +1740,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       if (!data.success) throw new Error(data.error ?? "Generation failed");
 
+      keepPhoto();
       setGeneratedImageUrl(data.imageUrl ?? null);
       setGenerateDescription(data.description ?? null);
       setGenerateError(null);
@@ -1749,7 +1758,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, userStatus, localGenerationBump, pushToHistory, goTo]);
+  }, [setGeneratedImageUrl, setGenerateDescription, setRoomPhotoUrl, userStatus, localGenerationBump, pushToHistory, goTo]);
 
   const handleGenerate = useCallback(async () => {
     // Every design starts from a photo (theirs or a sample)
@@ -1880,6 +1889,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
       if (slot && data.imageUrl) setVariations((vs) => vs.map((v) => (isSlot(v) ? { ...v, status: "done", url: data.imageUrl } : v)));
       else dropSlot();
+      // as in executeGenerate: a room reset mid-edit mustn't leave the edit without its photo
+      const now = useBuilderStore.getState();
+      if (store.roomPhotoUrl && !now.roomPhotoUrl && now.roomType === store.roomType) setRoomPhotoUrl(store.roomPhotoUrl);
       setGeneratedImageUrl(data.imageUrl ?? null);
       setGenerateDescription(data.description ?? null);
       setGenerateError(null);
@@ -1898,7 +1910,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setIsRefining(false);
       setIsGenerating(false);
     }
-  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setGenerateDescription, pushToHistory]);
+  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setRoomPhotoUrl, setGenerateDescription, pushToHistory]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -2012,7 +2024,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                   setShowRoomRouter(false);
                   // On a room page, another room means another page
                   if (room && r !== room) { router.push(ROOM_PAGES[r].path); return; }
-                  setRoomType(r);
+                  // the same room again keeps their work (setRoomType clears the photo and preview)
+                  const st = useBuilderStore.getState();
+                  if (r !== st.roomType || (!st.roomPhotoUrl && !st.generatedImageUrl && !isGeneratingRef.current)) setRoomType(r);
                   setRoomConfirmed(true);   // don't re-show on back-navigation
                 }}
               />

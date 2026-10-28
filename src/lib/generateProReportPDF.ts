@@ -473,30 +473,46 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   const imgH = 58;
   const imgW = (IW - 5) / 2;
   // an image jsPDF can't take is skipped (placeholder shown) rather than failing the whole report
-  const placeImage = (data: string | null, x: number) => {
+  const placeImage = (data: string | null, x: number, w = imgW) => {
     if (!data) return false;
-    try { pdf.addImage(data, "JPEG", x, y, imgW, imgH); return true; } catch (err) { console.warn("Report image skipped:", err); return false; }
+    try { pdf.addImage(data, "JPEG", x, y, w, imgH); return true; } catch (err) { console.warn("Report image skipped:", err); return false; }
+  };
+  const visionLabel = (x: number, w: number) => {
+    drawRect(pdf, x, y + imgH - 7, w, 7, TERRACOTTA);
+    sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
+    pdf.text("CLIENT'S REQUESTED VISION", x + w / 2, y + imgH - 2.5, { align: "center" });
   };
 
-  if (placeImage(roomImageData, MARGIN)) {
-    drawRect(pdf, MARGIN, y + imgH - 7, imgW, 7, CHARCOAL);
-    sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
-    pdf.text("CURRENT STATE", MARGIN + imgW / 2, y + imgH - 2.5, { align: "center" });
-  } else {
-    drawRect(pdf, MARGIN, y, imgW, imgH, SAND, 3);
-    sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
-    pdf.text("No room photo uploaded", MARGIN + imgW / 2, y + imgH / 2, { align: "center" });
+  // No room photo: the preview sits centred on its own, rather than beside an empty "before" box
+  let soloW = 0;
+  if (!roomImageData && aiImageData) {
+    try {
+      const { width, height } = pdf.getImageProperties(aiImageData);
+      soloW = Math.min(IW, (imgH * width) / height);
+    } catch { soloW = 0; }
   }
 
-  const rx = MARGIN + imgW + 5;
-  if (placeImage(aiImageData, rx)) {
-    drawRect(pdf, rx, y + imgH - 7, imgW, 7, TERRACOTTA);
-    sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
-    pdf.text("CLIENT'S REQUESTED VISION", rx + imgW / 2, y + imgH - 2.5, { align: "center" });
+  if (soloW && placeImage(aiImageData, MARGIN + (IW - soloW) / 2, soloW)) {
+    visionLabel(MARGIN + (IW - soloW) / 2, soloW);
   } else {
-    drawRect(pdf, rx, y, imgW, imgH, [230, 222, 212] as [number, number, number], 3);
-    sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
-    pdf.text("Generate an AI preview first", rx + imgW / 2, y + imgH / 2, { align: "center" });
+    if (placeImage(roomImageData, MARGIN)) {
+      drawRect(pdf, MARGIN, y + imgH - 7, imgW, 7, CHARCOAL);
+      sf(pdf, "bold"); pdf.setFontSize(6.5); pdf.setTextColor(...WHITE);
+      pdf.text("CURRENT STATE", MARGIN + imgW / 2, y + imgH - 2.5, { align: "center" });
+    } else {
+      drawRect(pdf, MARGIN, y, imgW, imgH, SAND, 3);
+      sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
+      pdf.text("No room photo uploaded", MARGIN + imgW / 2, y + imgH / 2, { align: "center" });
+    }
+
+    const rx = MARGIN + imgW + 5;
+    if (placeImage(aiImageData, rx)) {
+      visionLabel(rx, imgW);
+    } else {
+      drawRect(pdf, rx, y, imgW, imgH, [230, 222, 212] as [number, number, number], 3);
+      sf(pdf, "normal"); pdf.setFontSize(7.5); pdf.setTextColor(...GREY_TEXT);
+      pdf.text("Generate an AI preview first", rx + imgW / 2, y + imgH / 2, { align: "center" });
+    }
   }
   y += imgH + 6;
 

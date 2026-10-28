@@ -277,18 +277,6 @@ export default function HiddenCostsPage() {
         </div>
       </section>
 
-      {/* Footer links */}
-      <div className="py-8 px-6 border-t border-sand-200 bg-sand">
-        <div className="max-w-3xl mx-auto flex flex-wrap gap-4 text-sm text-charcoal/40">
-          <Link href="/"       className="hover:text-charcoal/70 transition-colors">← Home</Link>
-          <Link href="/guide"  className="hover:text-charcoal/70 transition-colors">Renovation Guide</Link>
-          <Link href="/gallery" className="hover:text-charcoal/70 transition-colors">Design Gallery</Link>
-          <Link href="/builder" className="hover:text-charcoal/70 transition-colors">Design Tool</Link>
-          <Link href="/privacy" className="hover:text-charcoal/70 transition-colors">Privacy</Link>
-          <Link href="/terms" className="hover:text-charcoal/70 transition-colors">Terms</Link>
-        </div>
-      </div>
-
     </main>
   );
 }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { CONTACT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -154,11 +153,6 @@ export default function PrivacyPage() {
               date.
             </p>
           </Section>
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-sand-200 flex flex-wrap gap-4 text-sm text-charcoal/40">
-          <Link href="/" className="hover:text-charcoal/70 transition-colors">← Home</Link>
-          <Link href="/builder" className="hover:text-charcoal/70 transition-colors">Design Tool</Link>
         </div>
       </div>
     </main>

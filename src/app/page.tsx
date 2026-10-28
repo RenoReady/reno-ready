@@ -623,31 +623,6 @@ export default function LandingPage() {
           </Link>
         </div>
       </section>
-
-      {/* ══════════════════════════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════════════════════════ */}
-      <footer className="border-t border-sand-200 py-10 px-6 bg-sand">
-        <div className="max-w-7xl mx-auto flex flex-col gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <p className="text-sm text-charcoal/40">© {new Date().getFullYear()} Reno Ready. Renovation planning made simple.</p>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-charcoal/40">
-              <Link href="#pricing"      className="hover:text-charcoal/70 transition-colors">Pricing</Link>
-              <Link href="#how-it-works" className="hover:text-charcoal/70 transition-colors">How it works</Link>
-              <Link href="/for-builders" className="hover:text-charcoal/70 transition-colors">For builders</Link>
-              <Link href="/guide"        className="hover:text-charcoal/70 transition-colors">Renovation Guide</Link>
-              <Link href="/gallery"      className="hover:text-charcoal/70 transition-colors">Design Gallery</Link>
-              <Link href="/hidden-costs" className="hover:text-charcoal/70 transition-colors">Hidden Costs</Link>
-              <Link href="/privacy"      className="hover:text-charcoal/70 transition-colors">Privacy</Link>
-              <Link href="/terms"        className="hover:text-charcoal/70 transition-colors">Terms</Link>
-            </div>
-          </div>
-          <p className="text-xs text-charcoal/30 border-t border-sand-200 pt-4">
-            Cost estimates are indicative only and based on current Australian market averages. Always obtain qualified builder quotes before committing to a renovation.
-          </p>
-        </div>
-      </footer>
-
     </div>
   );
 }

@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 };
 
 const SITE_TITLE       = "Reno Ready | Design Your Dream Renovation in Seconds";
-const SITE_DESCRIPTION = "Design your bathroom, kitchen, or bedroom in seconds. Get AI visual previews, instant itemized cost estimates, and builder briefs on Reno Ready.";
+const SITE_DESCRIPTION = "Design your bathroom, kitchen, or bedroom in seconds. Get AI visual previews, instant itemised cost estimates, and builder briefs on Reno Ready.";
 
 export const metadata: Metadata = {
   // absolute URLs for share images and canonical links

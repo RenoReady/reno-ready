@@ -62,11 +62,14 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
   },
   icons: {
+    // the house-and-tick mark alone on white, square, so search results and tabs show it clearly
     icon: [
-      { url: "/logo.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
     ],
-    apple:   [{ url: "/logo.png", type: "image/png", sizes: "512x512" }],
-    shortcut: "/logo.png",
+    apple:   [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+    shortcut: "/favicon.ico",
   },
 };
 

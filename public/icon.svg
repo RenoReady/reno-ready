@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="tick" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F6C3AB"/>
+      <stop offset="1" stop-color="#E9906F"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#D27D5E" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <g transform="translate(256 262) scale(0.33) translate(-960 -950)">
+    <!-- chimney -->
+    <rect x="622" y="613" width="96" height="166" fill="#2C3E50"/>
+    <!-- house outline -->
+    <path d="M495 1372 L490 890 L952 530 L1428 890 L1428 1372" fill="none" stroke="#2C3E50" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- tick -->
+    <polygon points="595,975 702,853 914,1038 1268,642 1390,750 929,1272" fill="url(#tick)" filter="url(#shadow)"/>
+  </g>
+</svg>

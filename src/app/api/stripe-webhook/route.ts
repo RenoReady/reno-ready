@@ -15,6 +15,8 @@
  *       checkout.session.completed
  *       customer.subscription.updated   (renewals, trial ending, cancel at period end)
  *       customer.subscription.deleted   (cancelled or unpaid)
+ *       checkout.session.expired        (left unpaid: one follow-up email)
+ *     (scripts/stripe-founder-setup.mjs --live adds the last one for you)
  *
  * Plans:
  *  projectPass  one-time $19  → "day_pass", access for 7 days
@@ -28,6 +30,7 @@ import Stripe from "stripe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
 import { logEvent } from "@/lib/funnel";
+import { sendCheckoutNudge } from "@/lib/checkoutNudge";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +134,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     await logEvent(null, { step: "paid", userId, detail: plan });
     console.info(`[stripe-webhook] ✓ User ${userId} upgraded to ${planLabel} (expires ${expiresAt.toISOString()}, customer ${stripeCustomerId ?? "guest"})`);
+  }
+
+  // ── Checkout left unpaid: one follow-up email ──────────────────
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const result  = await sendCheckoutNudge(session);
+    console.info(`[stripe-webhook] Checkout ${session.id} expired unpaid: follow-up ${result}`);
   }
 
   // ── Renewal, trial converting, cancellation ─────────────────────

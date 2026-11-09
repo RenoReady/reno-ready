@@ -16,7 +16,8 @@
 import Stripe from "stripe";
 import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
+import { FOUNDER_OFFER, PLANS, PROMO_CODE_PLANS, isPlanKey, type PlanKey } from "@/lib/plans";
+import { founderStatus } from "@/lib/founder";
 import { ATTRIBUTION_COOKIE, attributionMetadata, decodeAttribution, type Attribution } from "@/lib/attribution";
 
 function getStripe() {
@@ -53,9 +54,14 @@ async function getBaseUrl(): Promise<string> {
 /** Pages checkout may send people back to (anything else returns to /builder) */
 const RETURN_PATHS = ["/bathroom", "/kitchen", "/bedroom", "/builder", "/preview", "/account", "/pricing", "/"];
 
+/**
+ * @param promo  FOUNDER_OFFER.code to check out with the founding member price
+ *               already applied. Anything else is ignored.
+ */
 export async function createCheckoutSession(
   plan: PlanKey,
   returnPath?: string,
+  promo?: string,
 ): Promise<{ url: string } | { error: string; needsAuth?: true }> {
   try {
     if (!isPlanKey(plan)) return { error: "Unknown plan" };
@@ -82,12 +88,22 @@ export async function createCheckoutSession(
     // Paid access is tied to the account, so buyers sign in first
     if (!userId) return { error: "Please sign in first so we can attach your plan to your account.", needsAuth: true };
 
+    // Founding member link: apply the code up front (Stripe still enforces the 10-spot cap).
+    // Otherwise leave a "promotion code" box on the plans that take one.
+    // Checkout can't have both, so a founder checkout has no code box.
+    const founder = promo === FOUNDER_OFFER.code && plan === FOUNDER_OFFER.plan ? await founderStatus() : null;
+    const discount = founder
+      ? { discounts: [{ promotion_code: founder.promotionCodeId }] }
+      : PROMO_CODE_PLANS.includes(plan) ? { allow_promotion_codes: true } : {};
+
     const session = await stripe.checkout.sessions.create({
       mode,
       client_reference_id: userId,   // passed back in checkout.session.completed webhook
       customer_email:      email,
-      metadata: { plan, ...attributionMetadata(source) },   // plan for the webhook; src_* = which ad brought them
+      // plan for the webhook; back = the page to send them back to if they don't finish; src_* = which ad brought them
+      metadata: { plan, back, ...(founder && { offer: "founder" }), ...attributionMetadata(source) },
       line_items: [{ price: priceId, quantity: 1 }],
+      ...discount,
       // "I agree to the Terms of Service" tickbox (the link is set in Stripe → Settings → Public details)
       consent_collection: { terms_of_service: "required" },
       ...(mode === "subscription" && {

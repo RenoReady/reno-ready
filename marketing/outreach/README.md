@@ -20,7 +20,7 @@ The list: `brisbane-gold-coast-builders.csv` (A = core, B = secondary).
 - No "quick question" openers (too salesy). No "with your logo on it". No price in the first email (the $29 founder offer goes in the second message).
 - Always end with: Not for you? Just reply "no thanks" and I won't email again. (Spam Act opt-out.)
 - Bold two phrases for skimmers, no more: the pain point and the free mock-up ask.
-- Sign off "Cheers, Braiden", then the signature. Add the signature into the draft itself (from public/email/signature.html): the saved Gmail signature has had stray text in it.
+- Sign off "Cheers, Braiden", then the opt-out line. Create Gmail drafts with includeSignature: true so Gmail adds the saved signature (checked 11 Nov: it has the logo and no stray text). Don't paste the signature HTML into the draft: the Gmail tool strips external images, so the logo goes missing (batch 1 went out without it).
 
 ## Sending
 - 5 a day, from braiden@renoready.com.au in Gmail. Not through Resend: Resend is for the site's own emails and doesn't allow cold email.

@@ -22,6 +22,10 @@ The list: `brisbane-gold-coast-builders.csv` (A = core, B = secondary).
 - Bold two phrases for skimmers, no more: the pain point and the free mock-up ask.
 - Sign off "Cheers, Braiden", then the opt-out line. Create Gmail drafts with includeSignature: true so Gmail adds the saved signature (checked 11 Nov: it has the logo and no stray text). Don't paste the signature HTML into the draft: the Gmail tool strips external images, so the logo goes missing (batch 1 went out without it).
 
+## Tracking link
+- One link per email, in the solution paragraph: "You can see how it works at www.renoready.com.au/b/<business-code>" (e.g. /b/tpk-bathrooms). Clicks show in admin as source "outreach-<business-code>".
+- The Gmail tool wraps every link in a google.com redirect (recipients outside Gmail can see a "Redirect notice" page). Before scheduling, Braiden clicks the link in the draft, chooses Change, and pastes the clean https://www.renoready.com.au/b/<code> address.
+
 ## Sending
 - 5 a day, from braiden@renoready.com.au in Gmail. Not through Resend: Resend is for the site's own emails and doesn't allow cold email.
 - With the Gmail connector: Claude creates the drafts; Braiden uses Schedule send.

@@ -6,12 +6,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowRight, Camera, CheckCircle2, FileText, Images, Layers, Link2, MessageSquareQuote, Palette, Printer, ShieldCheck,
+  ArrowRight, BadgeCheck, Camera, CheckCircle2, FileText, Images, Layers, Link2, MessageSquareQuote, Palette, Printer, ShieldCheck,
 } from "lucide-react";
 import HeroVideo from "@/components/ui/HeroVideo";
 import BuyButton from "@/components/ui/BuyButton";
 import { CONTRACTOR_VIDEO } from "@/lib/roomPages";
-import { PRO_PRICING } from "@/lib/plans";
+import { FOUNDER_OFFER, PRO_PRICING } from "@/lib/plans";
+import { founderStatus } from "@/lib/founder";
 import { CONTACT_EMAIL } from "@/lib/config";
 
 export const metadata: Metadata = {
@@ -51,8 +52,12 @@ const FAQ = [
   { q: "Can I cancel?", a: "Yes. No contracts, cancel anytime in 1-click from My Account. You keep Pro until the end of the period you've paid for." },
 ];
 
-export default function ForBuildersPage() {
+/** Re-check the founding member spots left every 5 minutes */
+export const revalidate = 300;
+
+export default async function ForBuildersPage() {
   const monthly = PRO_PRICING.monthly, annual = PRO_PRICING.annual;
+  const founder = await founderStatus();
   return (
     <div className="min-h-screen bg-sand">
       {/* ── Hero ───────────────────────────────────────────── */}
@@ -154,6 +159,25 @@ export default function ForBuildersPage() {
         <div className="mx-auto max-w-4xl">
           <h2 className="text-center text-3xl font-bold text-charcoal sm:text-4xl">One job pays for a year of Pro</h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-base text-charcoal/60">Up to 500 designs a month, your branding on everything, and no contract.</p>
+          {founder && (
+            <div id="founder" className="mt-10 flex scroll-mt-28 flex-col gap-5 rounded-3xl border-2 border-terracotta bg-terracotta/5 p-7 shadow-warm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2">
+                <p className="inline-flex w-fit items-center gap-1.5 rounded-full bg-terracotta px-3 py-1 text-xs font-bold text-white">
+                  <BadgeCheck size={14} /> Founding member · {founder.left} of {founder.total} spots left
+                </p>
+                <p className="mt-1 text-4xl font-bold text-charcoal">
+                  ${FOUNDER_OFFER.price}<span className="text-lg font-semibold text-charcoal/45">/mo</span>
+                  <span className="ml-3 text-xl font-semibold text-charcoal/35 line-through">${monthly.price}</span>
+                </p>
+                <p className="max-w-md text-sm leading-relaxed text-charcoal/65">
+                  Everything in Pro for the first {founder.total} builders. Your ${FOUNDER_OFFER.price} price stays the same for as long as you stay subscribed.
+                </p>
+              </div>
+              <div className="sm:w-60">
+                <BuyButton plan={FOUNDER_OFFER.plan} promo={FOUNDER_OFFER.code} variant="primary" className="py-3.5" label={<>Claim a founding spot <ArrowRight size={15} /></>} />
+              </div>
+            </div>
+          )}
           <div className="mt-10 grid gap-5 md:grid-cols-2">
             <div className="flex flex-col gap-5 rounded-3xl border border-sand-200 bg-white p-7 shadow-warm-sm">
               <div>

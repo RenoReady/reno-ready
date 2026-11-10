@@ -13,17 +13,19 @@ interface BuyButtonProps {
   /** @deprecated use variant="primary" */
   featured?: boolean;
   className?: string;
+  /** FOUNDER_OFFER.code to check out at the founding member price */
+  promo?: string;
 }
 
-export default function BuyButton({ plan, label, variant, featured, className }: BuyButtonProps) {
-  const { start, pendingPlan, error, authModal } = useCheckout(plan);
+export default function BuyButton({ plan, label, variant, featured, className, promo }: BuyButtonProps) {
+  const { start, pendingPlan, error, authModal } = useCheckout(plan, promo);
   const isPending = pendingPlan === plan;
   const look = variant ?? (featured ? "primary" : "outline");
 
   return (
     <div className="flex flex-col gap-1.5">
       <button
-        onClick={() => start(plan)}
+        onClick={() => start(plan, promo)}
         disabled={isPending}
         className={cn(
           "flex items-center justify-center gap-2 w-full py-3 px-5 rounded-2xl",

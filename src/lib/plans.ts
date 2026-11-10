@@ -169,6 +169,23 @@ export const PLAN_COMPARISON: { label: string; free: boolean | string; pass: boo
   { label: "Your branding on PDF reports",       free: false,          pass: false,          pro: true },
 ];
 
+/**
+ * Founding member offer: Pro monthly at $29 instead of $49, for as long as the
+ * subscription stays active, for the first 10 builders. It's a Stripe promotion
+ * code (a $20-off-forever coupon on the Pro product, capped at 10 redemptions)
+ * made by scripts/stripe-founder-setup.mjs. The site only shows the offer while
+ * that code exists in Stripe and has spots left.
+ */
+export const FOUNDER_OFFER = {
+  code:   "FOUNDER",
+  plan:   "proMonthly" as const,
+  price:  29,
+  spots:  10,
+} as const;
+
+/** Plans whose checkout takes a typed promotion code (the yearly price already has its discount) */
+export const PROMO_CODE_PLANS: readonly PlanKey[] = ["projectPass", "proMonthly"];
+
 /** Pro pricing, monthly vs yearly */
 export const PRO_PRICING = {
   monthly: { plan: "proMonthly" as const, price: 49,  per: "/mo",  sub: "Billed monthly" },

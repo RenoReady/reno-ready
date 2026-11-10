@@ -19,7 +19,8 @@ The list: `brisbane-gold-coast-builders.csv` (A = core, B = secondary).
 - Ask: reply with a photo of a room they're quoting, and Braiden mocks it up for free.
 - No "quick question" openers (too salesy). No "with your logo on it". No price in the first email (the $29 founder offer goes in the second message).
 - Always end with: Not for you? Just reply "no thanks" and I won't email again. (Spam Act opt-out.)
-- Sign off "Cheers, Braiden". The Gmail signature adds the rest.
+- Bold two phrases for skimmers, no more: the pain point and the free mock-up ask.
+- Sign off "Cheers, Braiden", then the signature. Add the signature into the draft itself (from public/email/signature.html): the saved Gmail signature has had stray text in it.
 
 ## Sending
 - 5 a day, from braiden@renoready.com.au in Gmail. Not through Resend: Resend is for the site's own emails and doesn't allow cold email.

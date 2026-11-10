@@ -59,7 +59,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // ── First-touch attribution (page visits only, never overwritten) ──
-  if (request.method === "GET" && !pathname.startsWith("/api/") && !request.cookies.has(ATTRIBUTION_COOKIE)) {
+  // (/b/* outreach links set their own, so the email app's referrer doesn't win)
+  if (request.method === "GET" && !pathname.startsWith("/api/") && !pathname.startsWith("/b/") && !request.cookies.has(ATTRIBUTION_COOKIE)) {
     const src = attributionFrom(request.nextUrl, request.headers.get("referer"), request.nextUrl.hostname);
     if (src) {
       response.cookies.set(ATTRIBUTION_COOKIE, encodeAttribution(src), {

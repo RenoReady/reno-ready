@@ -79,3 +79,54 @@ export async function netByCustomer(excludeEmail: string): Promise<Map<string, n
     return { error: err instanceof Error ? err.message : "Stripe request failed" };
   }
 }
+
+// ── Daily money snapshot (for the health email) ─────────────────────
+
+export interface MoneySnapshot {
+  /** payments since `sinceMs`, and their net (cents) */
+  newPayments: number;
+  newRevenue:  number;
+  /** active subscriptions now, and monthly recurring revenue (cents) */
+  active:      number;
+  mrr:         number;
+  /** subscriptions cancelled since `sinceMs` */
+  cancelled:   number;
+}
+
+/**
+ * What changed in Stripe since `sinceMs`, plus where subscriptions stand now.
+ * MRR comes from each active subscription's latest invoice, so discounts (the
+ * founding member price) count at what's actually charged; yearly plans count
+ * at a twelfth. The admin's own payments and subscriptions are left out.
+ */
+export async function moneySnapshot(excludeEmail: string, sinceMs: number): Promise<MoneySnapshot | { error: string }> {
+  const stripe = stripeClient();
+  if (!stripe) return { error: "Stripe isn't configured" };
+  try {
+    let newPayments = 0, newRevenue = 0;
+    for await (const c of countedCharges(stripe, excludeEmail)) {
+      if ("partial" in c || c.created * 1000 < sinceMs) break;   // newest first
+      newPayments += 1;
+      newRevenue += c.amount_captured - c.amount_refunded;
+    }
+
+    const skip = new Set((await stripe.customers.list({ email: excludeEmail, limit: 20 })).data.map((c) => c.id));
+    const customerOf = (s: Stripe.Subscription) => (typeof s.customer === "string" ? s.customer : s.customer.id);
+
+    let active = 0, mrr = 0;
+    for await (const s of stripe.subscriptions.list({ status: "active", limit: 100, expand: ["data.latest_invoice"] })) {
+      if (skip.has(customerOf(s))) continue;
+      active += 1;
+      const inv = s.latest_invoice;
+      const paid = inv && typeof inv === "object" ? inv.amount_paid : 0;
+      mrr += s.items.data[0]?.price.recurring?.interval === "year" ? paid / 12 : paid;
+    }
+
+    const { data: ended } = await stripe.subscriptions.list({ status: "canceled", limit: 100 });
+    const cancelled = ended.filter((s) => !skip.has(customerOf(s)) && (s.canceled_at ?? 0) * 1000 >= sinceMs).length;
+
+    return { newPayments, newRevenue, active, mrr: Math.round(mrr), cancelled };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Stripe request failed" };
+  }
+}

@@ -4,8 +4,9 @@
  *
  * Covers the last 24 hours: visitors and how far they got, sign-ups (and any
  * that never finished signing in, which is how a broken Google sign-in
- * shows up), previews made and failed, payments and builder briefs, plus
- * warnings when something looks broken.
+ * shows up), previews made and failed, payments and builder briefs, what time
+ * of day people visited and signed up (Brisbane time), plus warnings when
+ * something looks broken.
  */
 
 import { Resend } from "resend";
@@ -15,6 +16,28 @@ import { FUNNEL_STEPS, STEP_LABEL, fetchEvents, groupPeople, type FunnelStep } f
 
 const SITE = "https://www.renoready.com.au";
 const DAY = 86_400_000;
+
+/** Times of day, Brisbane time (no daylight saving, so the bands never shift) */
+export const TIME_BANDS = [
+  { label: "Early morning (5–9am)", from: 5,  to: 9 },
+  { label: "Daytime (9am–5pm)",     from: 9,  to: 17 },
+  { label: "Evening (5–9pm)",       from: 17, to: 21 },
+  { label: "Night (9pm–5am)",       from: 21, to: 29 },
+] as const;
+
+const brisbaneHour = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Brisbane", hour: "numeric", hourCycle: "h23" });
+
+/** How many of these times fall in each band */
+export function byTimeOfDay(isoTimes: string[]): number[] {
+  const counts = TIME_BANDS.map(() => 0);
+  for (const iso of isoTimes) {
+    const h = Number(brisbaneHour.format(new Date(iso)));
+    const hh = h < 5 ? h + 24 : h;   // 0–4am counts as the night that started the evening before
+    const i = TIME_BANDS.findIndex((b) => hh >= b.from && hh < b.to);
+    if (i >= 0) counts[i]++;
+  }
+  return counts;
+}
 
 export interface HealthSummary {
   since: string;
@@ -26,6 +49,9 @@ export interface HealthSummary {
   failed: number;
   failures: string[];
   warnings: string[];
+  /** Per TIME_BANDS: when each visitor first turned up, and when each sign-up happened */
+  visitTimes: number[];
+  signupTimes: number[];
 }
 
 export async function healthSummary(now = Date.now()): Promise<HealthSummary> {
@@ -69,6 +95,8 @@ export async function healthSummary(now = Date.now()): Promise<HealthSummary> {
   return {
     since, people: people.length, steps, signups: newUsers.length, signupsNeverSignedIn: neverSignedIn,
     previews, failed: failedEvents.length, failures, warnings,
+    visitTimes: byTimeOfDay(people.map((p) => p.first)),
+    signupTimes: byTimeOfDay(newUsers.map((u) => u.created_at)),
   };
 }
 
@@ -83,6 +111,8 @@ export function healthEmail(h: HealthSummary) {
   const row = (label: string, value: string | number, strong = false) =>
     `<tr><td style="padding:6px 0;color:#3E4A57;">${label}</td><td style="padding:6px 0;text-align:right;font-weight:${strong ? 800 : 600};color:#2C3E50;">${value}</td></tr>`;
   const funnelRows = FUNNEL_STEPS.map((s) => row(STEP_LABEL[s], h.steps[s] ?? 0)).join("");
+  const timeRows = TIME_BANDS.map((b, i) =>
+    `<tr><td style="padding:6px 0;color:#3E4A57;">${b.label}</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#2C3E50;">${h.visitTimes[i]}</td><td style="padding:6px 0;text-align:right;font-weight:600;color:#2C3E50;">${h.signupTimes[i]}</td></tr>`).join("");
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(subject)}</title></head>
 <body style="margin:0;padding:24px 12px;background:#F5F0E6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#2C3E50;">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:18px;border:1px solid #EDE5D8;padding:26px 26px 18px;">
@@ -101,13 +131,20 @@ export function healthEmail(h: HealthSummary) {
     ${h.failures.length ? `<p style="margin:10px 0 0;font-size:12px;color:#B42318;">Errors: ${h.failures.map(esc).join(" · ")}</p>` : ""}
     <p style="margin:20px 0 6px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#6B7480;">How far people got</p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;">${funnelRows}</table>
+    <p style="margin:20px 0 6px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#6B7480;">When they came (Brisbane time)</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td></td><td style="padding:0 0 4px;text-align:right;font-size:11px;color:#9CA3AF;">Visitors</td><td style="padding:0 0 4px;text-align:right;font-size:11px;color:#9CA3AF;">Sign-ups</td></tr>
+      ${timeRows}
+    </table>
     <p style="margin:22px 0 0;"><a href="${SITE}/admin" style="display:inline-block;background:#D27D5E;color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 18px;border-radius:12px;">Open the dashboard</a></p>
   </div>
 </body></html>`;
   const text = [`${subject}`, "", ...h.warnings.map((w) => `! ${w}`), "",
     `New sign-ups: ${h.signups} (${h.signupsNeverSignedIn} never finished signing in)`,
     `Previews: ${h.previews} made, ${h.failed} failed${h.failures.length ? ` (${h.failures.join("; ")})` : ""}`, "",
-    ...FUNNEL_STEPS.map((s) => `${STEP_LABEL[s]}: ${h.steps[s] ?? 0}`), "", `${SITE}/admin`].join("\n");
+    ...FUNNEL_STEPS.map((s) => `${STEP_LABEL[s]}: ${h.steps[s] ?? 0}`), "",
+    "When they came (Brisbane time): visitors / sign-ups",
+    ...TIME_BANDS.map((b, i) => `${b.label}: ${h.visitTimes[i]} / ${h.signupTimes[i]}`), "", `${SITE}/admin`].join("\n");
   return { subject, html, text };
 }
 

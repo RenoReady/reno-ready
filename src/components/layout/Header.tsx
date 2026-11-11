@@ -166,13 +166,13 @@ export default function Header() {
         {/* ── Right: CTA + account widget ───────────────────────── */}
         <div className="flex items-center gap-2 flex-shrink-0">
 
-          {/* "Start Free" CTA — landing page only, desktop only */}
+          {/* "Start Free" CTA — landing pages, phones included (it's their only way in from the header) */}
           {!isAppRoute && (
             <Link
               href="/builder"
               className={cn(
-                "hidden sm:inline-flex items-center gap-2",
-                "px-5 py-2.5 rounded-xl text-sm font-semibold",
+                "inline-flex items-center gap-2",
+                "px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap",
                 "bg-terracotta text-white shadow-warm-sm",
                 "hover:bg-terracotta-600 transition-all duration-200",
               )}

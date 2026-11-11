@@ -156,13 +156,13 @@ export default function LandingPage() {
                 </div>
 
                 {/* Headline (matches the ads and the share image) */}
-                <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold text-charcoal leading-[1.05] text-balance">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-charcoal leading-[1.05] text-balance">
                   Design your dream reno{" "}
                   <span className="text-terracotta">in seconds.</span>
                 </h1>
 
                 {/* Sub-headline */}
-                <p className="text-xl text-charcoal/60 leading-relaxed max-w-[540px]">
+                <p className="text-lg sm:text-xl text-charcoal/60 leading-relaxed max-w-[540px]">
                   Design your <span className="font-semibold text-terracotta">bathroom</span>, <span className="font-semibold text-terracotta">kitchen</span>,
                   or <span className="font-semibold text-terracotta">bedroom</span> in seconds, get an instant itemised
                   cost estimate, and generate a builder brief.
@@ -170,17 +170,18 @@ export default function LandingPage() {
 
                 {/* Room CTAs */}
                 <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+                  {/* straight to Step 1 of the tool (#configurator), skipping the room page's intro */}
                   <Link
-                    href={ROOM_PAGES.bathroom.path}
+                    href={`${ROOM_PAGES.bathroom.path}#configurator`}
                     className="group inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-terracotta text-white text-lg font-bold shadow-[0_8px_24px_rgba(210,125,94,0.35)] hover:bg-terracotta-600 transition-all duration-200"
                   >
-                    Design Bathroom
+                    Design my bathroom, free
                     <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform duration-200" />
                   </Link>
                   {[ROOM_PAGES.kitchen, ROOM_PAGES.bedroom].map((p) => (
                     <Link
                       key={p.room}
-                      href={p.path}
+                      href={`${p.path}#configurator`}
                       className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl border-2 border-sand-300 bg-white/70 text-charcoal text-base font-bold hover:border-terracotta/50 hover:text-terracotta transition-all duration-200"
                     >
                       {p.exploreLabel}
@@ -190,7 +191,7 @@ export default function LandingPage() {
 
                 {/* Trust badges */}
                 <div className="flex flex-wrap items-center gap-5 pt-1">
-                  {["1 free preview + edit", "No credit card", "Bathrooms · Kitchens · Bedrooms"].map((b) => (
+                  {["No sign-up to start", "1 free preview + edit", "No credit card"].map((b) => (
                     <div key={b} className="flex items-center gap-2 text-sm font-medium text-charcoal/60">
                       <CheckCircle2 size={15} className="text-terracotta" />
                       {b}
@@ -203,7 +204,7 @@ export default function LandingPage() {
             {/* Right: the 30-second homeowner ad, 9:16 (not wrapped in ScrollReveal, so the poster paints immediately) */}
             <HeroVideo
               {...HOME_VIDEO}
-              className="order-first lg:order-none lg:mr-6"
+              className="lg:mr-6"
               label="Reno Ready in 30 seconds: snap your room, pick finishes, see the AI before and after with an itemised cost, then send the brief to a builder"
             />
 

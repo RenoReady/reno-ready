@@ -65,7 +65,8 @@ export default function RoomLanding({ room }: { room: RoomType }) {
             </h1>
             <p className="max-w-xl text-lg leading-relaxed text-charcoal/60">{page.intro}</p>
 
-            <ul className="grid gap-2 sm:grid-cols-2">
+            {/* the feature list is for larger screens; on phones it pushed the button off the first screen */}
+            <ul className="hidden gap-2 sm:grid sm:grid-cols-2">
               {page.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-charcoal/70">
                   <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0 text-terracotta" />
@@ -77,9 +78,9 @@ export default function RoomLanding({ room }: { room: RoomType }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <a
                 href="#configurator"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-7 py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] transition-all hover:bg-blue-700"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-terracotta px-7 py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(210,125,94,0.35)] transition-all hover:bg-terracotta-600"
               >
-                Start with Step 1 <ArrowDown size={18} />
+                Start designing, it&apos;s free <ArrowDown size={18} />
               </a>
               {others.map((o) => (
                 <Link
@@ -91,12 +92,16 @@ export default function RoomLanding({ room }: { room: RoomType }) {
                 </Link>
               ))}
             </div>
+            <p className="-mt-2 flex items-center gap-2 text-sm font-medium text-charcoal/55">
+              <CheckCircle2 size={15} className="flex-shrink-0 text-terracotta" />
+              No sign-up to start · 1 free preview · no credit card
+            </p>
           </div>
 
           {page.video ? (
-            <HeroVideo {...page.video} className="order-first lg:order-none" label={`Reno Ready ${page.room} walkthrough: design, see the cost, then talk to a builder`} />
+            <HeroVideo {...page.video} label={`Reno Ready ${page.room} walkthrough: design, see the cost, then talk to a builder`} />
           ) : (
-            <div className="order-first lg:order-none"><StaticReel page={page} /></div>
+            <div><StaticReel page={page} /></div>
           )}
         </div>
       </section>

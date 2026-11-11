@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/** data-clarity-mask: Clarity blanks out this page if a recording that started elsewhere carries on into it */
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <div data-clarity-mask="True">{children}</div>;
 }

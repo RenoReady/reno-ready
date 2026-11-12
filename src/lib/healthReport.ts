@@ -1,5 +1,6 @@
 /**
- * The daily health email to the admin (server only), sent by the 9am cron
+ * The daily health email to the admin, with a copy to the work inbox
+ * (CONTACT_EMAIL, or HEALTH_EMAIL_CC) (server only), sent by the 9am cron
  * (/api/cron/draft-reminders) straight after the reminder run.
  *
  * Covers the last 24 hours: visitors and how far they got, sign-ups (and any
@@ -13,7 +14,7 @@
 
 import { Resend } from "resend";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { ADMIN_EMAIL } from "@/lib/config";
+import { ADMIN_EMAIL, CONTACT_EMAIL } from "@/lib/config";
 import { FUNNEL_STEPS, STEP_LABEL, fetchEvents, groupPeople, type FunnelEvent, type FunnelStep, type Person } from "@/lib/funnel";
 import { moneySnapshot, type MoneySnapshot } from "@/lib/stripeRevenue";
 import { formatAUD } from "@/lib/utils";
@@ -240,7 +241,12 @@ export async function sendHealthEmail(): Promise<{ sent: boolean; subject?: stri
   if (!process.env.RESEND_API_KEY || !sender || /resend\.dev/i.test(sender)) return { sent: false, error: "RESEND_FROM_EMAIL not set" };
   try {
     const mail = healthEmail(await healthSummary());
-    const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({ from: sender, to: ADMIN_EMAIL, subject: mail.subject, html: mail.html, text: mail.text });
+    // a copy to the work inbox too (HEALTH_EMAIL_CC overrides; "none" turns it off)
+    const ccSetting = process.env.HEALTH_EMAIL_CC?.trim();
+    const cc = ccSetting === "none" ? [] : [ccSetting || CONTACT_EMAIL].filter((e) => e.toLowerCase() !== ADMIN_EMAIL.toLowerCase());
+    const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+      from: sender, to: ADMIN_EMAIL, ...(cc.length && { cc }), subject: mail.subject, html: mail.html, text: mail.text,
+    });
     if (error) throw new Error(error.message);
     return { sent: true, subject: mail.subject };
   } catch (err) {

@@ -29,6 +29,7 @@ import { saveGeneration } from "@/lib/generations";
 import { logEvent } from "@/lib/funnel";
 import { isPaidTier, isProTier } from "@/lib/plans";
 import { getAllowance, canUse, recordUsage, type UsageKind } from "@/lib/usage";
+import { startAnonPreview, markAnonPreviewDone, claimAnonPreviews } from "@/lib/anonPreviews";
 
 // Vercel hobby plan caps serverless functions at 60 s.
 // We set 55 s here so we have time to return a clean error rather than a raw 504.
@@ -373,18 +374,31 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({
-        success:          false,
-        upgrade_required: true,
-        reason:           "auth_required",
-        error:            "Sign in to generate previews.",
-      });
+      // One free preview before signing in (watermarked, 1K). Edits, variations and
+      // anything past the limits in anonPreviews.ts still ask them to sign in.
+      const slot = body.mode !== "refine" && !body.variation ? await startAnonPreview(req, body.roomType) : null;
+      if (!slot || !("id" in slot)) {
+        return NextResponse.json({
+          success:          false,
+          upgrade_required: true,
+          reason:           "auth_required",
+          error:            "Sign in to generate previews.",
+        });
+      }
+      const result = isMockMode() ? await handleMock(body.selections) : await handleReal(body, "1K");
+      await logEvent(req, result.success
+        ? { step: "preview", room: body.roomType, detail: "signed out" }
+        : { step: "preview_failed", room: body.roomType, detail: `signed out: ${result.error ?? "failed"}` });
+      if (result.success) await markAnonPreviewDone(slot.id);
+      return NextResponse.json(result);
     }
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const kind: UsageKind = body.mode === "refine" ? "edit" : "render";
     failedFor = { userId: user.id, room: body.roomType, edit: kind === "edit" };
     const allowance = await getAllowance(user);
+    // a preview made before signing in (this browser, or claimed earlier) is their free one
+    if (allowance.tier === "free" && kind === "render") allowance.rendersUsed += await claimAnonPreviews(req, user.id);
     const hasPro = isPaidTier(allowance.tier);
 
     // 4 variations at once is a Pro feature

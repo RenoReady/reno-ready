@@ -257,3 +257,14 @@ export function useDraftAutosave(enabled: boolean, signedIn: boolean, meta: () =
     };
   }, [enabled, signedIn]);
 }
+
+/** Saves the design (with its preview) to this device right now, e.g. before the Google sign-in redirect */
+export async function saveDraftLocallyNow(estimate: string | null = null): Promise<void> {
+  const st = useBuilderStore.getState();
+  if (!st.roomPhotoUrl && !st.generatedImageUrl) return;
+  await saveLocalDraft({
+    id: currentDraftId(), roomType: st.roomType, snapshot: builderSnapshot(),
+    photo: st.roomPhotoUrl, render: st.generatedImageUrl, description: st.generateDescription,
+    estimate, updatedAt: Date.now(),
+  }).catch(() => { /* storage blocked: the autosave may still have it */ });
+}

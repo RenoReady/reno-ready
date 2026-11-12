@@ -104,6 +104,22 @@ export function builderSnapshot(): Record<string, unknown> {
   };
 }
 
+const RESUME_KEY = "reno_ready_resume_preview";
+
+/** Signing in to save a preview made while signed out: bring that preview back afterwards */
+export function markResumePreviewAfterAuth(): void {
+  try { sessionStorage.setItem(RESUME_KEY, "1"); } catch { /* storage blocked */ }
+}
+
+/** True once, if a preview should be restored after sign-in */
+export function takeResumePreviewAfterAuth(): boolean {
+  try {
+    const v = sessionStorage.getItem(RESUME_KEY) === "1";
+    sessionStorage.removeItem(RESUME_KEY);
+    return v;
+  } catch { return false; }
+}
+
 /**
  * Restore previously saved builder state from sessionStorage.
  * Clears the snapshot after reading so it can't be applied twice.

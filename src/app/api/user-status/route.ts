@@ -9,10 +9,11 @@
  *  renders/edits used + limit for the current period (limit null = no limit)
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { TIER_LIMITS, FREE_GENERATION_LIMIT, isPaidTier, type Tier } from "@/lib/plans";
 import { getAllowance } from "@/lib/usage";
+import { anonPreviewsUsed, claimAnonPreviews } from "@/lib/anonPreviews";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ interface UserStatusResponse {
   editsLimit:      number | null;
 }
 
-export async function GET(): Promise<NextResponse<UserStatusResponse>> {
+export async function GET(req: NextRequest): Promise<NextResponse<UserStatusResponse>> {
   const empty: UserStatusResponse = {
     userId: null, isAdmin: false, isPremium: false, tier: "free",
     generationCount: 0, freeLimit: FREE_GENERATION_LIMIT,
@@ -40,9 +41,12 @@ export async function GET(): Promise<NextResponse<UserStatusResponse>> {
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json(empty);
+    // signed out: their one free preview may already be used on this browser
+    if (!user) return NextResponse.json({ ...empty, rendersUsed: await anonPreviewsUsed(req) });
 
     const a = await getAllowance(user);
+    // a preview made before signing in counts as the free one
+    if (a.tier === "free") a.rendersUsed += await claimAnonPreviews(req, user.id);
     return NextResponse.json({
       userId:          user.id,
       isAdmin:         a.tier === "admin",

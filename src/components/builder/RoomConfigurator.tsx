@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import AuthModal, { isAuthed, markAuthed } from "@/components/auth/AuthModal";
 import Button from "@/components/ui/Button";
-import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth } from "@/lib/store";
+import { useBuilderStore, saveBuilderStateForAuth, restoreBuilderStateFromAuth, markResumePreviewAfterAuth, takeResumePreviewAfterAuth } from "@/lib/store";
 import {
   VANITY_OPTIONS, TAPWARE_OPTIONS,
   FLOOR_FORMATS, WALL_FORMATS, SURFACE_TONES, PAINT_TONES, KEEP_WALLS_PAINT, surfaceSwatch, paintToneFor,
@@ -33,7 +33,7 @@ import ShareModal from "@/components/builder/ShareModal";
 import ProWelcome, { brandPromptDismissed } from "@/components/account/ProWelcome";
 import {
   useDraftAutosave, loadLocalDraft, isResumable, applyDraft, startNewDraft,
-  fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, type LocalDraft,
+  fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, saveDraftLocallyNow, type LocalDraft,
 } from "@/lib/drafts";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
@@ -1247,7 +1247,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       // Restore builder state saved before the OAuth redirect
       const pending = restoreBuilderStateFromAuth();
       const restored = useBuilderStore.getState();
-      if (restored.roomPhotoUrl) {
+      if (takeResumePreviewAfterAuth()) {
+        // signed in to save the preview they made while signed out: open that design again
+        loadLocalDraft().then((d) => { if (isResumable(d)) setPendingResume({ draft: d, generate: false }); });
+      } else if (restored.roomPhotoUrl) {
         // the room picker decided to open before the hand-off restored their room
         setShowRoomRouter(false);
         setStage("design");
@@ -1369,6 +1372,15 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [showAuthModal,      setShowAuthModal]      = useState(false);
   // the sign-in was asked for to open a saved design (not to generate)
   const [authForDraft,       setAuthForDraft]       = useState(false);
+  // signing in to keep a preview made while signed out (no new generation after)
+  const [authForSave,        setAuthForSave]        = useState(false);
+  /** Signed out with a preview: save it on this device, then sign in and come back to it */
+  const askToSave = useCallback(async () => {
+    markResumePreviewAfterAuth();
+    await saveDraftLocallyNow();
+    setAuthForSave(true);
+    setShowAuthModal(true);
+  }, []);
   // Which upgrade pop-up is open (null = none)
   const [paywall,            setPaywall]            = useState<PaywallReason | null>(null);
   const [showBriefModal,     setShowBriefModal]     = useState(false);
@@ -1597,9 +1609,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   const executeGenerate = useCallback(async (count: number = 1) => {
     track("generate", { room: useBuilderStore.getState().roomType });
-    if (!isAuthed()) {
-      saveBuilderStateForAuth(true); // snapshot before OAuth redirect
-      setShowAuthModal(true);
+    // Signed out: the first preview is free without an account (the server enforces
+    // the limits). Once it's used, ask them to sign in to keep it instead.
+    if (!isAuthed() && !userStatus.loading && remaining(userStatus, "render", localGenerationBump) === 0) {
+      void askToSave();
       return;
     }
 
@@ -1613,7 +1626,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
     // Client-side early paywall — avoids a round-trip when we already know
     // the user is over the free limit. The API enforces this server-side too.
-    if (!userStatus.loading && remaining(userStatus, "render", localGenerationBump) === 0) {
+    if (isAuthed() && !userStatus.loading && remaining(userStatus, "render", localGenerationBump) === 0) {
       setPaywall(userStatus.tier === "pass" ? "pass_limit" : "limit");
       return;
     }
@@ -1758,7 +1771,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, setRoomPhotoUrl, userStatus, localGenerationBump, pushToHistory, goTo]);
+  }, [setGeneratedImageUrl, setGenerateDescription, setRoomPhotoUrl, userStatus, localGenerationBump, pushToHistory, goTo, askToSave]);
 
   const handleGenerate = useCallback(async () => {
     // Every design starts from a photo (theirs or a sample)
@@ -1814,6 +1827,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const handleRefine = useCallback(async () => {
     const note = refinementNote.trim();
     if (!note) return;
+    // edits are for signed-in accounts: sign in first, keeping the preview
+    if (!isAuthed()) { void askToSave(); return; }
     const store = useBuilderStore.getState();
 
     // Need a generated image to refine; fall back to original photo if somehow missing
@@ -1910,7 +1925,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setIsRefining(false);
       setIsGenerating(false);
     }
-  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setRoomPhotoUrl, setGenerateDescription, pushToHistory]);
+  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setRoomPhotoUrl, setGenerateDescription, pushToHistory, askToSave]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -2639,6 +2654,21 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         {stage === "estimate" && (
           <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
             <div ref={canvasRef} className="flex flex-col gap-4 min-w-0 scroll-mt-28">
+              {/* Made while signed out: invite them to keep it */}
+              {hasPreview && viewportState === "ready" && !isGenerating && !userStatus.loading && !userStatus.userId && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-charcoal">
+                    Your free preview is ready. <span className="font-normal text-charcoal/65">Sign in to save it and make your free edit.</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void askToSave()}
+                    className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-terracotta px-5 py-3 text-sm font-bold text-white shadow-warm-sm transition-all duration-200 hover:bg-terracotta-600"
+                  >
+                    Save my design
+                  </button>
+                </div>
+              )}
               {/* Happy already? Take them straight to the last step */}
               {hasPreview && viewportState === "ready" && !isGenerating && !refinementMode && (
                 <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3046,8 +3076,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       {showAuthModal && (
         <AuthModal
           {...(authForDraft && { title: "Sign in to open your design", message: <>Your saved design is waiting in your account. Sign in with the same Google account to pick up where you left off.</> })}
-          onSuccess={() => { setShowAuthModal(false); if (!authForDraft) executeGenerate(); }}
-          onClose={() => { setShowAuthModal(false); setAuthForDraft(false); }}
+          {...(authForSave && { title: "Save your design", message: <>Sign in with Google to <strong>keep this design</strong>, make your <strong>free edit</strong> and come back to it on any device. Free, no credit card.</> })}
+          onSuccess={() => { setShowAuthModal(false); if (authForSave) setAuthForSave(false); else if (!authForDraft) executeGenerate(); }}
+          onClose={() => { setShowAuthModal(false); setAuthForDraft(false); if (authForSave) { setAuthForSave(false); takeResumePreviewAfterAuth(); } }}
         />
       )}
 

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Sparkles, SlidersHorizontal, Layers, Droplets,
+  Sparkles, SlidersHorizontal, Layers, Droplets, Camera,
   CheckCircle2, X, Maximize2, Minimize2, ArrowLeftRight,
   RotateCcw, Loader2, AlertCircle, ArrowRight, Zap,
   ShieldCheck, BarChart2, Wrench, MessageSquare, Download,
@@ -36,6 +36,7 @@ import {
   fetchAccountDraft, listAccountDrafts, setDraftHandoff, peekDraftHandoff, saveDraftLocallyNow, type LocalDraft,
 } from "@/lib/drafts";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
+import EmailDesign from "@/components/builder/EmailDesign";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
 import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES } from "@/lib/stylePresets";
@@ -45,7 +46,7 @@ import { type ZoneId } from "@/components/ui/ZoneSwapOverlay";
 import BrushMask, { BRUSH_SIZES, type BrushMaskHandle, type BrushSize } from "@/components/builder/BrushMask";
 import RoomRouter from "@/components/ui/RoomRouter";
 import { track } from "@/lib/track";
-import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, type Stage } from "@/components/builder/Steps";
+import { StepCard, StepTracker, Panel, PhotoStart, SAMPLE_ROOMS, SAMPLE_RESULTS, type Stage } from "@/components/builder/Steps";
 import KeepExistingToggle from "@/components/ui/KeepExistingToggle";
 import DesignNote from "@/components/builder/DesignNote";
 import { isKept } from "@/lib/keepExisting";
@@ -1374,6 +1375,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const [authForDraft,       setAuthForDraft]       = useState(false);
   // signing in to keep a preview made while signed out (no new generation after)
   const [authForSave,        setAuthForSave]        = useState(false);
+  // The sample room: Generate shows its ready-made result (no AI call, free preview kept)
+  const [usingSample,        setUsingSample]        = useState(false);
+  const [exampleShown,       setExampleShown]       = useState(false);
   /** Signed out with a preview: save it on this device, then sign in and come back to it */
   const askToSave = useCallback(async () => {
     markResumePreviewAfterAuth();
@@ -1438,6 +1442,19 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const goTo = useCallback((next: Stage) => {
     setStage(next);
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, []);
+
+  /** From the sample's example result back to Step 1, for their own photo */
+  const tryOwnPhoto = useCallback(() => {
+    setExampleShown(false);
+    setUsingSample(false);
+    genHistoryRef.current = [];
+    historyIdxRef.current = -1;
+    setGenHistory([]);
+    setHistoryIdx(-1);
+    useBuilderStore.getState().setGeneratedImageUrl(null);
+    setViewportState("idle");
+    useBuilderStore.getState().setRoomPhotoUrl(null);   // back to Step 1
   }, []);
 
   // ── Drafts ────────────────────────────────────────────────────────
@@ -1556,6 +1573,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         if (!ctx || !canvas.width || !canvas.height) { fail("We couldn't process that photo. Please try another one."); return; }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setRoomPhotoUrl(canvas.toDataURL("image/jpeg", 0.85));
+        setUsingSample(file.name.startsWith("sample-"));
+        setExampleShown(false);
         setPhotoBusy(false);
         track("photo", { room: useBuilderStore.getState().roomType, detail: file.name.startsWith("sample-") ? "sample" : "own photo" });
         goTo("design");
@@ -1608,7 +1627,20 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   }, []);
 
   const executeGenerate = useCallback(async (count: number = 1) => {
-    track("generate", { room: useBuilderStore.getState().roomType });
+    track("generate", { room: useBuilderStore.getState().roomType, ...(usingSample && count === 1 && { detail: "sample example" }) });
+    // The sample room shows its ready-made result: instant, free, and their free preview is kept for their own photo
+    if (usingSample && count === 1) {
+      const url = SAMPLE_RESULTS[useBuilderStore.getState().roomType];
+      setGeneratedImageUrl(url);
+      setGenerateDescription(null);
+      setGenerateError(null);
+      pushToHistory(url);
+      setExampleShown(true);
+      setViewportState("ready");
+      goTo("estimate");
+      return;
+    }
+    setExampleShown(false);
     // Signed out: the first preview is free without an account (the server enforces
     // the limits). Once it's used, ask them to sign in to keep it instead.
     if (!isAuthed() && !userStatus.loading && remaining(userStatus, "render", localGenerationBump) === 0) {
@@ -1771,7 +1803,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     } finally {
       setIsGenerating(false);
     }
-  }, [setGeneratedImageUrl, setGenerateDescription, setRoomPhotoUrl, userStatus, localGenerationBump, pushToHistory, goTo, askToSave]);
+  }, [setGeneratedImageUrl, setGenerateDescription, setRoomPhotoUrl, userStatus, localGenerationBump, pushToHistory, goTo, askToSave, usingSample]);
 
   const handleGenerate = useCallback(async () => {
     // Every design starts from a photo (theirs or a sample)
@@ -1827,6 +1859,8 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   const handleRefine = useCallback(async () => {
     const note = refinementNote.trim();
     if (!note) return;
+    // the sample's example result can't be edited: start on their own photo
+    if (exampleShown) { tryOwnPhoto(); return; }
     // edits are for signed-in accounts: sign in first, keeping the preview
     if (!isAuthed()) { void askToSave(); return; }
     const store = useBuilderStore.getState();
@@ -1925,7 +1959,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
       setIsRefining(false);
       setIsGenerating(false);
     }
-  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setRoomPhotoUrl, setGenerateDescription, pushToHistory, askToSave]);
+  }, [refinementNote, selectedRegion, maskStrokes, setGeneratedImageUrl, setRoomPhotoUrl, setGenerateDescription, pushToHistory, askToSave, exampleShown, tryOwnPhoto]);
 
   const budgetPct = ((budget - BUDGET_MIN) / (BUDGET_MAX - BUDGET_MIN)) * 100;
 
@@ -2654,23 +2688,42 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         {stage === "estimate" && (
           <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 sm:gap-6 items-start">
             <div ref={canvasRef} className="flex flex-col gap-4 min-w-0 scroll-mt-28">
-              {/* Made while signed out: invite them to keep it */}
-              {hasPreview && viewportState === "ready" && !isGenerating && !userStatus.loading && !userStatus.userId && (
+              {/* The sample's ready-made result: send them to their own photo */}
+              {exampleShown && viewportState === "ready" && !isGenerating && (
                 <div className="flex flex-col gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-semibold text-charcoal">
-                    Your free preview is ready. <span className="font-normal text-charcoal/65">Sign in to save it and make your free edit.</span>
+                    That&apos;s an example result.{" "}
+                    <span className="font-normal text-charcoal/65">Now try it on your own {roomName.toLowerCase()}. Your free preview is still waiting.</span>
                   </p>
                   <button
                     type="button"
-                    onClick={() => void askToSave()}
+                    onClick={tryOwnPhoto}
                     className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-terracotta px-5 py-3 text-sm font-bold text-white shadow-warm-sm transition-all duration-200 hover:bg-terracotta-600"
                   >
-                    Save my design
+                    <Camera size={16} /> Use my own photo
                   </button>
                 </div>
               )}
+              {/* Made while signed out: invite them to keep it */}
+              {!exampleShown && hasPreview && viewportState === "ready" && !isGenerating && !userStatus.loading && !userStatus.userId && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 p-3 pl-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-semibold text-charcoal">
+                      Your free preview is ready. <span className="font-normal text-charcoal/65">Sign in to save it and make your free edit.</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void askToSave()}
+                      className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-terracotta px-5 py-3 text-sm font-bold text-white shadow-warm-sm transition-all duration-200 hover:bg-terracotta-600"
+                    >
+                      Save my design
+                    </button>
+                  </div>
+                  <EmailDesign estimate={shownEstimate} />
+                </div>
+              )}
               {/* Happy already? Take them straight to the last step */}
-              {hasPreview && viewportState === "ready" && !isGenerating && !refinementMode && (
+              {!exampleShown && hasPreview && viewportState === "ready" && !isGenerating && !refinementMode && (
                 <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-semibold text-emerald-900">Love how it looks? Send it to a builder in one step.</p>
                   <button

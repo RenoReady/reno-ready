@@ -64,9 +64,18 @@ export interface HealthSummary {
   /** Outreach email links clicked in the last 7 days, by business */
   outreach: { source: string; people: number }[];
   money: MoneySnapshot | { error: string };
+  /** People who had their design emailed to them ("Email it to me"), last 24 hours */
+  emailLeads: { email: string; room: string | null; estimate: string | null }[];
 }
 
 export interface DayStats { people: number; signups: number; previews: number; paid: number }
+
+/** "Email it to me" leads since a time; [] if the table isn't there yet */
+async function recentEmailLeads(since: string): Promise<HealthSummary["emailLeads"]> {
+  const { data, error } = await createSupabaseServiceRoleClient().from("email_leads")
+    .select("email, room, estimate").gte("created_at", since).order("created_at", { ascending: false }).limit(20);
+  return error ? [] : (data ?? []) as HealthSummary["emailLeads"];
+}
 
 /** Where someone came from: the first source on any of their events, else direct */
 const sourceOf = (p: Person) => p.events.find((e) => e.source)?.source ?? "direct";
@@ -146,6 +155,7 @@ export async function healthSummary(now = Date.now()): Promise<HealthSummary> {
     signupTimes: byTimeOfDay(newUsers.map((u) => u.created_at)),
     avg7, sources: countSources(people).slice(0, 6), outreach,
     money: await moneySnapshot(ADMIN_EMAIL, now - DAY),
+    emailLeads: await recentEmailLeads(since),
   };
 }
 
@@ -197,6 +207,9 @@ export function healthEmail(h: HealthSummary) {
       <tr><td></td><td style="padding:0 0 4px;text-align:right;font-size:11px;color:#9CA3AF;">Last 24h</td><td style="padding:0 0 4px;text-align:right;font-size:11px;color:#9CA3AF;">Daily avg</td></tr>
       ${compareRows}
     </table>
+    ${h.emailLeads.length ? `${heading(`New email leads (${h.emailLeads.length})`)}
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">${h.emailLeads.map((l) => row(`<a href="mailto:${esc(l.email)}" style="color:#2C3E50;">${esc(l.email)}</a>`, esc([l.room, l.estimate].filter(Boolean).join(" · ")))).join("")}</table>
+    <p style="margin:6px 0 0;font-size:12px;color:#6B7480;">They asked for their design by email and agreed to a couple of follow-ups.</p>` : ""}
     ${heading("Money (Stripe)")}
     ${moneyHtml}
     ${heading("Details")}
@@ -226,6 +239,7 @@ export function healthEmail(h: HealthSummary) {
     ...FUNNEL_STEPS.map((s) => `${STEP_LABEL[s]}: ${h.steps[s] ?? 0}`), "",
     "Last 24h vs daily avg of the 7 days before:",
     `Visitors ${h.people} (${h.avg7.people}) · Sign-ups ${h.signups} (${h.avg7.signups}) · Previews ${h.previews} (${h.avg7.previews}) · Paid ${h.steps.paid ?? 0} (${h.avg7.paid})`, "",
+    ...(h.emailLeads.length ? [`New email leads (${h.emailLeads.length}):`, ...h.emailLeads.map((l) => `  ${l.email} (${[l.room, l.estimate].filter(Boolean).join(", ")})`), ""] : []),
     "error" in h.money ? `Stripe: ${h.money.error}`
       : `Money: ${h.money.newPayments} new payments (${formatAUD(h.money.newRevenue / 100)}) · ${h.money.active} active subscriptions · MRR ${formatAUD(h.money.mrr / 100)} · ${h.money.cancelled} cancelled`, "",
     "Where visitors came from:", ...h.sources.map((r) => `  ${r.source}: ${r.people}`),

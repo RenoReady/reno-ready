@@ -13,7 +13,8 @@
 
 import { useEffect, useState } from "react";
 import { savedPostcode, savePostcode, track } from "@/lib/track";
-import { Check, ArrowLeftRight, Camera, ImagePlus, Loader2 } from "lucide-react";
+import { Check, ArrowLeftRight, Camera, ImagePlus, Loader2, Smartphone } from "lucide-react";
+import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
 import type { RoomType } from "@/lib/roomTypes";
 
@@ -164,6 +165,33 @@ export const SAMPLE_ROOMS: Record<RoomType, string> = {
   bedroom:  "/samples/bedroom.jpg",
 };
 
+/** A ready-made result for each sample room: shown instantly, no AI call, no free preview used */
+export const SAMPLE_RESULTS: Record<RoomType, string> = {
+  bathroom: "/samples/bathroom-after.jpg",
+  kitchen:  "/samples/kitchen-after.jpg",
+  bedroom:  "/samples/bedroom-after.jpg",
+};
+
+/** Desktop only: a QR code that opens this step on their phone, where the photo is */
+function PhoneHandoff() {
+  const [svg, setSvg] = useState<string | null>(null);
+  useEffect(() => {
+    const url = `${window.location.origin}${window.location.pathname}#configurator`;
+    QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#2C3E50", light: "#FFFFFF" } })
+      .then(setSvg).catch(() => setSvg(null));
+  }, []);
+  if (!svg) return null;
+  return (
+    <div className="hidden items-center gap-4 rounded-2xl border-2 border-sand-200 bg-white/70 p-3 pr-5 sm:flex">
+      <div className="h-24 w-24 flex-shrink-0 rounded-xl bg-white p-1" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-base font-bold text-charcoal"><Smartphone size={16} className="text-terracotta" /> Photo on your phone?</span>
+        <span className="block text-sm text-charcoal/55">Scan this with your phone camera to carry on there. It opens this step, ready to take or pick a photo.</span>
+      </span>
+    </div>
+  );
+}
+
 export function PhotoStart({ room, onFile, onSample, busy, error }: {
   room:     RoomType;
   onFile:   (file: File) => void;
@@ -198,6 +226,9 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
           <span className="hidden text-sm text-charcoal/55 sm:inline">
             Drag it here, or <span className="font-semibold text-terracotta">choose a photo</span>
           </span>
+          <span className="text-sm text-charcoal/55">
+            Any photo works, even an old one from your camera roll. Mess doesn&apos;t matter: we tidy it up in the design.
+          </span>
         </span>
         <span className="inline-flex items-center gap-2 rounded-2xl bg-charcoal px-6 py-3.5 text-base font-bold text-white sm:hidden">
           <Camera size={18} /> Take or choose photo
@@ -205,6 +236,8 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
       </label>
 
       {error && <p className="text-center text-sm font-semibold text-red-600">{error}</p>}
+
+      <PhoneHandoff />
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-sand-200" />
@@ -222,7 +255,7 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
         <img src={SAMPLE_ROOMS[room]} alt="" className="h-16 w-16 flex-shrink-0 rounded-xl object-cover" />
         <span className="min-w-0 flex-1">
           <span className="block text-base font-bold text-charcoal">Try with a sample {name}</span>
-          <span className="block text-sm text-charcoal/50">One tap — see how it works</span>
+          <span className="block text-sm text-charcoal/50">See an example result. It won&apos;t use your free preview</span>
         </span>
         <span className="text-lg font-bold text-terracotta" aria-hidden>→</span>
       </button>

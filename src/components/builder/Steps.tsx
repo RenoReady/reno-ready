@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { savedPostcode, savePostcode, track } from "@/lib/track";
 import { Check, ArrowLeftRight, Camera, ImagePlus, Loader2, Smartphone } from "lucide-react";
 import QRCode from "qrcode";
+import FinishLater from "@/components/builder/FinishLater";
 import { cn } from "@/lib/utils";
 import type { RoomType } from "@/lib/roomTypes";
 
@@ -172,6 +173,29 @@ export const SAMPLE_RESULTS: Record<RoomType, string> = {
   bedroom:  "/samples/bedroom-after.jpg",
 };
 
+/** The questions people stop to ask before handing over a photo, answered on the spot */
+const STEP1_FAQ = [
+  { q: "Is my photo private?", a: "Yes. Your photo is only used to create your design. We never post it or share it publicly." },
+  { q: "How accurate is the cost?", a: "You get an itemised estimate based on Queensland 2026 market rates, typically within about 12%. It's a realistic starting point to take to builders, not a quote." },
+  { q: "What's free?", a: "Your first preview is free, with no sign-up and no credit card. Sign in (also free) to save it and make a free edit." },
+];
+
+function Step1Faq() {
+  return (
+    <div className="flex flex-col divide-y divide-sand-200 rounded-2xl border-2 border-sand-200 bg-white/70 px-4">
+      {STEP1_FAQ.map((f) => (
+        <details key={f.q} className="group py-2.5">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-charcoal">
+            {f.q}
+            <span className="text-charcoal/40 transition-transform group-open:rotate-45" aria-hidden>+</span>
+          </summary>
+          <p className="pt-1.5 text-sm leading-relaxed text-charcoal/60">{f.a}</p>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 /** Desktop only: a QR code that opens this step on their phone, where the photo is */
 function PhoneHandoff() {
   const [svg, setSvg] = useState<string | null>(null);
@@ -259,6 +283,10 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
         </span>
         <span className="text-lg font-bold text-terracotta" aria-hidden>→</span>
       </button>
+
+      <FinishLater room={room} />
+
+      <Step1Faq />
 
       <PostcodeField room={room} />
     </div>

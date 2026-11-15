@@ -86,7 +86,10 @@ export async function POST(req: NextRequest) {
     });
     if (error) throw new Error(error.message);
 
-    const { error: saveError } = await svc.from("email_leads").insert({ email, room, estimate, visitor_id: visitor });
+    // save the lead; works before the "source" column migration too
+    const lead = { email, room, estimate, visitor_id: visitor };
+    let { error: saveError } = await svc.from("email_leads").insert({ ...lead, source: "design" });
+    if (saveError && /source/i.test(saveError.message)) ({ error: saveError } = await svc.from("email_leads").insert(lead));
     if (saveError) console.warn("[email-design] sent, but couldn't save the lead:", saveError.message);
     return NextResponse.json({ ok: true });
   } catch (err) {

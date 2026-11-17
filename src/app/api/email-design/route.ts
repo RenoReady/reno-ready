@@ -16,6 +16,7 @@ import { Resend } from "resend";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { CONTACT_EMAIL } from "@/lib/config";
 import { VISITOR_COOKIE } from "@/lib/visitor";
+import { canReceiveEmail } from "@/lib/emailDomain";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     const estimate = typeof body.estimate === "string" ? body.estimate.slice(0, 40) : null;
     const image = typeof body.image === "string" ? body.image : "";
     if (!EMAIL.test(email)) return fail("Please enter a valid email address.");
+    if (!(await canReceiveEmail(email))) return fail("That email address can't receive mail. Please check the part after the @.");
     if (!image.startsWith("data:image/jpeg;base64,") || image.length > MAX_IMAGE) return fail("That design couldn't be attached. Please try again.");
 
     const visitor = req.cookies.get(VISITOR_COOKIE)?.value?.slice(0, 64);

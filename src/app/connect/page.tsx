@@ -772,7 +772,7 @@ export default function ConnectPage() {
 
               {/* Itemised Cost Breakdown */}
               <div className="mb-6">
-                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">Detailed Cost Breakdown</h3>
+                <h3 className="text-xs font-bold text-charcoal/45 uppercase tracking-wider mb-3">Itemised Cost Estimate</h3>
                 <div className="rounded-xl border border-sand-200 overflow-hidden">
                   {itemisedCosts.map((item, i) => (
                     <div

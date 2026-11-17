@@ -7,7 +7,7 @@
  *
  * Structure:
  *   Page 1 — Cover: Before/After · Cost Hero · Materials Specification
- *   Page 2 — Full Itemised Cost Breakdown · Project Brief
+ *   Page 2 — Itemised Cost Estimate · Project Brief
  */
 
 import { jsPDF } from "jspdf";
@@ -584,13 +584,13 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
   //  PAGE 2 — Itemised Cost Breakdown + Project Brief
   // ══════════════════════════════════════════════════════════════════
   pdf.addPage();
-  header("Detailed Cost Breakdown", 2);
+  header("Itemised Cost Estimate", 2);
   y = 22;
 
   // Title
   drawRect(pdf, MARGIN, y, 4, 7, TERRACOTTA, 2);
   sf(pdf, "bold"); pdf.setFontSize(13); pdf.setTextColor(...CHARCOAL);
-  pdf.text("Detailed Cost Breakdown", MARGIN + 7, y + 5.5);
+  pdf.text("Itemised Cost Estimate", MARGIN + 7, y + 5.5);
   y += 13;
 
   // Column headers
@@ -692,7 +692,7 @@ async function buildProReportPDF(input: ProReportInput, img: { maxW: number; qua
     if (y + h <= PH - 40) return;
     footer();
     pdf.addPage();
-    header("Detailed Cost Breakdown (continued)", pdf.getNumberOfPages());
+    header("Itemised Cost Estimate (continued)", pdf.getNumberOfPages());
     y = 26;
   };
 
@@ -931,7 +931,7 @@ async function buildProjectReportPDF(input: ProjectReportInput, imagesReady = fa
 
     // cost breakdown: stops above the footer, the rest summed into one line
     sf(pdf, "bold"); pdf.setFontSize(9); pdf.setTextColor(...CHARCOAL);
-    pdf.text("Cost breakdown", MARGIN, ry + 4);
+    pdf.text("Estimated cost breakdown", MARGIN, ry + 4);
     ry += 8;
     const items = r.estimate.items.filter((it) => it.amount !== 0);
     const fit = Math.max(0, Math.floor((PH - 30 - ry - 10) / 6.5));

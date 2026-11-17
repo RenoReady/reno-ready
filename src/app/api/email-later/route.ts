@@ -14,6 +14,7 @@ import { Resend } from "resend";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { CONTACT_EMAIL } from "@/lib/config";
 import { VISITOR_COOKIE } from "@/lib/visitor";
+import { canReceiveEmail } from "@/lib/emailDomain";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     const email = typeof body.email === "string" ? body.email.trim().slice(0, 200) : "";
     const room = typeof body.room === "string" && ROOMS.has(body.room) ? body.room : "bathroom";
     if (!EMAIL.test(email)) return fail("Please enter a valid email address.");
+    if (!(await canReceiveEmail(email))) return fail("That email address can't receive mail. Please check the part after the @.");
 
     const visitor = req.cookies.get(VISITOR_COOKIE)?.value?.slice(0, 64);
     if (!visitor) return fail("Please refresh the page and try again.");

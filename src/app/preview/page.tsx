@@ -402,7 +402,7 @@ export default function PreviewPage() {
             <Card variant="default" padding="none" className="overflow-hidden">
               <div className="px-5 py-4 border-b border-sand-100 flex items-center gap-2">
                 <DollarSign size={14} className="text-terracotta" strokeWidth={2.5} />
-                <h3 className="text-sm font-bold text-charcoal">Cost Breakdown</h3>
+                <h3 className="text-sm font-bold text-charcoal">Itemised Cost Estimate</h3>
               </div>
 
               {/* Base renovation items */}

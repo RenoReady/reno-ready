@@ -348,7 +348,8 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
         }
 
         if (!isRetryable(err)) allBusy = false;
-        tried.push(`${modelName}: ${lastError.slice(0, 120)}`);
+        // drop the SDK's "Error fetching from <url>: " so the status and Google's reason fit
+        tried.push(`${modelName}: ${lastError.replace(/^\[GoogleGenerativeAI Error\]:\s*/, "").replace(/Error fetching from \S+?: (?=\[)/, "").slice(0, 140)}`);
         console.warn(`[generate] ${modelName} failed: ${lastError}`);
         break;  // move to next model
       }

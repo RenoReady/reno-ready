@@ -189,19 +189,26 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
 }
 
 // ── Models — tried in order ────────────────────────────────────────
-// gemini-3.1-flash-image       Nano Banana 2 — primary. 1K for the free
-//                              preview ($0.067/image), 2K for paid plans ($0.101)
-// gemini-3.1-flash-lite-image  Nano Banana 2 Lite — backup when the primary
-//                              is busy or failing; 1K only ($0.034/image)
+// gemini-nano-banana-2.1       Nano Banana 2.1 — primary since 17 Nov 2026.
+//                              Half the price of Nano Banana 2 at Google list
+//                              prices: $0.034 at 1K (free preview), $0.050 at 2K
+//                              (paid plans); input tokens cost more but that's
+//                              well under a cent per preview.
+// gemini-3.1-flash-image       Nano Banana 2 — first backup. Deprecated by Google
+//                              6 Oct 2026 (no shutdown date). $0.067 1K, $0.101 2K.
+// gemini-3.1-flash-lite-image  Nano Banana 2 Lite — last backup; 1K only ($0.034).
 // gemini-2.5-flash-image was shut down by Google on 2 October 2026.
+// A model that errors (busy, retired, refused) falls through to the next, and the
+// failure log records what each one said.
 //
 // GEMINI_IMAGE_MODELS (Vercel setting, optional) overrides the list without a
-// code change, e.g. "gemini-nano-banana-2.1,gemini-3.1-flash-lite-image". The
-// first model gets the 1K/2K size; the rest are tried at their default size.
+// code change, e.g. "gemini-3.1-flash-image,gemini-3.1-flash-lite-image" to go
+// back. The first two get the 1K/2K size; the rest their default size.
 function modelsFor(size: "1K" | "2K"): { name: string; imageSize?: "1K" | "2K" }[] {
   const override = (process.env.GEMINI_IMAGE_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-  if (override.length) return override.map((name, i) => (i === 0 ? { name, imageSize: size } : { name }));
+  if (override.length) return override.map((name, i) => (i < 2 && !name.includes("lite") ? { name, imageSize: size } : { name }));
   return [
+    { name: "gemini-nano-banana-2.1", imageSize: size },
     { name: "gemini-3.1-flash-image", imageSize: size },
     { name: "gemini-3.1-flash-lite-image" },
   ];
@@ -327,6 +334,7 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
             imageUrl:    `data:${mimeType};base64,${data}`,
             description: textPart?.text ?? "Your AI renovation preview is ready.",
             resolution:  size ?? "1K",
+            detail:      modelName,   // which model made it, for the log
           };
         }
 
@@ -407,7 +415,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       }
       const result = isMockMode() ? await handleMock(body.selections) : await handleReal(body, "1K");
       await logEvent(req, result.success
-        ? { step: "preview", room: body.roomType, detail: "signed out" }
+        ? { step: "preview", room: body.roomType, detail: ["signed out", result.detail].filter(Boolean).join(" · ") }
         : { step: "preview_failed", room: body.roomType, detail: `signed out: ${result.detail || result.error || "failed"}` });
       if (result.success) await markAnonPreviewDone(slot.id);
       return NextResponse.json(publicResult(result));
@@ -454,7 +462,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
     }
 
     await logEvent(req, result.success
-      ? { step: kind === "edit" ? "edit" : "preview", userId: user.id, room: body.roomType, detail: body.variation ? "variations" : null }
+      ? { step: kind === "edit" ? "edit" : "preview", userId: user.id, room: body.roomType, detail: [body.variation ? "variations" : null, result.detail].filter(Boolean).join(" · ") || null }
       : { step: "preview_failed", userId: user.id, room: body.roomType, detail: (kind === "edit" ? "edit: " : "") + (result.detail || result.error || "failed") });
     failedFor = null;
 

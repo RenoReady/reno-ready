@@ -2045,7 +2045,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     <Button variant="primary" size="lg" fullWidth onClick={handleGenerate} disabled={isGenerating} className="group min-h-[56px] text-base">
       {isGenerating
         ? <><Loader2 size={18} className="mr-2 animate-spin" />Generating…</>
-        : <><Sparkles size={18} className="mr-2" />Generate Preview<ArrowRight size={18} className="ml-2 group-hover:translate-x-0.5 transition-transform" /></>}
+        : <><Sparkles size={18} className="mr-2" />{usingSample ? "See the example result" : "Generate Preview"}<ArrowRight size={18} className="ml-2 group-hover:translate-x-0.5 transition-transform" /></>}
     </Button>
   );
 
@@ -2148,6 +2148,19 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
             <div className="lg:order-1 flex flex-col gap-5 min-w-0">
               <StepCard step={2}>
+                {/* The sample shows a ready-made example, so say so before they spend time choosing */}
+                {usingSample && (
+                  <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-charcoal/70">
+                      <span className="font-semibold text-charcoal">You&apos;re using our sample {roomName.toLowerCase()}.</span>{" "}
+                      Generate shows a ready-made example and doesn&apos;t apply your choices. Use your own photo to design with them.
+                    </p>
+                    <button type="button" onClick={tryOwnPhoto}
+                      className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-terracotta px-4 py-2.5 text-sm font-bold text-white shadow-warm-sm transition-all duration-200 hover:bg-terracotta-600">
+                      <Camera size={15} /> Use my own photo
+                    </button>
+                  </div>
+                )}
                 {roomType === "bathroom" && (
                   <StyleLibrary looks={BATHROOM_STYLES} activeId={designStyle} onSelect={handleStyle} />
                 )}

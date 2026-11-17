@@ -100,6 +100,8 @@ interface GenerateResponse {
   tier?:             string;
   /** Output resolution: 2K for paid plans, 1K for the free preview */
   resolution?:       "1K" | "2K";
+  /** Server only (stripped before responding): what each model actually said, for the failure log */
+  detail?:           string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -192,7 +194,13 @@ async function handleMock(selections: GenerateRequest["selections"]): Promise<Ge
 // gemini-3.1-flash-lite-image  Nano Banana 2 Lite — backup when the primary
 //                              is busy or failing; 1K only ($0.034/image)
 // gemini-2.5-flash-image was shut down by Google on 2 October 2026.
+//
+// GEMINI_IMAGE_MODELS (Vercel setting, optional) overrides the list without a
+// code change, e.g. "gemini-nano-banana-2.1,gemini-3.1-flash-lite-image". The
+// first model gets the 1K/2K size; the rest are tried at their default size.
 function modelsFor(size: "1K" | "2K"): { name: string; imageSize?: "1K" | "2K" }[] {
+  const override = (process.env.GEMINI_IMAGE_MODELS ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+  if (override.length) return override.map((name, i) => (i === 0 ? { name, imageSize: size } : { name }));
   return [
     { name: "gemini-3.1-flash-image", imageSize: size },
     { name: "gemini-3.1-flash-lite-image" },
@@ -282,6 +290,7 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
   // Try each model; on a 503 retry once after 3 s before moving on
   let lastError = "";
   let allBusy   = true;   // tracks whether every failure was a capacity 503
+  const tried: string[] = [];   // what each model said, for the failure log
 
   for (const { name: modelName, imageSize: size } of modelsFor(resolution)) {
     const imageConfig = {
@@ -321,8 +330,10 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
           };
         }
 
-        // Returned text only — treat as non-retryable failure
-        lastError = "Model returned no image";
+        // Returned text only (often a safety block) — treat as non-retryable failure
+        const finish = candidate?.finishReason, block = result.response.promptFeedback?.blockReason;
+        lastError = `no image${finish ? ` (finish: ${finish})` : ""}${block ? ` (blocked: ${block})` : ""}`;
+        tried.push(`${modelName}: ${lastError}`);
         allBusy   = false;
         console.warn(`[generate] ${modelName} returned no image, trying next model`);
         break;
@@ -337,6 +348,7 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
         }
 
         if (!isRetryable(err)) allBusy = false;
+        tried.push(`${modelName}: ${lastError.slice(0, 120)}`);
         console.warn(`[generate] ${modelName} failed: ${lastError}`);
         break;  // move to next model
       }
@@ -350,6 +362,7 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
     return {
       success: false,
       error:   "Gemini is experiencing high demand right now. Please try again in 30 seconds — it usually clears quickly.",
+      detail:  tried.join(" | "),
     };
   }
 
@@ -357,7 +370,13 @@ async function handleReal(req: GenerateRequest, resolution: "1K" | "2K"): Promis
   return {
     success: false,
     error:   "The AI couldn't generate an image this time. Please try again in a moment.",
+    detail:  tried.join(" | "),
   };
+}
+
+/** The response for the browser: the per-model detail is for our logs only */
+function publicResult({ detail: _detail, ...rest }: GenerateResponse): GenerateResponse {
+  return rest;
 }
 
 
@@ -388,9 +407,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       const result = isMockMode() ? await handleMock(body.selections) : await handleReal(body, "1K");
       await logEvent(req, result.success
         ? { step: "preview", room: body.roomType, detail: "signed out" }
-        : { step: "preview_failed", room: body.roomType, detail: `signed out: ${result.error ?? "failed"}` });
+        : { step: "preview_failed", room: body.roomType, detail: `signed out: ${result.detail || result.error || "failed"}` });
       if (result.success) await markAnonPreviewDone(slot.id);
-      return NextResponse.json(result);
+      return NextResponse.json(publicResult(result));
     }
 
     const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -435,7 +454,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
 
     await logEvent(req, result.success
       ? { step: kind === "edit" ? "edit" : "preview", userId: user.id, room: body.roomType, detail: body.variation ? "variations" : null }
-      : { step: "preview_failed", userId: user.id, room: body.roomType, detail: (kind === "edit" ? "edit: " : "") + (result.error ?? "failed") });
+      : { step: "preview_failed", userId: user.id, room: body.roomType, detail: (kind === "edit" ? "edit: " : "") + (result.detail || result.error || "failed") });
     failedFor = null;
 
     // ── After a successful generation ─────────────────────────────
@@ -467,7 +486,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<GenerateRespo
       });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(publicResult(result));
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

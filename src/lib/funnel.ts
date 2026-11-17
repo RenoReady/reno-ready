@@ -87,7 +87,7 @@ export async function logEvent(req: RequestLike | null, e: EventInput): Promise<
       user_id:    e.userId ?? null,
       step:       e.step,
       room:       e.room && ROOMS.has(e.room) ? e.room : null,
-      detail:     clip(e.detail),
+      detail:     clip(e.detail, 300),   // long enough for a preview failure's per-model reasons
       page:       clip(e.page, 120),
       source:     src?.source ?? null,
       device:     req ? deviceFrom(ua) : null,

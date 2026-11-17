@@ -149,6 +149,9 @@ export async function healthSummary(now = Date.now()): Promise<HealthSummary> {
     warnings.push(`${neverSignedIn} of ${newUsers.length} new sign-ups never finished signing in.`);
   if ((steps.generate ?? 0) >= 3 && previews === 0)
     warnings.push(`${steps.generate} people clicked Generate but no previews were made.`);
+  // Google's prepaid AI credit running out stops every preview: say so plainly
+  if (failedEvents.some((e) => /402|prepayment|billing|quota|RESOURCE_EXHAUSTED/i.test(e.detail ?? "")))
+    warnings.push("Google AI credit or quota has run out, so previews are failing. Top up at aistudio.google.com (Billing) and turn on auto-reload.");
   if (failedEvents.length >= 2 && failedEvents.length / (failedEvents.length + previews) > 0.25)
     warnings.push(`${failedEvents.length} previews failed (${Math.round((failedEvents.length / (failedEvents.length + previews)) * 100)}% of attempts).`);
   if (people.length === 0)

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "14 November 2026";
+const LAST_UPDATED = "19 November 2026";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
             <List items={[
               <><strong>Account details.</strong> When you sign in with Google we receive your email address and a unique account ID. We don&apos;t receive your Google password.</>,
               <><strong>Your designs.</strong> The finishes, room size, budget and notes you choose in the design tool, the AI instructions (prompt) built from them, and the AI-generated preview images. We store each preview with the date and time it was made and the room type.</>,
-              <><strong>Room photos.</strong> If you upload a photo of your room, it&apos;s sent to our AI provider to create your preview.</>,
+              <><strong>Room photos.</strong> If you upload a photo of your room, it&apos;s sent to our AI provider to create your preview. If you send it from your phone to your computer with the QR code, we hold it only until your computer picks it up (deleted then, or after an hour at most).</>,
               <><strong>Drafts.</strong> While you design, your choices, room photo and latest preview are saved automatically so you can pick up where you left off. On your device they&apos;re kept in your browser&apos;s storage. Once you&apos;re signed in, they&apos;re also saved privately to your account and listed under My Account, where you can delete any draft at any time. We keep your 12 most recent drafts.</>,
               <><strong>Usage of free previews.</strong> How many previews you&apos;ve generated, so we can apply the free limit.</>,
               <><strong>Payments.</strong> Your plan and when it expires. Card details are entered directly with Stripe, our payment processor; we never see or store your full card number.</>,

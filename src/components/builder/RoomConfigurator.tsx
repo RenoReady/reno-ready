@@ -37,6 +37,7 @@ import {
 } from "@/lib/drafts";
 import ProjectBriefModal from "@/components/ui/ProjectBriefModal";
 import EmailDesign from "@/components/builder/EmailDesign";
+import PhotoSend from "@/components/builder/PhotoSend";
 import HygieneAdvisoryModal from "@/components/ui/HygieneAdvisoryModal";
 import StyleLibrary from "@/components/ui/StyleLibrary";
 import { BATHROOM_STYLES, KITCHEN_STYLES, BEDROOM_STYLES } from "@/lib/stylePresets";
@@ -1228,11 +1229,15 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
   // The query string we arrived with. The effect below tidies the address bar,
   // so later effects read this instead of window.location.
+  // Opened from the Step 1 QR code on a computer: this phone sends its photo there
+  const [handoffToken,       setHandoffToken]       = useState<string | null>(null);
   const arrivalSearch = useRef<string | null>(null);
   if (arrivalSearch.current === null && typeof window !== "undefined") arrivalSearch.current = window.location.search;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const handoff = params.get("handoff");
+    if (handoff && /^[A-Za-z0-9_-]{20,40}$/.test(handoff)) setHandoffToken(handoff);
 
     if (params.get("authed") === "1" && params.has("draft")) {
       // back from signing in to open a saved design (e.g. a reminder email): the draft effect loads it
@@ -1457,6 +1462,29 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     useBuilderStore.getState().setRoomPhotoUrl(null);   // back to Step 1
   }, []);
 
+  /** A photo sent from their phone via the Step 1 QR code */
+  const receiveFromPhone = useCallback((photo: string) => {
+    setRoomPhotoUrl(photo);
+    setUsingSample(false);
+    setExampleShown(false);
+    track("photo", { room: useBuilderStore.getState().roomType, detail: "from phone" });
+    goTo("design");
+  }, [setRoomPhotoUrl, goTo]);
+
+  /** The phone leaves the hand-off and designs here instead (with the photo it picked, if any) */
+  const designOnThisPhone = useCallback((photo: string | null) => {
+    setHandoffToken(null);
+    const u = new URL(window.location.href);
+    u.searchParams.delete("handoff");
+    window.history.replaceState({}, "", u.toString());
+    if (photo) {
+      setRoomPhotoUrl(photo);
+      setUsingSample(false);
+      track("photo", { room: useBuilderStore.getState().roomType, detail: "own photo" });
+      goTo("design");
+    }
+  }, [setRoomPhotoUrl, goTo]);
+
   // ── Drafts ────────────────────────────────────────────────────────
   /** Loads a draft into the builder, moving to that room's page if needed */
   const resumeDraft = useCallback((d: LocalDraft, generate = false, accountId?: string) => {
@@ -1490,6 +1518,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     const params = new URLSearchParams(window.location.search);
     const arrived = new URLSearchParams(arrivalSearch.current ?? "");
     if (arrived.has("payment_success") || (arrived.has("authed") && !arrived.has("draft"))) return;   // handled above, without asking
+    if (arrived.has("handoff")) return;   // the phone side of the QR code: just sending a photo
     const clean = (key: string) => {
       const u = new URL(window.location.href);
       u.searchParams.delete(key);
@@ -2106,7 +2135,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         {stage === "upload" && (
           <div className="mx-auto w-full max-w-2xl">
             <StepCard step={1}>
-              <PhotoStart room={roomType} onFile={handleFile} onSample={handleSample} busy={photoBusy} error={photoError} />
+              {handoffToken
+                ? <PhotoSend token={handoffToken} room={roomType} onDesignHere={designOnThisPhone} />
+                : <PhotoStart room={roomType} onFile={handleFile} onSample={handleSample} onPhoneHandoff={receiveFromPhone} busy={photoBusy} error={photoError} />}
             </StepCard>
           </div>
         )}

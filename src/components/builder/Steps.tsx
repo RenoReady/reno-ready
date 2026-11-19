@@ -11,7 +11,7 @@
  *   Panel       — an unnumbered section inside a step
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { savedPostcode, savePostcode, track } from "@/lib/track";
 import { Check, ArrowLeftRight, Camera, ImagePlus, Loader2, Smartphone } from "lucide-react";
 import QRCode from "qrcode";
@@ -196,30 +196,86 @@ function Step1Faq() {
   );
 }
 
-/** Desktop only: a QR code that opens this step on their phone, where the photo is */
-function PhoneHandoff() {
+/**
+ * Desktop only: a QR code that opens this step on their phone. With a
+ * hand-off (POST /api/handoff), the photo they send from the phone lands
+ * here by itself: this polls /api/handoff/<token> and passes it to onPhoto.
+ * If the hand-off can't start, the QR still opens this step on the phone.
+ */
+const HANDOFF_POLL_MS = 2500;
+const HANDOFF_LIFETIME_MS = 25 * 60_000;
+
+function PhoneHandoff({ room, onPhoto }: { room: RoomType; onPhoto?: (photo: string) => void }) {
   const [svg, setSvg] = useState<string | null>(null);
+  const [linked, setLinked] = useState(false);
+  const [expired, setExpired] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const onPhotoRef = useRef(onPhoto);
+  useEffect(() => { onPhotoRef.current = onPhoto; }, [onPhoto]);
+
   useEffect(() => {
-    const url = `${window.location.origin}${window.location.pathname}#configurator`;
-    QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#2C3E50", light: "#FFFFFF" } })
-      .then(setSvg).catch(() => setSvg(null));
-  }, []);
+    if (!window.matchMedia("(min-width: 640px)").matches) return;   // phones see the upload button instead
+    let stopped = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const base = `${window.location.origin}${window.location.pathname}`;
+    const draw = (url: string) => QRCode.toString(url, { type: "svg", margin: 1, color: { dark: "#2C3E50", light: "#FFFFFF" } })
+      .then((s) => { if (!stopped) setSvg(s); }).catch(() => { if (!stopped) setSvg(null); });
+
+    (async () => {
+      const res = onPhotoRef.current
+        ? await fetch("/api/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ room }) })
+            .then((r) => r.json()).catch(() => null)
+        : null;
+      if (stopped) return;
+      if (!res?.ok || !res.token) { setLinked(false); void draw(`${base}#configurator`); return; }   // plain link fallback
+      setLinked(true);
+      setExpired(false);
+      void draw(`${base}?handoff=${res.token}#configurator`);
+      const started = Date.now();
+      timer = setInterval(async () => {
+        if (document.hidden) return;
+        if (Date.now() - started > HANDOFF_LIFETIME_MS) { clearInterval(timer); setExpired(true); return; }
+        const r = await fetch(`/api/handoff/${res.token}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+        if (stopped || !r) return;
+        if (r.status === "ready" && typeof r.photo === "string") { clearInterval(timer); onPhotoRef.current?.(r.photo); }
+        else if (r.status === "gone") { clearInterval(timer); setExpired(true); }
+      }, HANDOFF_POLL_MS);
+    })();
+    return () => { stopped = true; clearInterval(timer); };
+  }, [room, attempt]);
+
   if (!svg) return null;
   return (
     <div className="hidden items-center gap-4 rounded-2xl border-2 border-sand-200 bg-white/70 p-3 pr-5 sm:flex">
-      <div className="h-24 w-24 flex-shrink-0 rounded-xl bg-white p-1" aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
+      <div className={cn("h-24 w-24 flex-shrink-0 rounded-xl bg-white p-1", expired && "opacity-20")} aria-hidden dangerouslySetInnerHTML={{ __html: svg }} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 text-base font-bold text-charcoal"><Smartphone size={16} className="text-terracotta" /> Photo on your phone?</span>
-        <span className="block text-sm text-charcoal/55">Scan this with your phone camera to carry on there. It opens this step, ready to take or pick a photo.</span>
+        {linked ? (
+          expired ? (
+            <span className="block text-sm text-charcoal/55">
+              This code has expired.{" "}
+              <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold text-terracotta underline underline-offset-2">Get a new code</button>
+            </span>
+          ) : (
+            <>
+              <span className="block text-sm text-charcoal/55">Scan this with your phone camera, then take or pick a photo. It appears here by itself, so you can choose your finishes on this screen.</span>
+              <span className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-charcoal/40"><Loader2 size={12} className="animate-spin" /> Waiting for your photo…</span>
+            </>
+          )
+        ) : (
+          <span className="block text-sm text-charcoal/55">Scan this with your phone camera to carry on there. It opens this step, ready to take or pick a photo.</span>
+        )}
       </span>
     </div>
   );
 }
 
-export function PhotoStart({ room, onFile, onSample, busy, error }: {
+export function PhotoStart({ room, onFile, onSample, onPhoneHandoff, busy, error }: {
   room:     RoomType;
   onFile:   (file: File) => void;
   onSample: () => void;
+  /** A photo sent from their phone via the QR code (a JPEG data URL) */
+  onPhoneHandoff?: (photo: string) => void;
   /** True while a photo or sample is being prepared */
   busy:     boolean;
   error:    string | null;
@@ -261,7 +317,7 @@ export function PhotoStart({ room, onFile, onSample, busy, error }: {
 
       {error && <p className="text-center text-sm font-semibold text-red-600">{error}</p>}
 
-      <PhoneHandoff />
+      <PhoneHandoff room={room} onPhoto={onPhoneHandoff} />
 
       <div className="flex items-center gap-3">
         <span className="h-px flex-1 bg-sand-200" />

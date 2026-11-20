@@ -130,3 +130,23 @@ export async function moneySnapshot(excludeEmail: string, sinceMs: number): Prom
     return { error: err instanceof Error ? err.message : "Stripe request failed" };
   }
 }
+
+/** Net revenue (cents, after refunds) and number of payments between two times, admin's own left out */
+export async function periodRevenue(excludeEmail: string, fromMs: number, toMs: number): Promise<{ net: number; payments: number } | { error: string }> {
+  const stripe = stripeClient();
+  if (!stripe) return { error: "Stripe isn't configured" };
+  try {
+    let net = 0, payments = 0;
+    for await (const c of countedCharges(stripe, excludeEmail)) {
+      if ("partial" in c) break;
+      const t = c.created * 1000;
+      if (t < fromMs) break;   // newest first: everything after this is older
+      if (t >= toMs) continue;
+      net += c.amount_captured - c.amount_refunded;
+      payments += 1;
+    }
+    return { net, payments };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Stripe request failed" };
+  }
+}

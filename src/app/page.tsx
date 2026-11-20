@@ -426,9 +426,8 @@ export default function LandingPage() {
 
           <ScrollReveal variant="scaleIn" delay={0.1}>
             <BeforeAfterSlider
-              height={480}
-              className="w-full"
-              beforeSrc="/ai-render-sample.png"
+              className="mx-auto w-full max-w-[480px] !h-auto aspect-[3/4]"
+              beforeSrc="/ai-render-sample.jpg"
               afterSrc="/final-build-sample.jpg"
               beforeLabel="AI Render"
               afterLabel="Real Result"
@@ -444,16 +443,15 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="text-xs font-bold text-charcoal/50 uppercase tracking-widest mb-1.5">
-                  Designer Note — prompt sent to AI
+                  Designer Note — what was chosen
                 </p>
-                <p className="text-sm text-charcoal/70 leading-relaxed font-mono">
-                  &ldquo;Renovate this Australian bathroom with large-format Marble Blanc wall tiles,
-                  Nude Travertine herringbone floor, a floating white oak vanity with brushed gold tapware,
-                  and a frameless walk-in shower. Remove the freestanding bath. Budget: $28,000 AUD.
-                  Photorealistic render, natural light.&rdquo;
+                <p className="text-sm text-charcoal/70 leading-relaxed">
+                  Large-format stone-look wall and floor tiles, a blue vertical-tile feature wall,
+                  a walk-in shower with a brushed gold framed screen and rail shower, a tiled niche,
+                  and an arched backlit mirror. The old shower and bath are removed.
                 </p>
                 <p className="text-xs text-charcoal/40 mt-2">
-                  These selections are made in the Reno Ready builder — the prompt is generated automatically.
+                  These selections are made in the Reno Ready builder, and the preview is generated from the room photo.
                 </p>
               </div>
             </div>

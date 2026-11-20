@@ -34,3 +34,14 @@ The list: `brisbane-gold-coast-builders.csv` (A = core, B = secondary).
 
 ## Batches
 - `batch-1.md`: the first 5 (style approved, waiting on email addresses).
+
+## Template v2 (from batch 5): image in the email
+No replies after ~17 businesses and 15 follow-ups with v1, so v2 shows the result inside the email.
+- Subject: "Clients going quiet after the quote?"
+- Opening line about the business, then: "I've been speaking with a few renovators lately, and the same thing keeps coming up: **clients go quiet after the quote because they can't picture the finished room.**"
+- "So I built Reno Ready. Here's a real bathroom: the photo before, its Reno Ready preview, and the finished job:" then the inline image `proof-bathroom.jpg` (attach inline, `cid:att0`).
+- "You upload a photo of the room, pick the finishes with your client, and they see their own room transformed in seconds, with an itemised cost estimate."
+- "**Send me a photo of a room you're quoting and I'll mock it up for free.** Or try it yourself at www.renoready.com.au/b/<code>"
+- Then sign-off, signature (includeSignature), opt-out line.
+- `proof-bathroom.jpg` is before / preview / finished job (1220×540). The preview is a real Reno Ready render, with the rug changed to a plain teal mat in AI Studio (20 Nov). It matches the finished job: stone tiles, blue feature wall, gold-framed screen. The render on its own: `marketing/showreel/assets/preview-teal.jpg` (also on the home page slider).
+- Prestige (info@prestigetilinganddesign.com.au) bounced: no such mailbox.

@@ -651,7 +651,7 @@ function ArchitectViewport({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: await toJpeg(generatedImageUrl, 0.92) }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (!res.ok || !data.url) throw new Error(data.error ?? "Export failed");
       // the link is served as a download, so this saves the file
       const a = document.createElement("a");
@@ -1199,6 +1199,25 @@ interface RoomConfiguratorProps {
   embedded?: boolean;
 }
 
+/**
+ * Reads an API reply as JSON. If the server answered with something else
+ * (e.g. Vercel's "Request Entity Too Large" page), return a readable error
+ * instead of "Unexpected token…".
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJson(res: Response): Promise<any> {
+  try {
+    return await res.json();
+  } catch {
+    return {
+      success: false,
+      error: res.status === 413
+        ? "That image was too large to send. Please try again."
+        : "Something went wrong on our side. Please try again in a moment.",
+    };
+  }
+}
+
 export default function RoomConfigurator({ room, embedded = false }: RoomConfiguratorProps) {
   const router  = useRouter();
   // Top of the tool — each step change scrolls back here
@@ -1720,7 +1739,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         (store.tileStyle ? `, layout=${store.tileStyle}` : "") +
         (store.customNote ? `, custom: ${store.customNote}` : "");
 
-      const postGenerate = async (variation?: number) => (await fetch("/api/generate", {
+      const postGenerate = async (variation?: number) => readJson(await fetch("/api/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1752,7 +1771,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             keepExisting:      store.keepExisting,
           },
         }),
-      })).json();
+      }));
 
       // Pro: four takes at once. The first to finish shows straight away;
       // the rest fill the strip under the preview as they arrive.
@@ -1896,9 +1915,11 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
 
     // Need a generated image to refine; fall back to original photo if somehow missing
     const rawSeed = store.generatedImageUrl ?? store.roomPhotoUrl;
-    const seedImage = rawSeed ? await toJpeg(rawSeed).catch(() => rawSeed) : rawSeed;
+    // 2K renders (and the highlighted copy) are shrunk so both fit under Vercel's 4.5 MB request limit
+    const seedImage = rawSeed ? await toJpeg(rawSeed, 0.85, 1600).catch(() => rawSeed) : rawSeed;
     // the painted area, captured before the render is cleared for the new one
-    const highlighted = maskStrokes > 0 ? await brushRef.current?.highlighted().catch(() => null) ?? null : null;
+    const rawMask = maskStrokes > 0 ? await brushRef.current?.highlighted().catch(() => null) ?? null : null;
+    const highlighted = rawMask ? await toJpeg(rawMask, 0.85, 1600).catch(() => rawMask) : null;
     const roomWord = store.roomType;
 
     // Editing one of the variations: its result joins the strip after that take's last edit (B → B1 → B2)
@@ -1954,7 +1975,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
         }),
       });
 
-      const data = await res.json();
+      const data = await readJson(res);
       if (data.upgrade_required) {
         setPaywall(data.tier === "pass" ? "pass_limit" : data.reason === "edit_limit" ? "refine" : "limit");
         // put the render back so they don't lose it

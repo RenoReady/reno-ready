@@ -1402,6 +1402,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   // The sample room: Generate shows its ready-made result (no AI call, free preview kept)
   const [usingSample,        setUsingSample]        = useState(false);
   const [exampleShown,       setExampleShown]       = useState(false);
+  // Signed out, the sample room shows a ready-made example (so the one free preview is kept
+  // for their own photo). Signed in, the sample is designed for real like any photo.
+  const sampleIsExample = usingSample && !userStatus.loading && !userStatus.userId;
   /** Signed out with a preview: save it on this device, then sign in and come back to it */
   const askToSave = useCallback(async () => {
     markResumePreviewAfterAuth();
@@ -1675,9 +1678,10 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
   }, []);
 
   const executeGenerate = useCallback(async (count: number = 1) => {
-    track("generate", { room: useBuilderStore.getState().roomType, ...(usingSample && count === 1 && { detail: "sample example" }) });
-    // The sample room shows its ready-made result: instant, free, and their free preview is kept for their own photo
-    if (usingSample && count === 1) {
+    const showExample = usingSample && count === 1 && !isAuthed();
+    track("generate", { room: useBuilderStore.getState().roomType, ...(showExample && { detail: "sample example" }) });
+    // Signed out, the sample room shows its ready-made result: instant, free, and their free preview is kept for their own photo
+    if (showExample) {
       const url = SAMPLE_RESULTS[useBuilderStore.getState().roomType];
       setGeneratedImageUrl(url);
       setGenerateDescription(null);
@@ -2095,7 +2099,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
     <Button variant="primary" size="lg" fullWidth onClick={handleGenerate} disabled={isGenerating} className="group min-h-[56px] text-base">
       {isGenerating
         ? <><Loader2 size={18} className="mr-2 animate-spin" />Generating…</>
-        : <><Sparkles size={18} className="mr-2" />{usingSample ? "See the example result" : "Generate Preview"}<ArrowRight size={18} className="ml-2 group-hover:translate-x-0.5 transition-transform" /></>}
+        : <><Sparkles size={18} className="mr-2" />{sampleIsExample ? "See the example result" : "Generate Preview"}<ArrowRight size={18} className="ml-2 group-hover:translate-x-0.5 transition-transform" /></>}
     </Button>
   );
 
@@ -2158,7 +2162,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <StepCard step={1}>
               {handoffToken
                 ? <PhotoSend token={handoffToken} room={roomType} onDesignHere={designOnThisPhone} />
-                : <PhotoStart room={roomType} onFile={handleFile} onSample={handleSample} onPhoneHandoff={receiveFromPhone} busy={photoBusy} error={photoError} />}
+                : <PhotoStart room={roomType} onFile={handleFile} onSample={handleSample} sampleIsExample={!userStatus.userId} onPhoneHandoff={receiveFromPhone} busy={photoBusy} error={photoError} />}
             </StepCard>
           </div>
         )}
@@ -2201,7 +2205,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
             <div className="lg:order-1 flex flex-col gap-5 min-w-0">
               <StepCard step={2}>
                 {/* The sample shows a ready-made example, so say so before they spend time choosing */}
-                {usingSample && (
+                {sampleIsExample && (
                   <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-terracotta/25 bg-terracotta/5 p-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-charcoal/70">
                       <span className="font-semibold text-charcoal">You&apos;re using our sample {roomName.toLowerCase()}.</span>{" "}
@@ -2869,7 +2873,7 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                     <div className="flex gap-3">
                       {/* Orange — enter refinement mode */}
                       <button
-                        onClick={() => (lockedEdits ? openEditsPaywall() : setRefinementMode(true))}
+                        onClick={() => (exampleShown ? tryOwnPhoto() : lockedEdits ? openEditsPaywall() : setRefinementMode(true))}
                         className={cn(
                           "flex items-center justify-center gap-2 flex-1 py-4 rounded-2xl",
                           "bg-terracotta text-white text-sm font-bold",
@@ -2877,9 +2881,9 @@ export default function RoomConfigurator({ room, embedded = false }: RoomConfigu
                           "transition-all duration-200",
                         )}
                       >
-                        {lockedEdits ? <Lock size={15} /> : <Sparkles size={16} />}
-                        Not quite right?
-                        {showCounter && editsLeft !== null && (
+                        {exampleShown ? <Camera size={16} /> : lockedEdits ? <Lock size={15} /> : <Sparkles size={16} />}
+                        {exampleShown ? "Edit your own photo" : "Not quite right?"}
+                        {!exampleShown && showCounter && editsLeft !== null && (
                           <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                             {editsLeft === 0 ? "Upgrade" : userStatus.tier === "free" ? "1 free edit" : `${editsLeft} left`}
                           </span>

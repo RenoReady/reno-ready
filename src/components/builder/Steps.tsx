@@ -270,10 +270,12 @@ function PhoneHandoff({ room, onPhoto }: { room: RoomType; onPhoto?: (photo: str
   );
 }
 
-export function PhotoStart({ room, onFile, onSample, onPhoneHandoff, busy, error }: {
+export function PhotoStart({ room, onFile, onSample, sampleIsExample = true, onPhoneHandoff, busy, error }: {
   room:     RoomType;
   onFile:   (file: File) => void;
   onSample: () => void;
+  /** Signed out, the sample shows a ready-made example; signed in, it's designed for real */
+  sampleIsExample?: boolean;
   /** A photo sent from their phone via the QR code (a JPEG data URL) */
   onPhoneHandoff?: (photo: string) => void;
   /** True while a photo or sample is being prepared */
@@ -335,7 +337,7 @@ export function PhotoStart({ room, onFile, onSample, onPhoneHandoff, busy, error
         <img src={SAMPLE_ROOMS[room]} alt="" className="h-16 w-16 flex-shrink-0 rounded-xl object-cover" />
         <span className="min-w-0 flex-1">
           <span className="block text-base font-bold text-charcoal">Try with a sample {name}</span>
-          <span className="block text-sm text-charcoal/50">See an example result. It won&apos;t use your free preview</span>
+          <span className="block text-sm text-charcoal/50">{sampleIsExample ? "See an example result. It won\u2019t use your free preview" : "Try your choices on our photo"}</span>
         </span>
         <span className="text-lg font-bold text-terracotta" aria-hidden>→</span>
       </button>

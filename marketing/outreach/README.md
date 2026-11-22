@@ -8,6 +8,7 @@ Goal: a first Reno Ready Pro sale (founding member, $29/month) before the end of
 - **P — Prospect:** posts before/afters, sells straight to homeowners, quotes in person, already uses some software.
 - **E — Employees:** 1–15 (smaller is fine: the price is low).
 - Area: Brisbane, Logan, Redlands, Ipswich, Gold Coast (estimates use QLD pricing).
+- Only pick businesses with a clearly identifiable website of their own (not just an Oneflare/Houzz listing). More than 5 Google reviews is a bonus. (Braiden, 22 Nov: 3 of batch 5 were directory-only and had no email.)
 - Skip: volume/new-home builders, commercial fit-outs, subcontract-only trades, franchises, anyone outside Australia.
 
 The list: `brisbane-gold-coast-builders.csv` (A = core, B = secondary).

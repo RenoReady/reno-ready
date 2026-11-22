@@ -45,3 +45,8 @@ src/
 npm install
 npm run dev
 ```
+
+## Pull requests (Braiden's rule, 22 Nov 2026)
+
+- Claude merges its own pull requests once the build and Vercel preview pass (about 95% of changes).
+- Ask Braiden to check before merging anything big: changes that affect the whole site (layout, navigation, branding, pricing or plans, payments, sign-in) or anything risky.

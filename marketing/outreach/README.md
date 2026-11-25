@@ -46,3 +46,10 @@ No replies after ~17 businesses and 15 follow-ups with v1, so v2 shows the resul
 - Then sign-off, signature (includeSignature), opt-out line.
 - `proof-bathroom.jpg` is before / preview / finished job (1220×540). The preview is a real Reno Ready render, with the rug changed to a plain teal mat in AI Studio (20 Nov). It matches the finished job: stone tiles, blue feature wall, gold-framed screen. The render on its own: `marketing/showreel/assets/preview-teal.jpg` (also on the home page slider).
 - Prestige (info@prestigetilinganddesign.com.au) bounced: no such mailbox.
+
+## Template v3 test: "your own job, mocked up" (week of 30 Nov)
+Braiden approved trying this on about 5 of the most promising businesses.
+- Take a "before" photo from the business's own website or Instagram (a job in progress or an old room), run it through Reno Ready, and send them the result: their own before beside the Reno Ready preview.
+- One-to-one only. Never publish their photo or use it anywhere else.
+- Short email: "I ran one of your before photos through Reno Ready. Here's what your client would have seen at the quote:" then the image, then the "try it on your next quote" line and the /b/<code> link.
+- Compare replies and /b/ clicks with v2 (template v2, batches 5–7).
